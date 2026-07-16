@@ -26,7 +26,7 @@ manual process), and what must the AI beat, by how much, to justify itself? -->
 
 | Actor | Type | What they do today | What the AI does for them |
 |-------|------|--------------------|--------------------------|
-| <!-- name --> | <!-- internal / external / system --> | <!-- current state --> | <!-- AI's role --> |
+| <!-- name --> | {{ primary_users }} <!-- from scaffold: refine --> | <!-- current state --> | <!-- AI's role --> |
 
 ---
 
@@ -34,6 +34,8 @@ manual process), and what must the AI beat, by how much, to justify itself? -->
 
 <!-- One paragraph or lightweight mermaid diagram: people + systems + connections.
      Draw only what exists or will exist in this POC — not the full future state. -->
+
+**External systems (from scaffold):** {{ external_systems | join(', ') if external_systems else 'none declared' }}
 
 ---
 
@@ -56,9 +58,15 @@ manual process), and what must the AI beat, by how much, to justify itself? -->
 |----------|--------|--------|-----------|
 | Auth / identity | <!-- Resolved / Open --> | | |
 | Data model ownership | <!-- Resolved / Open --> | | |
-| AI approach | <!-- retrieval / generation / automation / orchestration --> | | |
+| AI approach | Resolved | {{ project_type }} | Set at scaffold time — revisit if the shape changes |
 | Data sensitivity | Resolved | {{ data_sensitivity }} | Set at scaffold time |
+| Deployment target | Resolved | {{ deployment_target }} | Set at scaffold time |
 | Multi-tenancy | <!-- Resolved / Open --> | | |
+{%- if is_agent_shaped %}
+| Agent tools | Resolved | {{ agent_tools | join(', ') if agent_tools else 'none' }} | Set at scaffold time |
+| Agent memory | Resolved | {{ agent_memory }} | Set at scaffold time{% if agent_memory == 'long_term' %} — postgres checkpointer dependency seeded on{% endif %} |
+| Human approval | Resolved | {{ human_approval }} | Set at scaffold time — constrains every tool that writes to an external system |
+{%- endif %}
 
 ---
 

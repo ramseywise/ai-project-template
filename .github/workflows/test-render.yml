@@ -2,7 +2,7 @@ name: Test template renders
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   pull_request:
   workflow_dispatch:
 
@@ -14,10 +14,14 @@ jobs:
       matrix:
         include:
           # --- render+lint tier ---
-          - name: defaults
-            args: ""
+          # (no plain "defaults" row — defaults-tested below renders the same
+          # config and additionally runs the test suite, fully subsuming it)
           - name: layering-only
-            args: "-d scaffold_full_project=false"
+            args: "-d project_type=existing_repo"
+          - name: project_type-mcp_server
+            args: "-d project_type=mcp_server"
+          - name: project_type-eval_suite
+            args: "-d project_type=eval_suite"
           - name: primary_chat_agent-lg_agent
             args: "-d primary_chat_agent=lg_agent"
           - name: primary_chat_agent-adk_agent
@@ -74,9 +78,12 @@ jobs:
       # .agents/ is vendored reference material that mentions copier variables in
       # prose (e.g. framework-selection's SKILL.md) — excluded here for the same
       # reason the generated Makefile's LINT_PATHS and pre-commit exclude it.
+      # {{prompt}}/{{question}} are promptfoo's own runtime template syntax, not
+      # unrendered copier Jinja — filtered by pattern (not by excluding the whole
+      # file, which also carries real copier substitutions worth checking).
       - name: Check for leftover Jinja
         run: |
-          if grep -rn '{{' out/ --exclude-dir='.agents' --include='*.py' --include='*.md' --include='*.toml' --include='*.yaml' --include='*.yml' | grep -v 'font-family\|border-collapse\|padding: 0.4rem\|background: #f2f2f2\|margin-bottom\|font-weight: bold'; then
+          if grep -rn '{{' out/ --exclude-dir='.agents' --include='*.py' --include='*.md' --include='*.toml' --include='*.yaml' --include='*.yml' | grep -v 'font-family\|border-collapse\|padding: 0.4rem\|background: #f2f2f2\|margin-bottom\|font-weight: bold\|{{prompt}}\|{{question}}'; then
             echo "Leftover unrendered Jinja found"
             exit 1
           fi
@@ -84,12 +91,16 @@ jobs:
       # Delegates to the render's own `make lint-check` (LINT_PATHS) rather than
       # repo-wide ruff — .claude/ ships vendored reference scripts (mcp-builder)
       # that are deliberately outside the project's lint boundary.
+      # Lint needs only the dev group (ruff), not the full agent runtime
+      # (sentence-transformers/torch, ~2GB) — sync just dev and stop `uv run`
+      # from re-syncing the project. Test-tier jobs sync the full runtime later
+      # via `uv run pytest`'s own auto-sync.
       - name: Lint rendered project
         working-directory: out
         run: |
           if [ -f pyproject.toml ]; then
-            uv sync --group dev
-            make lint-check
+            uv sync --only-group dev
+            UV_NO_SYNC=1 make lint-check
           fi
 
       - name: Run Python tests

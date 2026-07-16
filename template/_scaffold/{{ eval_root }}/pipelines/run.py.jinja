@@ -29,6 +29,7 @@ from pydantic import BaseModel
 
 from core.models import SearchResult
 from evals.graders.citation import grade_answer_overlap, grade_retrieval
+from evals.graders.custom import all_graders
 {%- if include_ragas_grader %}
 from evals.graders.ragas_grader import grade_with_ragas
 {%- endif %}
@@ -69,6 +70,9 @@ class HeuristicReport(BaseModel):
     hit_rate: float
     mean_reciprocal_rank: float
     mean_answer_overlap: float | None
+    # Project-specific metrics from evals/graders/custom/ — averaged per-row
+    # scores keyed by registered grader name; gateable via targets.yaml.
+    custom_scores: dict[str, float] = {}
 {%- if include_ragas_grader %}
     mean_ragas_faithfulness: float | None = None
     mean_ragas_answer_relevancy: float | None = None
@@ -112,6 +116,8 @@ def _check_targets(report: HeuristicReport, targets: dict[str, float]) -> list[s
     failures: list[str] = []
     for metric, target in targets.items():
         actual = getattr(report, metric, None)
+        if actual is None:
+            actual = report.custom_scores.get(metric)
         if actual is None:
             print(f"target {metric}: n/a (not measured this run — skipped)")
             continue
@@ -254,6 +260,7 @@ def run_heuristic(backend: str) -> tuple[HeuristicReport, list[str]]:
     golden_qa = _load_golden_qa(GOLDEN_QA_PATH)
     rows: list[RowResult] = []
     overlap_ratios: list[float] = []
+    generated_by_id: dict[str, str | None] = {}
 {%- if include_ragas_grader %}
     ragas_faithfulness_scores: list[float] = []
     ragas_answer_relevancy_scores: list[float] = []
@@ -272,6 +279,7 @@ def run_heuristic(backend: str) -> tuple[HeuristicReport, list[str]]:
         ragas_scores: dict[str, float] | None = None
 {%- endif %}
         generated_answer = try_generate_fn(question, thread_id=entry["id"])
+        generated_by_id[entry["id"]] = generated_answer
         if generated_answer is not None:
             overlap_grade = grade_answer_overlap(generated_answer, entry["expected_answer"])
             answer_overlap_ratio = overlap_grade.overlap_ratio
@@ -307,6 +315,16 @@ def run_heuristic(backend: str) -> tuple[HeuristicReport, list[str]]:
             )
         )
 
+    custom_scores: dict[str, float] = {}
+    for grader_name, grader in all_graders().items():
+        scores = [
+            score
+            for entry in golden_qa
+            if (score := grader(entry, generated_by_id.get(entry["id"]))) is not None
+        ]
+        if scores:
+            custom_scores[grader_name] = sum(scores) / len(scores)
+
     ranks = [row.rank for row in rows]
     report = HeuristicReport(
         backend=backend,
@@ -315,6 +333,7 @@ def run_heuristic(backend: str) -> tuple[HeuristicReport, list[str]]:
         hit_rate=hit_rate(ranks),
         mean_reciprocal_rank=mean_reciprocal_rank(ranks),
         mean_answer_overlap=(sum(overlap_ratios) / len(overlap_ratios) if overlap_ratios else None),
+        custom_scores=custom_scores,
 {%- if include_ragas_grader %}
         mean_ragas_faithfulness=(
             sum(ragas_faithfulness_scores) / len(ragas_faithfulness_scores)
@@ -375,6 +394,8 @@ def _print_summary(backend: str, report: HeuristicReport) -> None:
         print(f"mean_answer_overlap: {report.mean_answer_overlap:.3f}")
     else:
         print(f"mean_answer_overlap: n/a (no ANTHROPIC_API_KEY set — {backend} retrieval-only)")
+    for name, value in sorted(report.custom_scores.items()):
+        print(f"{name}: {value:.3f} (custom grader)")
 {%- if include_ragas_grader %}
     if report.mean_ragas_faithfulness is not None:
         print(f"mean_ragas_faithfulness:      {report.mean_ragas_faithfulness:.3f}")

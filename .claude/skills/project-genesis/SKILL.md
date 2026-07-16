@@ -33,11 +33,15 @@ don't.
 
 ## Steps
 
-### Step 0 — Check for existing DESIGN.md
+### Step 0 — Check for existing DESIGN.md and planning docs
 
 If a `DESIGN.md` or `.claude/docs/DESIGN.md` exists (produced by `/scope-poc`), read it first.
-Many of the infrastructure questions below are determinable from the design — don't re-ask what's
-already answered. Surface only the questions that remain open after reading the design doc.
+Also scan for planning docs that pre-answer infrastructure questions: `roadmap.md`,
+`.claude/docs/milestones/*.md`, `.claude/docs/plans/*.md` — milestone files sometimes contain
+the literal copier arguments (a live dry-run found `vector_backend=postgres` and
+`primary_chat_agent=lg_agent` verbatim in a milestone's "done when"). Don't re-ask what's
+already answered — but ratify inherited decisions out loud ("your milestone pins X — confirm?")
+rather than silently adopting them. Surface only the questions that remain open.
 
 If no DESIGN.md exists, consider suggesting `/scope-poc` before continuing — especially if the
 user hasn't yet defined actors, MVP scope, or key architectural decisions. `/project-genesis`
@@ -45,39 +49,63 @@ works without it, but infrastructure choices made without a design are guesses.
 
 ### Step 1 — Ask, don't hand over a form
 
-Have a short real conversation (not a rigid checklist read verbatim) covering:
+Have a short real conversation (not a rigid checklist read verbatim). It mirrors
+`copier.yaml`'s own phased interview — scope first, implementation only where
+Phase 1 makes it relevant:
+
+**Phase 1 — scoping (always cover these):**
 
 1. **What are you building, who's it for?** → `project_name`, `project_slug`,
-   `project_description`.
-2. **Fresh project, or layering onto something that already exists?** → maps to
-   `scaffold_full_project` (false = layering-only: `.claude/` + whichever of
-   `.agents/`/`mcp_servers/` they want, nothing else touched).
-3. **Does it touch customer or otherwise sensitive data?** → `data_sensitivity`
-   (`public`/`internal`/`restricted`/`secret`). Don't default this silently —
-   it drives a hard rule in the generated `CLAUDE.md` and a Terraform tag.
-4. **Does it need retrieval/eval rigor** (RAG, agent evals, anything graded
-   against a golden set)? → `enable_structure_guard`.
-5. **Frontend/TypeScript component?** → `has_typescript`.
-6. **Does it need to expose tools to other agents/services?** → `include_mcp_server`
-   (+ `mcp_server_name`/`mcp_server_slug` if yes).
-7. **Which chat agent(s) do you want** — LangGraph (`lg_agent`), Google ADK
-   (`adk_agent`), both (today's default), or neither (build your own on top of
-   `rag_agent` alone)? → `primary_chat_agent`. Note `rag_agent` (the retrieval
-   backend the MCP tool calls) and `akira` ship regardless of this choice — they're
+   `project_description`, `project_type` (`chat_app`/`agent`/`workflow`/`rag`/
+   `mcp_server`/`ai_backend`/`eval_suite`/`prototype`/`existing_repo` — the last
+   one is layering-only mode: `.claude/` + whichever of `.agents/`/`mcp_servers/`
+   they want, nothing else touched), `primary_users`
+   (`internal`/`customers`/`developers`/`public_api`).
+2. **What external systems does it touch?** → `external_systems` (multiselect:
+   `slack`/`github`/`google_workspace`/`calendar`/`email`/`database`/`web`) —
+   copier seeds integration and vector-store defaults from this, so get it right
+   rather than skipping it.
+3. **Backend language(s)** — Python (default) or a real TypeScript backend
+   service too? → `primary_backend_language`.
+4. **Where does it run?** → `deployment_target` (`local`/`docker`/`cloud`/`serverless`).
+5. **Does it touch customer or otherwise sensitive data?** → `data_sensitivity`
+   (`public`/`internal`/`restricted`/`secret`). Copier defaults this from
+   `primary_users`, but don't let it default silently in conversation — it
+   drives a hard rule in the generated `CLAUDE.md` and a Terraform tag.
+
+**Phase 1b — the AI system itself (agent-shaped projects):**
+
+6. **What tools will the agent use, will it store memory, does it need human
+   approval before acting?** → `agent_tools` (multiselect; `mcp` seeds
+   `include_mcp_server`), `agent_memory` (`none`/`conversation`/`long_term` —
+   `long_term` seeds the postgres checkpointer), `human_approval`
+   (`none`/`sometimes`/`always`). These land in DESIGN.md's Key Decisions —
+   they matter more than any individual feature toggle.
+
+**Phase 2/3 — only when the conversation raises them (otherwise the seeded
+defaults are right):**
+
+7. **Which chat agent(s)** — LangGraph (`lg_agent`), Google ADK (`adk_agent`),
+   both, or neither (build on `rag_agent` alone)? → `primary_chat_agent`.
+   Copier derives a sensible default from `project_type`; only ask if the
+   design names a framework. `rag_agent` and `akira` ship regardless — they're
    shared LangGraph-based infra, not "the framework" being picked.
-8. **Backend language(s)** — Python (default) or a real TypeScript backend
-   service too? → `primary_backend_language`. Independent of `mcp_server_language`
-   (the MCP server's own implementation language).
-9. **Vector store at production scale, or just getting started?** → `vector_backend`
-   (`duckdb` default / `memory` for zero-setup dev / `opensearch` for a real cluster).
-10. **Any classical ML/stats work** (baseline model comparison, forecasting,
-    A/B testing) **alongside the agentic-AI pieces?** → `include_ml_labs`
-    (default `false` — this is a large, separate addition, don't default it on).
+8. **Vector store at production scale, or just getting started?** →
+   `vector_backend` (`duckdb` default / `memory` zero-setup / `opensearch`
+   cluster / `postgres` pgvector — auto-defaulted to `postgres` when `database`
+   is in `external_systems`).
+9. **Optional add-ons** → `optional_features` (multiselect: `akira` +
+   `dev_companion` default on; `promptfoo`/`ragas`/`web_research`/
+   `meeting_intelligence`/`marketing`/`n8n_webhook`/`composio`/`ml_labs`).
+   Mention only the ones the design implies — e.g. classical ML/stats work
+   (baselines, forecasting, A/B) → add `ml_labs`.
 
 Skip questions whose answer is obvious from context already given (e.g. if
-they've already said "no existing repo, brand new thing", don't re-ask
-`scaffold_full_project`). Everything not covered by these seven questions keeps
-copier's own default — don't invent additional questions.
+they've already said "no existing repo, brand new thing", `project_type` can't
+be `existing_repo`). Everything not covered keeps copier's own derived default
+— don't invent additional questions, and don't ask about anything in
+copier.yaml's "inferred, never asked" tier (`source_root`, `eval_root`,
+`python_version`, `aws_region`, ...) unless the user brings it up.
 
 ### Step 2 — Map to copier variables
 
@@ -101,14 +129,48 @@ copier copy --vcs-ref HEAD --trust --defaults \
   -d "project_name_input=<name>" \
   -d "project_slug=<slug>" \
   -d "project_description=<description>" \
+  -d "project_type=<chat_app|agent|workflow|rag|mcp_server|ai_backend|eval_suite|prototype|existing_repo>" \
+  -d "primary_users=<internal|customers|developers|public_api>" \
+  -d "primary_backend_language=<python|typescript|both>" \
+  -d "external_systems=[<slack, github, ...>]" \
+  -d "deployment_target=<local|docker|cloud|serverless>" \
   -d "data_sensitivity=<classification>" \
-  -d "scaffold_full_project=<true|false>" \
-  -d "enable_structure_guard=<true|false>" \
-  -d "has_typescript=<true|false>" \
-  -d "include_mcp_server=<true|false>" \
-  -d "primary_chat_agent=<lg_agent|adk_agent|both|none>" \
+  -d "agent_tools=[<search, mcp, ...>]" \
+  -d "agent_memory=<none|conversation|long_term>" \
+  -d "human_approval=<none|sometimes|always>" \
+  -d "optional_features=[<akira, dev_companion, ...>]" \
   . "<output_dir>"
 ```
+
+Drop any `-d` the conversation didn't cover — `--defaults` fills it from the
+seeded derivations. Multiselects take YAML list syntax (`[a, b]`). Hidden/
+derived variables (`scaffold_full_project`, `include_*`, `vector_backend`
+when not asked, `source_root`, ...) can still be pinned with `-d` when the
+conversation explicitly named them.
+
+**Prefer a data file over a long `-d` chain.** With more than ~5 answers, write
+them to a YAML file and pass `--data-file` — a 15-flag shell line is where
+operator errors live (a live dry-run lost a cycle to a dropped positional arg):
+
+```bash
+cat > /tmp/genesis-answers.yml <<'EOF'
+project_name_input: <name>
+project_type: agent
+external_systems: [database, calendar]
+# ...one key per answer from Step 2's table
+EOF
+copier copy --vcs-ref HEAD --trust --defaults --data-file /tmp/genesis-answers.yml . "<output_dir>"
+```
+
+**Rendering into an existing repo** (files already present) needs a protocol, not
+hope:
+1. Before rendering: `git status` the target; snapshot any UNTRACKED files that the
+   template will touch (`README.md`, `.claude/**`) to a backup dir — git cannot
+   restore untracked files.
+2. Render with `--overwrite` (non-interactive conflict prompts fail otherwise).
+3. After rendering: restore user-owned files the template clobbered — at minimum
+   `git checkout -- README.md` if the repo had a real README — and report exactly
+   which pre-existing files were overwritten vs preserved.
 
 Resolve `<output_dir>` to an absolute path first (`mkdir -p` then `cd ... && pwd`)
 — a relative path here has previously caused a broken `mv` mid-render (see
@@ -141,6 +203,24 @@ matches `primary_chat_agent` if `scaffold_full_project`, `uv sync` inside
 project's change-contract now that its shape is set).
 
 ## Notes
+
+- **Tell the user the add-later story in Step 5's report — always.** The render is
+  not a one-shot commitment: `.copier-answers.yml` in the generated project records
+  every answer, and any toggle can be flipped later by re-running copier against the
+  same directory with the changed answer (`copier copy --overwrite -d include_ml_labs=true ...`,
+  or `copier update` once the template is version-tagged). Users who don't know this
+  over-scaffold "just in case" — say it explicitly so they can scaffold the MVP and
+  add capabilities when they're actually needed.
+- **Legacy toggle → new axis mapping** (planning docs written against the old flat
+  interview stay actionable — both forms are honored by `-d`):
+
+  | Old toggle | New interview source |
+  |---|---|
+  | `include_calendar_integration=true` | `calendar` in `external_systems` |
+  | `include_meeting_intelligence=true` | `meeting_intelligence` in `optional_features` |
+  | `include_ml_labs=true` | `ml_labs` in `optional_features` |
+  | `include_promptfoo/ragas/web_research/composio/n8n_webhook` | same name in `optional_features` |
+  | `scaffold_full_project=false` | `project_type=existing_repo` |
 
 - The raw `make new_project` (interactive) / `make new_project_dev` (dirty
   working tree, no commit required) targets in this repo's `Makefile` remain

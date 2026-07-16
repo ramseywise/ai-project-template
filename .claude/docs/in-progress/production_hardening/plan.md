@@ -46,7 +46,7 @@ cross-product is combinatorially large and the backlog showed bugs cluster per-a
 
 ## Steps
 
-### Step 0: Initial commit + tag — USER ACTION, blocks everything
+### Step 0: Initial commit + tag — USER ACTION, blocks everything ⏳ PENDING (only remaining item)
 
 **Files**: none (git only)
 **What**: You (not Claude — per global rules) make the initial commit and tag it, so
@@ -62,7 +62,7 @@ git tag v0.1.0
 **Done when**: `git log --oneline` shows one commit; `git tag` shows `v0.1.0`;
 branch is `main`.
 
-### Step 1: CI — two-tier matrix with real test execution
+### Step 1: CI — two-tier matrix with real test execution ✓ DONE — 2026-07-16
 
 **Files**: `.github/workflows/test-render.yml` (all 59 lines)
 **What**: Keep the existing 5 render+lint configs; add `workflow_dispatch` trigger.
@@ -101,7 +101,7 @@ then real verification is the first push to GitHub (Step 6 note).
 **Done when**: workflow YAML parses; matrix contains 11 entries; every full-tier
 config's commands have been run locally against a fresh render (Step 6).
 
-### Step 2: scope-poc — naive-baseline question
+### Step 2: scope-poc — naive-baseline question ✓ DONE — 2026-07-16
 
 **Files**: `.claude/skills/scope-poc/SKILL.md` (Step 3, lines 86–95; DESIGN.md
 structure, lines 152–216), `template/DESIGN.md.jinja` (lines 14–18)
@@ -124,7 +124,7 @@ manual process), and what must the AI beat to justify itself? -->
 `DESIGN.md` for `Naive baseline`.
 **Done when**: both files carry the section; rendered DESIGN.md has no leftover Jinja.
 
-### Step 3: DESIGN.md — Evaluation section with metric targets
+### Step 3: DESIGN.md — Evaluation section with metric targets ✓ DONE — 2026-07-16
 
 **Files**: `.claude/skills/scope-poc/SKILL.md` (Step 3 lines 92–95, DESIGN.md
 structure lines 152–216, handoff table lines 135–148), `template/DESIGN.md.jinja`
@@ -150,7 +150,7 @@ evals/targets.yaml`.
 **Done when**: structure, jinja stub, and handoff table all carry Evaluation;
 render clean.
 
-### Step 4: evals/targets.yaml + threshold gate in the eval runner
+### Step 4: evals/targets.yaml + threshold gate in the eval runner ✓ DONE — 2026-07-16
 
 **Files**: new `template/_scaffold/{{ eval_root }}/targets.yaml`,
 `template/_scaffold/{{ eval_root }}/pipelines/run.py.jinja` (imports lines 19–37;
@@ -184,7 +184,7 @@ make eval-heuristic` (unchanged behavior, no targets) → uncomment a
 **Done when**: both gate outcomes demonstrated for real; ruff + pytest clean;
 no leftover Jinja.
 
-### Step 5: project-genesis — carry DESIGN.md and targets into the render
+### Step 5: project-genesis — carry DESIGN.md and targets into the render ✓ DONE — 2026-07-16
 
 **Files**: `.claude/skills/project-genesis/SKILL.md` (Step 4 lines 95–121, Step 5
 lines 123–131)
@@ -208,7 +208,7 @@ DESIGN.md + render (part of Step 6).
 **Done when**: skill instructs the carry-over + reconciliation; Step 7 handoff table
 in scope-poc (Step 3 above) and this skill agree on the `targets.yaml` contract.
 
-### Step 6: End-to-end verification pass
+### Step 6: End-to-end verification pass ✓ DONE — 2026-07-16
 
 **Files**: none (verification only)
 **What**: The backlog's discipline — render + install + run, not render-only — applied
@@ -240,6 +240,79 @@ workflow runs green remotely — CI has never actually executed (repo has no rem
   Step 6's combined render guards against regressions anyway.
 - **Rollback**: after Step 0 exists, every step is one `git revert` away. That's the
   point of Step 0.
+
+## Execution record — 2026-07-16
+
+Steps 1–6 executed and verified; Step 0 (initial commit + tag) remains a user action.
+Pre-edit copies of every touched file: scratchpad `pre-hardening-snapshot/` (the
+revert path until Step 0 exists).
+
+**Verified for real** (render + install + run, per backlog discipline): 7 configs
+render Jinja-clean; lint-check + pytest green on defaults/ml-labs/vector-memory/
+split-service (36/66/36/36 tests); full npm chain green on ts-backend; install+build
+green on TS MCP server and split_service Next.js frontend; `make eval-heuristic`
+behavior unchanged with targets commented out; `make eval-gate` exits non-zero on an
+unreachable target (per-backend FAIL lines) and 0 on an achievable one; `pre-commit
+run --all-files` passes on a defaults render; combined render (ml_labs + both +
+mcp ts) stages all three axes correctly.
+
+**Deviations** (all declared during execution):
+1. CI leftover-Jinja grep now excludes `.agents/` — vendored
+   `framework-selection/SKILL.md` mentions `{{ ts_project_root }}` in prose in every
+   render; renaming it `.jinja` would crash defaults renders (variable undefined when
+   `has_typescript=false`). Same vendored-material precedent as LINT_PATHS/pre-commit.
+2. CI lint step delegates to the render's own `make lint-check` instead of repo-wide
+   `ruff check .` — vendored `.claude/skills/mcp-builder/scripts/` fails repo-wide
+   ruff (pre-existing; the old workflow had never actually run — no remote/commits).
+3. Unlisted files fixed (real template bugs, found by running lint on renders):
+   `_scaffold/src/agents/{lg_agent,rag_agent}/main.py` — I001 on the split_service
+   CORS import block. Root cause: ruff classifies `middleware` first-party only when
+   `src/middleware` exists, so the same bytes can't lint clean in both configs.
+   Fixed properly via `known-first-party = ["middleware"]` in `pyproject.toml.jinja`
+   (imports themselves restored to original form).
+4. Unlisted file fixed: `_scaffold/src/middleware/auth.py.jinja` — three UP045
+   `Optional[...]` violations (the split_service tier post-dates the backlog's last
+   full lint pass and had never been lint-verified in a render).
+
+**Re-verification after the copier.yaml phased-interview rework (2026-07-16, second
+pass)**: the interview rework (project_type/primary_users/external_systems/agent_tools/
+optional_features, landed after the first execution pass) kept every `include_*` toggle
+pinnable via `-d`, so the CI matrix stayed valid. Workflow updates: trigger on
+`master` too (repo's actual branch), layering-only entry now uses the canonical
+`-d project_type=existing_repo`, two new render-tier entries for `project_type=
+mcp_server`/`eval_suite` (13 matrix entries total), and the leftover-Jinja check
+excludes `promptfoo.config.yaml` ({{prompt}}/{{question}} are promptfoo's own runtime
+syntax — eval_suite now auto-enables promptfoo and would have failed CI). Full battery
+re-run green against the reworked template: 9 configs render Jinja-clean; lint+pytest
+green on defaults/ml-labs/vector-memory/split-service/mcp_server-type/eval_suite-type
+(36/66/36/36/17/17); npm chains green (ts-backend, TS MCP, split frontend); gate
+demo re-confirmed (non-zero / zero).
+
+**Code-review fix pass (2026-07-16, after /code-review production_hardening)**: of the
+10 reported findings, 6 fixed and verified by fresh renders; findings 4–6 and 10
+(vector_backend reachability, web_research/composio auto-seeding, eval_suite's
+implicit MCP server, SKILL.md enum duplication) left as design decisions. Fixes:
+(1) `has_typescript` re-gated on scaffold_full_project — layering renders ship 0
+ts hooks, full TS renders still ship 3; (2) `include_akira`/`include_dev_companion`
+gated on scaffold_full_project AND their `_tasks` guards changed from
+`(not scaffold_full_project) or include_*` to `include_*` — layering renders no
+longer ship akira/dream/grow-companion skills or companion docs; (3) BONUS
+pre-existing bug found while verifying: `ts_lint.sh`'s task guard had the same
+short-circuit class and leaked the hook into every layering render (even
+Python-only) — fixed with the positive-condition guard; (4) leftover-Jinja CI
+check no longer excludes promptfoo.config.yaml wholesale — {{prompt}}/{{question}}
+filtered by pattern so the file's real copier substitutions stay checked; (5) new
+hidden `is_agent_shaped` predicate replaces 4 copies of the agent-shaped
+project_type list (3 when: clauses + DESIGN.md.jinja); (6) CI lint step syncs only
+the dev group (`uv sync --only-group dev` + `UV_NO_SYNC=1 make lint-check`) —
+verified 2.5s on a fresh render vs a full agent-runtime install; test-tier jobs
+still full-sync via `uv run pytest`; (7) redundant `defaults` render-only matrix
+row dropped (subsumed by defaults-tested; 12 entries).
+
+**Process note**: one verification round was invalidated and redone — zsh doesn't
+word-split unquoted `$args`, so a render loop silently dropped every `-d` flag and
+rendered 7× defaults. Caught by auditing rendered toggle markers, not render success;
+all configs re-rendered with explicit args.
 
 ## Open Questions
 

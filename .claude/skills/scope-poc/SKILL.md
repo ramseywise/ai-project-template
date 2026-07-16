@@ -32,7 +32,23 @@ Don't conflate them — many design sessions happen weeks before the scaffold is
 
 ## Steps
 
-### Step 0 — DSSG detection
+### Step 0 — Discover what's already decided
+
+**Scan for planning docs before asking anything** — not just DESIGN.md. Check the
+workspace for `roadmap.md`, `.claude/docs/milestones/*.md`, `.claude/docs/plans/*.md`,
+and any sequencing/exec-summary docs. Milestone files frequently contain the literal
+scaffold parameters (a real dry-run found `vector_backend=postgres` and
+`primary_chat_agent=lg_agent` written verbatim in a milestone's "done when"). Treat
+these as pre-answered sources with the same authority as an existing DESIGN.md.
+
+**Ratify inherited decisions — don't silently adopt them.** For every decision a doc
+pre-answers, surface it as a one-line checkpoint: *"your roadmap resolved X on
+\<date\> — confirm, or reopen?"* Skipping the re-interview is right; skipping the
+user's consent is not. A user who never said "yes, LangGraph" out loud will not feel
+ownership of the scaffold that assumes it — this exact failure was observed in a live
+session.
+
+### Step 0.5 — DSSG detection
 
 Before starting the interview, check if the project is a known DSSG platform project.
 Signals: the user mentions "DSSG", "nonprofit-success-ai", "project-mgmt-ai", "dssg/",
@@ -45,6 +61,20 @@ If DSSG platform is detected:
 - Acknowledge what's already decided rather than re-deciding it
 
 ### Step 1 — Tier 1: Problem and actors
+
+**If the project is agent-shaped, open with the three-axes disambiguation** — users
+reliably collapse these into one anxiety ("should this be a Vercel agent, LangGraph,
+or Supabase/Firebase?" — verbatim from a live session). State it plainly before any
+technical question, and never bundle a governance gate (budget/approval pending) with
+a technical choice in the same question:
+
+| Axis | The question | Typical answers |
+|------|--------------|-----------------|
+| Agent framework | How the AI code is written | LangGraph / ADK (Python), Vercel AI SDK (TS) |
+| Database / identity | Where data lives, who users are | Supabase / Postgres / Firebase |
+| Deployment | Where it runs | Vercel (TS frontends), Railway/cloud (Python services), local |
+
+These are independent decisions — say so explicitly.
 
 Have a real conversation (not a rigid checklist read aloud). Cover:
 
@@ -88,6 +118,13 @@ engagement status," you know the actor without asking.
 7. **What data does the AI reason over?**
    - Structured records (DB rows)? Unstructured documents (PDFs, transcripts, notes)?
    - Live API data (calendar, email, web)?
+
+7b. **Does the MVP itself need retrieval (RAG)?**
+   - Retrieval belongs in THIS project only if the MVP's demo requires finding and
+     surfacing stored content. Extraction pipelines, automation, and services that
+     read via another system's API usually don't — don't let the scaffold's defaults
+     answer this for the user. Record the answer in Key Decisions; it drives whether
+     rag_agent and its heavy embedding dependencies belong in the render at all.
 
 8. **How will you evaluate "good"?**
    - Is there a golden set of expected outputs to grade against?
@@ -144,14 +181,15 @@ from the design:
 
 | DESIGN.md answer | /project-genesis question |
 |-----------------|--------------------------|
-| Actor type + data flow | `primary_chat_agent` |
-| External systems to integrate | `include_mcp_server`, integration toggles |
+| AI approach + system shape | `project_type` (drives most other defaults; `existing_repo` = layering-only) |
+| Actors | `primary_users`, `primary_chat_agent` |
+| External systems to integrate | `external_systems` (seeds integrations, Composio, web research, vector store), `agent_tools` |
+| Agent behavior (tools/memory/approval) | `agent_tools`, `agent_memory`, `human_approval` |
 | Data classification | `data_sensitivity` |
-| Evaluation rigor | `enable_structure_guard` |
-| Existing repo or fresh | `scaffold_full_project` |
+| Deployment / operator model (budget/scale) | `deployment_target`, `vector_backend` complexity |
 | Vector/retrieval needs | `vector_backend` |
-| Operator model (budget/scale) | `vector_backend` complexity, `aws_region` |
 | System boundaries (external user + own backend) | `frontend_backend_topology` |
+| Optional tooling implied by the design | `optional_features` |
 | Evaluation table (metrics + targets) | transcribed into `evals/targets.yaml` after render (see /project-genesis Step 4) |
 
 Tell the user: "Run `/project-genesis` next. Here's what to answer for the infrastructure

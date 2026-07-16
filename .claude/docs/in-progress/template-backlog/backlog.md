@@ -161,7 +161,7 @@ separate hook script, matching that precedent). New `Makefile` targets
 from the already-existing-but-unused `node_mcp_server.md` reference doc, mirroring the
 Python FastMCP server's exact `search_articles` tool/contract.
 
-**Real source material used**: `github/_archived/sevdesk/va-agents`'s real
+**Real source material used**: an archived former-employer `va-agents` repo's real
 `eslint.config.mjs` (trimmed of Next.js-specific plugins) and Jest+ts-jest setup;
 `template/.claude/skills/mcp-builder/reference/node_mcp_server.md`'s package.json/
 tsconfig/tool-registration patterns.
@@ -205,7 +205,7 @@ source and genericized (domain-specific logic rewritten, not copy-pasted):
 |---|---|---|
 | `regression/` | `NRR/src/models/model.py`+`plot.py` | RFE-based logistic regression, coefficient tables, significance plots — stripped the food/menstrual-cycle domain logic, kept the statistical core |
 | `timeseries/` | `atlas/evals/arima.py` + `core/preprocessing/preprocessing.py` | ARIMAForecaster w/ full assumption diagnostics — ported mostly faithfully (already generic); trimmed the polars-based `Preprocessor`/`fill_gaps` DataFrame wrapper (pipeline glue, not reusable core) |
-| `stats_testing/` | sevdesk's real Dec-2025 A/B-test notebook | Power analysis, Wilson CI, Mann-Whitney U, bootstrap Cliff's delta — de-Germanized, hardcoded CSV paths removed |
+| `stats_testing/` | a former employer's real Dec-2025 A/B-test notebook | Power analysis, Wilson CI, Mann-Whitney U, bootstrap Cliff's delta — de-Germanized, hardcoded CSV paths removed |
 | `feature_engineering/` | `atlas/core/preprocessing/features.py` | Lag/rolling/EWM/calendar/Fourier builders **rewritten polars→pandas**, vectorized via `groupby().shift()`/`.rolling()` instead of the original's manual per-series loops (faster, not just ported); mutual-info/correlation/permutation importance ported as-is (already numpy-only); dropped `add_company_level_features` (cash-flow-specific) |
 | `model_comparison/` | `lebanese-blonde/src/models.py` (real, deployed LightGBM scorecard) | `TabularPreprocessor` genericized from `PreprocessData` (feature lists as constructor params, not a dataset-specific import); new `compare_classifiers()` — the actual "boosting vs. random forest baseline" harness you asked for |
 | `clustering/` | `listen-wiseer/src/recommend/modules/clustering.py` | GMM soft-clustering pattern genericized (dropped hardcoded Spotify audio-feature/key-mode columns for constructor-supplied feature lists); `classifiers.py` (532 lines, playlist-reranking-specific) explicitly NOT ported — too task-specific, already covered generically by `model_comparison` |
