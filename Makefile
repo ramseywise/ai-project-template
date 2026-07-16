@@ -1,4 +1,4 @@
-.PHONY: new_project new_project_dev run_copier check_tools
+.PHONY: new_project new_project_dev run_copier check_tools preview_defaults
 
 input_dir := .
 
@@ -21,3 +21,9 @@ run_copier:
 	mkdir -p "$$output_dir"; \
 	output_dir=$$(cd "$$output_dir" && pwd); \
 	copier copy $(VCS_REF) $(input_dir) "$$output_dir" --trust -d "project_name_input=$$project_name"
+
+## Preview resolved copier defaults without rendering any files.
+## Usage: make preview_defaults project_type=rag external_systems="[slack,github]"
+##        make preview_defaults ARGS="--all"
+preview_defaults:
+	@python3 scripts/preview_defaults.py $(filter-out $@,$(MAKECMDGOALS)) $(ARGS)
