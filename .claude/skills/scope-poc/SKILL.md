@@ -60,6 +60,40 @@ If DSSG platform is detected:
 - Ask only what's specific to THIS project's slice (stage ownership, actor, AI scope, MVP)
 - Acknowledge what's already decided rather than re-deciding it
 
+### Step 0.6 — Consume Project Profile (from /project-discovery)
+
+Scan for `.claude/docs/PROJECT-PROFILE.md` or `PROJECT-PROFILE.md` in the workspace.
+If found, this project went through `/project-discovery` upstream — many questions are
+already answered.
+
+**Load and map the profile to interview tiers:**
+
+| Profile field | Maps to | Interview tier |
+|--------------|---------|----------------|
+| "The Pain Point" | Problem statement + current workaround | Tier 1 Q1 (pre-filled) |
+| "Nonprofit / Organization" | Actor context | Tier 1 Q2 (partially pre-filled) |
+| "Archetype" | AI approach (retrieval/generation/automation/orchestration) | Tier 3 Q7 (pre-filled) |
+| "Must-Demonstrate" | MVP scope — thinnest slice | Tier 5 Q12 (pre-filled) |
+| "Capacity Constraints" | Operator model, budget, timeline | Tier 4 Q11 (pre-filled) |
+| "Explicitly Out of Scope" | POC exclusions | Tier 5 Q14 (pre-filled) |
+| "Copier Hints" | Design record — suggestions, not decisions | Informational (verify during interview) |
+
+**For each pre-filled field:** present as a one-line ratification checkpoint:
+*"Your discovery session determined [X] — confirm, or reopen?"*
+
+Do NOT silently adopt profile values. The user must explicitly confirm each one,
+same discipline as Step 0's ratification of planning docs.
+
+**Questions still asked normally** (not covered by the profile):
+- Specific actors and their roles (Tier 1 Q2-3 — profile names the org but not all actors)
+- System boundaries and existing integrations (Tier 2 Q4-6)
+- Data classification and multi-tenancy (Tier 4 Q9-10)
+- Evaluation metrics and naive baseline (Tier 3 Q8, Q8b)
+- Top risks (Tier 5 Q13)
+
+The profile is a head start, not a shortcut — it pre-fills the "what" but the "how"
+and "constraints" still need the full interview.
+
 ### Step 1 — Tier 1: Problem and actors
 
 **If the project is agent-shaped, open with the three-axes disambiguation** — users
