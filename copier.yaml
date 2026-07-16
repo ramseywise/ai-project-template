@@ -1,0 +1,610 @@
+_subdirectory: template
+_message_before_copy: >+
+  AI-Eng Claude Template
+
+  By default, scaffolds a full AI/agent project (pyproject.toml, three working
+  example agents — src/agents/lg_agent, rag_agent, adk_agent — plus akira, a
+  proactive quality agent, core/ ingestion, evals/, infra/, tests/, CI) plus the
+  .claude/ skill+hook tooling and .agents/ framework reference library from the
+  playground reference setup. Set scaffold_full_project=false to fall back to
+  the original, layering-only mode — safe to run into an existing repo, only
+  adding .claude/.agents/mcp_servers and touching nothing else. Set
+  primary_chat_agent to lg_agent/adk_agent/none to trim to one (or neither)
+  chat agent — rag_agent (LangGraph-based retrieval backend for the MCP tool)
+  and akira ship regardless, since they're shared infra, not "the framework."
+
+_message_after_copy: >+
+  Done. Next steps:
+  - Review CLAUDE.md and fill in the "Hard Rules" placeholder section.
+  - Run `chmod +x .claude/hooks/*.sh` if hooks aren't executable.
+  - If scaffold_full_project: run `make setup` (uv sync + .env from example), then {% if primary_chat_agent in ["lg_agent", "both"] %}`make lg-up`{% elif primary_chat_agent == "adk_agent" %}`make adk-up`{% else %}`make rag-up`{% endif %} to try the example agent.
+  {%- if scaffold_full_project and primary_backend_language in ["typescript", "both"] and frontend_backend_topology != "split_service" %}
+  - TS backend service scaffolded at {{ ts_project_root }}/ — run `make ts-install` then `make ts-dev`.
+  {%- endif %}
+  {%- if has_typescript and ts_agent_framework == "vercel_ai_sdk" %}
+  - Vercel AI SDK agent scaffolded at {{ ts_project_root }}/{{ ts_source_root }}/agent/ — set ANTHROPIC_API_KEY, then `make ts-dev` and POST to /agent/chat to try it.
+  {%- endif %}
+  {%- if scaffold_full_project and frontend_backend_topology == "split_service" %}
+  - split_service scaffolded: Next.js frontend at {{ ts_project_root }}/ (`make ts-install` then `make ts-dev`) + FastAPI backend with Supabase-JWT auth ({{ source_root }}/middleware/auth.py). Create a Supabase project, fill in SUPABASE_URL/SUPABASE_ANON_KEY/SUPABASE_JWT_SECRET (backend) and NEXT_PUBLIC_SUPABASE_URL/NEXT_PUBLIC_SUPABASE_ANON_KEY (frontend) before first deploy — Vercel for the frontend, Railway for the backend (see railway.toml/vercel.json).
+  {%- endif %}
+  {%- if include_mcp_server %}
+  - MCP server: `cd mcp_servers/{{ mcp_server_slug }} && {% if mcp_server_language == "typescript" %}npm install{% else %}uv sync{% endif %}`.
+  {%- endif %}
+  {%- if include_akira %}
+  - Run `make akira-kaneda` for a proactive quality scan once you have real code to scan.
+  {%- endif %}
+  {%- if include_dev_companion %}
+  - `.claude/docs/companion/collaboration.md` starts blank — /grow-companion fills it in as real sessions happen.
+  {%- endif %}
+  - Run `/sanyi init` to define this project's change-contract (变易/简易/不易 layers) now that its shape is set.
+
+_exclude:
+  - __pycache__
+  - .git
+  - copier.yaml
+
+project_name:
+  type: str
+  help: What is your project name?
+  placeholder: "{{project_name_input}}"
+  default: "{{project_name_input}}"
+
+project_slug:
+  type: str
+  help: Is this project slug ok? (used for folder/package naming)
+  placeholder: my-project
+  default: "{{ project_name.lower().replace(' ', '-') }}"
+
+project_description:
+  type: str
+  help: One-sentence description of the project
+  default: "TODO: describe this project"
+
+data_sensitivity:
+  type: str
+  help: >-
+    What's the most sensitive data this project will touch? Drives a CLAUDE.md
+    hard-rule and (when scaffold_full_project) a Terraform resource tag —
+    governance should be visible from day one, not bolted on later.
+  choices:
+    public: "public"
+    internal: "internal"
+    restricted: "restricted"
+    secret: "secret"
+  default: "internal"
+
+# Three tiers exist across the questions below (see README's "What you get"
+# for the full breakdown): .claude/ tooling is always scaffolded; the two
+# `include_*` toggles right below are independent of scaffold_full_project
+# (you can get .agents/ and/or mcp_servers/ in layering-only mode); everything
+# else — src/, core/, evals/, tests/, infrastructure/, pyproject.toml — is one
+# all-or-nothing bundle gated on scaffold_full_project.
+
+scaffold_full_project:
+  type: bool
+  help: >-
+    Scaffold a full project (pyproject.toml, src/agents/lg_agent working example,
+    core/ ingestion, evals/, infra/, tests/, CI) in addition to the .claude/.agents/
+    tooling? Turn off to use this template in its original layering-only mode —
+    safe to run into an existing repo, only adding .claude/.agents/mcp_servers.
+  default: true
+
+source_root:
+  type: str
+  help: Name of the application source directory (hooks scope their checks to this)
+  default: src
+
+ticket_prefix:
+  type: str
+  help: Ticket prefix used for branch naming and linked-issue conventions (e.g. LIN, JIRA, GH)
+  default: LIN
+
+enable_structure_guard:
+  type: bool
+  help: Enforce a canonical eval-suite directory layout? (only meaningful for eval-suite-shaped repos, e.g. RAG/agent evals)
+  default: "{{ scaffold_full_project }}"
+
+eval_root:
+  type: str
+  help: Name of the eval-suite directory
+  default: evals
+  when: "{{ scaffold_full_project or enable_structure_guard }}"
+
+eval_allowed_dirs:
+  type: str
+  help: Space-separated list of the only allowed top-level subdirectories under eval_root
+  default: graders metrics pipelines reports utils
+  when: "{{ scaffold_full_project or enable_structure_guard }}"
+
+python_version:
+  type: str
+  help: Minimum Python version for pyproject.toml
+  default: "3.12"
+  when: "{{ scaffold_full_project }}"
+
+aws_region:
+  type: str
+  help: Default AWS region for the infra/ Terraform skeleton
+  default: eu-central-1
+  when: "{{ scaffold_full_project }}"
+
+# Only meaningful alongside scaffold_full_project — python is a working example
+# backend (lg_agent/rag_agent/adk_agent per primary_chat_agent); typescript/both
+# additionally stage a real Node/TS backend service at ts_project_root (package.json,
+# tsconfig, eslint, Jest — see .claude/hooks/ts_lint.sh.jinja/ts_test.sh.jinja).
+primary_backend_language:
+  type: str
+  help: >-
+    Backend language(s). python ships the working example agents. typescript/both
+    additionally scaffold a real Node/TS backend service (not just frontend hooks)
+    at ts_project_root, with its own lint/typecheck/test tooling.
+  choices:
+    python: "python"
+    typescript: "typescript"
+    both: "both"
+  default: "python"
+  when: "{{ scaffold_full_project }}"
+
+has_typescript:
+  type: bool
+  help: Does this project have a TypeScript component (frontend and/or backend)?
+  default: "{{ primary_backend_language in ['typescript', 'both'] if scaffold_full_project else false }}"
+
+ts_source_root:
+  type: str
+  help: Name of the TypeScript source directory (relative, used for console.log/model-string checks)
+  default: src
+  when: "{{ has_typescript }}"
+
+ts_project_root:
+  type: str
+  help: Name of the TypeScript project root directory (where tsconfig.json/node_modules live)
+  default: "{{ project_slug }}"
+  when: "{{ has_typescript }}"
+
+# Orthogonal to primary_backend_language/primary_chat_agent, same philosophy as
+# vector_backend — a TS project may or may not want an agent loop at all (some
+# TS backends are plain API services). vercel_ai_sdk stages a real agent/ tree
+# (streamText + tool() loop, Anthropic provider) at
+# {{ ts_project_root }}/{{ ts_source_root }}/agent/, framework-agnostic (a plain
+# Request->Response handler, wireable into Express today or a Next.js route
+# handler in a Vercel-hosted project) — see .agents/skills/framework-selection.
+ts_agent_framework:
+  type: str
+  help: >-
+    TypeScript agent framework. none (default) stages the plain TS backend
+    service only, no LLM code. vercel_ai_sdk additionally stages a real
+    tool-calling agent loop (Vercel AI SDK's streamText + tool()) at
+    {{ ts_project_root }}/{{ ts_source_root }}/agent/ — for projects deploying
+    a TS-native assistant (e.g. a Vercel-hosted frontend's own API routes)
+    rather than calling out to a separate Python agent service.
+  choices:
+    none: "none"
+    vercel_ai_sdk: "vercel_ai_sdk"
+  default: "none"
+  when: "{{ has_typescript }}"
+
+# Orthogonal to ts_agent_framework — that toggle is about whether the *agent
+# loop* lives in TS (single-service, no separate Python backend needed).
+# frontend_backend_topology is about *deployment shape*: does the TS side
+# deploy as one thing, or as a genuinely separate service from the Python
+# backend, each with its own host and its own auth boundary? split_service
+# scaffolds FOIA-Fluent's actual production shape (dssg/projects/FOIA-Fluent)
+# — a Next.js frontend + a separate FastAPI backend, sharing identity via
+# Supabase Auth JWT rather than sharing a process. Mutually exclusive in
+# practice with ts_agent_framework=vercel_ai_sdk (that path assumes the
+# agent's own API routes ARE the backend); /project-genesis should flag the
+# conflict rather than copier enforcing it structurally.
+frontend_backend_topology:
+  type: str
+  help: >-
+    How do frontend and backend deploy? single (default) is today's shape —
+    frontend hooks only, or one Node/TS backend service per
+    primary_backend_language, no separate deployable. split_service scaffolds
+    FOIA-Fluent's proven shape: a Next.js frontend (Vercel) + a separate
+    FastAPI backend (Railway), talking over HTTPS, sharing identity via
+    Supabase Auth JWT — an Edge middleware on the frontend
+    ({{ ts_project_root }}/{{ ts_source_root }}/middleware.ts) and a FastAPI
+    dependency on the backend ({{ source_root }}/middleware/auth.py) — with
+    Postgres RLS for tenant isolation. Only offered when there's both a real
+    TS component and a Python backend to connect.
+  choices:
+    single: "single"
+    split_service: "split_service"
+  default: "single"
+  when: "{{ scaffold_full_project and has_typescript and primary_backend_language in ['python', 'both'] }}"
+
+enable_macos_notifications:
+  type: bool
+  help: Use macOS notifications (osascript) for Stop/long-test hooks?
+  default: true
+
+expensive_command_patterns:
+  type: str
+  help: "Optional: regex of expensive/costly commands to nudge --dry-run on before running (leave blank to disable)"
+  default: ""
+
+# Independent of scaffold_full_project — available in layering-only mode too.
+include_agent_reference_library:
+  type: bool
+  help: >-
+    Scaffold .agents/skills/ — a tool-agnostic agent-framework reference library
+    (ADK + LangGraph scaffolding and patterns) shared across Claude, ADK's own tooling,
+    or any other agent harness in this project? Also enables the /new-agent skill.
+  default: true
+
+# Independent of scaffold_full_project — available in layering-only mode too.
+global_skills_source:
+  type: str
+  choices:
+    vendored: "vendored"
+    none: "none"
+  help: >-
+    Include the shared workflow skills (quick-commit, review-pr, execute-tasks,
+    scope-initiative, design-sprint, plan-review, research-review, execute-plan, code-review,
+    code-debug, compact-session, define-milestones,
+    doc-to-linear-tickets, github-projects, mcp-builder, plan-refactor, prototype,
+    skill-creator)? "vendored" copies this template's own snapshot, last synced
+    from the ~/.claude/skills/ reservoir via scripts/sync-global-skills.sh — portable,
+    works for anyone who clones this template. If you're the maintainer and want the
+    absolute latest reservoir state rather than the last-synced snapshot, run that
+    script here first, then render.
+  default: vendored
+
+# Sub-gated under the full-scaffold tier (when: scaffold_full_project) — not
+# independent like the two include_* toggles above.
+include_akira:
+  type: bool
+  help: >-
+    Scaffold akira — a second prebuilt LangGraph agent for proactive codebase
+    quality scanning (kiyoko/kaneda/dao modes)? Only meaningful alongside
+    scaffold_full_project.
+  default: "{{ scaffold_full_project }}"
+  when: "{{ scaffold_full_project }}"
+
+include_dev_companion:
+  type: bool
+  help: >-
+    Add the dev-companion layer — a living "how we work on this project" doc
+    that transforms (not appends) over time, plus a /dream maintenance-audit
+    skill? Complements, not replaces, compact-session and the memory system.
+  default: "{{ scaffold_full_project }}"
+
+include_ml_labs:
+  type: bool
+  help: >-
+    Scaffold labs/ — a classical ML/stats toolkit (regression, time-series,
+    stats-testing/A-B, feature engineering, model comparison, clustering)?
+    A large, opt-in addition orthogonal to this template's primary agentic-AI
+    focus (evals/ grades agent output quality; labs/ builds/compares predictive
+    models — different job). Default off since it's not everyone's use case.
+  default: false
+  when: "{{ scaffold_full_project }}"
+
+primary_chat_agent:
+  type: str
+  help: >-
+    Which prebuilt chat agent(s) do you want? rag_agent (the retrieval backend
+    the MCP tool calls) and akira (quality scanning) are LangGraph-based and
+    ship regardless of this choice — this only picks the user-facing chat
+    agent(s) and trims their framework-specific dependencies accordingly.
+  choices:
+    lg_agent: "lg_agent"
+    adk_agent: "adk_agent"
+    both: "both"
+    none: "none"
+  default: "both"
+  when: "{{ scaffold_full_project }}"
+
+vector_backend:
+  type: str
+  help: >-
+    rag_agent's vector store backend. duckdb (default, today's behavior) is a
+    durable single file, no external service. memory is in-process (zero setup,
+    optional JSON snapshot for persistence across restarts) — good for local
+    dev/CI. opensearch is for production scale (external cluster, HNSW kNN) —
+    requires the optional opensearch-py dependency and a reachable cluster.
+    postgres uses pgvector — for Supabase or any managed Postgres, requires the
+    optional psycopg/pgvector dependencies and a reachable database with the
+    pgvector extension enabled.
+  choices:
+    duckdb: "duckdb"
+    memory: "memory"
+    opensearch: "opensearch"
+    postgres: "postgres"
+  default: "duckdb"
+  when: "{{ scaffold_full_project }}"
+
+enable_postgres_checkpointer:
+  type: bool
+  help: >-
+    Add langgraph-checkpoint-postgres so lg_agent's/rag_agent's LangGraph
+    checkpointer CAN be switched to postgres at runtime (LG_CHECKPOINTER=postgres
+    / RAG_CHECKPOINTER=postgres, using POSTGRES_DSN). The runtime default stays
+    "memory" either way — checkpointer construction happens eagerly at
+    graph-compile time (unlike vector_backend, which is lazy per-call), so
+    defaulting straight to postgres would make `make test`/import fail hard
+    without a live database reachable. Independent of vector_backend — you can
+    checkpoint to Postgres while keeping vectors in DuckDB, or vice versa (a
+    single Supabase Postgres instance backing both is one common setup, but not
+    required).
+  default: "{{ vector_backend == 'postgres' }}"
+  when: "{{ scaffold_full_project }}"
+
+include_n8n_webhook:
+  type: bool
+  help: >-
+    Scaffold a generic, HMAC-verified inbound webhook receiver
+    (POST /webhooks/n8n) so n8n (or any external workflow tool) can call back
+    into this project — e.g. "workflow finished, update this record". The
+    OTHER direction (n8n calling an agent's existing /chat endpoint) needs no
+    new code — see the "Integrations" section in the generated README for that
+    contract. Mounted into every present agent's FastAPI app automatically via
+    a try/except-on-import pattern, so no agent's main.py needs edits either way.
+  default: false
+  when: "{{ scaffold_full_project }}"
+
+include_calendar_integration:
+  type: bool
+  help: >-
+    Scaffold integrations/google_calendar.py — a thin Google Calendar client
+    (list/create events, find availability) using a pre-obtained OAuth2 refresh
+    token (GOOGLE_CALENDAR_REFRESH_TOKEN + client id/secret), not an interactive
+    consent flow — that one-time setup is documented in the module's docstring,
+    not implemented here. Independent of include_marketing_integrations.
+  default: false
+  when: "{{ scaffold_full_project }}"
+
+include_marketing_integrations:
+  type: bool
+  help: >-
+    Scaffold integrations/{eventbrite,linkedin,canva}.py — thin httpx clients
+    for publishing an event (Eventbrite), posting an update (LinkedIn UGC
+    Posts API), and generating an asset from a template (Canva Connect API).
+    Bundled as one toggle since these three are typically used together for
+    one "marketing automation" workflow, not independently.
+  default: false
+  when: "{{ scaffold_full_project }}"
+
+include_meeting_intelligence:
+  type: bool
+  help: >-
+    Scaffold integrations/meeting_intelligence.py — accepts a meeting transcript
+    (e.g. from a Granola/Fireflies webhook or manual upload) and extracts
+    structured action items/decisions/owners/deadlines via one LLM call.
+  default: false
+  when: "{{ scaffold_full_project }}"
+
+include_ragas_grader:
+  type: bool
+  help: >-
+    Add a ragas-based LLM-judge grader (faithfulness/answer-relevancy/context-
+    precision) alongside the existing heuristic eval suite. KNOWN ISSUE
+    (verified 2026-07-14): the current ragas release (0.4.3) has a broken
+    top-level import due to an upstream packaging bug (unconditionally imports
+    a langchain-community submodule that no longer exists) — `uv sync`
+    succeeds but `import ragas` currently crashes. This module catches that and
+    skips ragas scoring gracefully rather than crashing eval runs, but produces
+    no real scores until ragas ships a fix — check before relying on this.
+  default: false
+  when: "{{ scaffold_full_project }}"
+
+include_promptfoo:
+  type: bool
+  help: >-
+    Add promptfoo.config.yaml — a config-driven, non-Python eval harness
+    (npx promptfoo eval) that hits rag_agent's /chat endpoint directly over
+    HTTP. Runs alongside, not instead of, the Python heuristic eval suite in
+    evals/ — different tool, same "grade retrieval quality" job.
+  default: false
+  when: "{{ scaffold_full_project }}"
+
+include_composio:
+  type: bool
+  help: >-
+    Scaffold integrations/composio.py — discover and execute third-party app
+    actions (Gmail, Slack, GitHub, hundreds more) through Composio's unified
+    tool-execution API (composio.tools.get()/execute()). Connecting an
+    account (Gmail, etc.) happens once via Composio's own dashboard/CLI, out
+    of scope for this module.
+  default: false
+  when: "{{ scaffold_full_project }}"
+
+include_web_research:
+  type: bool
+  help: >-
+    Scaffold integrations/web_research.py — autonomous web research + report
+    generation via GPT-Researcher. Needs its own LLM + search-provider API
+    keys (GPT-Researcher's own env vars, not this project's settings). KNOWN
+    ISSUE (verified 2026-07-14): gpt-researcher's transitive spacy dependency
+    has no wheel for Python 3.14 yet — `uv sync` fails unless this project
+    pins an older Python (confirmed working on 3.12) via .python-version or
+    python_version. Not a problem on 3.12/3.13.
+  default: false
+  when: "{{ scaffold_full_project }}"
+
+# Independent of scaffold_full_project — available in layering-only mode too.
+include_mcp_server:
+  type: bool
+  help: Scaffold a parameterized MCP server (FastMCP) for this project?
+  default: true
+
+mcp_server_name:
+  type: str
+  help: MCP server display name (passed to FastMCP(...))
+  default: "{{ project_slug }}"
+  when: "{{ include_mcp_server }}"
+
+mcp_server_slug:
+  type: str
+  help: MCP server package/directory slug
+  default: "{{ project_slug }}"
+  when: "{{ include_mcp_server }}"
+
+mcp_server_language:
+  type: str
+  help: >-
+    MCP server implementation language. python (FastMCP) is today's default.
+    typescript uses the official MCP TypeScript SDK — see
+    .claude/skills/mcp-builder/reference/node_mcp_server.md. Independent of
+    primary_backend_language — a Python backend can have a TS MCP server or
+    vice versa.
+  choices:
+    python: "python"
+    typescript: "typescript"
+  default: "python"
+  when: "{{ include_mcp_server }}"
+
+_tasks:
+  - "chmod +x {{ _copier_conf.dst_path }}/.claude/hooks/*.sh 2>/dev/null || true"
+  - "{{ 'true' if include_mcp_server else 'rm -rf ' ~ _copier_conf.dst_path ~ '/mcp_servers' }}"
+  - "{{ 'true' if include_agent_reference_library else 'rm -rf ' ~ _copier_conf.dst_path ~ '/.agents ' ~ _copier_conf.dst_path ~ '/.claude/skills/new-agent' }}"
+  - >-
+    {{ 'true' if global_skills_source == 'vendored' else 'rm -rf ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/quick-commit ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/quick-pr ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/review-pr ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/execute-tasks ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/scope-initiative ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/design-sprint ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/doc-to-linear-tickets ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/plan-review ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/research-review ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/execute-plan ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/code-review ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/code-debug ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/compact-session ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/define-milestones ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/github-projects ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/mcp-builder ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/plan-refactor ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/prototype ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/skill-creator' }}
+  # NB: agents/akira is staged under _scaffold/ (only moved into place by the mv
+  # task below when scaffold_full_project=true) — must be removed from ITS
+  # _scaffold/ staging path, not the final source_root path, or this runs before
+  # the mv ever populates the final location and silently does nothing.
+  - "{{ 'true' if (not scaffold_full_project) or include_akira else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/agents/akira ' ~ _copier_conf.dst_path ~ '/.claude/skills/akira' }}"
+  - "{{ 'true' if (not scaffold_full_project) or include_dev_companion else 'rm -rf ' ~ _copier_conf.dst_path ~ '/.claude/skills/dream ' ~ _copier_conf.dst_path ~ '/.claude/skills/grow-companion ' ~ _copier_conf.dst_path ~ '/.claude/docs/companion' }}"
+  # integrations/ sub-modules are independently removable — a blanket rm -rf tied
+  # to one toggle would also delete modules gated by the OTHER toggles below.
+  # Same staging-path caveat as akira/dream above — integrations/ is staged
+  # under _scaffold/{{ source_root }}, only moved into place by the big mv task
+  # when scaffold_full_project=true.
+  - "{{ 'true' if (not scaffold_full_project) or include_n8n_webhook else 'rm -f ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/integrations/n8n_webhook.py' }}"
+  - "{{ 'true' if (not scaffold_full_project) or include_calendar_integration else 'rm -f ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/integrations/google_calendar.py' }}"
+  - "{{ 'true' if (not scaffold_full_project) or include_marketing_integrations else 'rm -f ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/integrations/eventbrite.py ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/integrations/linkedin.py ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/integrations/canva.py' }}"
+  - "{{ 'true' if (not scaffold_full_project) or include_meeting_intelligence else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/integrations/meeting_intelligence.py ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/integrations/clients ' ~ _copier_conf.dst_path ~ '/_scaffold/tests/unit/integrations' }}"
+  # If nothing under integrations/ ended up enabled, remove the now-empty package.
+  - "{{ 'true' if (not scaffold_full_project) or include_n8n_webhook or include_calendar_integration or include_marketing_integrations or include_meeting_intelligence or include_composio or include_web_research else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/integrations' }}"
+  - "{{ 'true' if (not scaffold_full_project) or include_ragas_grader else 'rm -f ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ eval_root ~ '/graders/ragas_grader.py' }}"
+  - "{{ 'true' if (not scaffold_full_project) or include_promptfoo else 'rm -f ' ~ _copier_conf.dst_path ~ '/_scaffold/promptfoo.config.yaml' }}"
+  - "{{ 'true' if (not scaffold_full_project) or include_composio else 'rm -f ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/integrations/composio.py' }}"
+  - "{{ 'true' if (not scaffold_full_project) or include_web_research else 'rm -f ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/integrations/web_research.py' }}"
+  # lg_agent and adk_agent are staged under _scaffold/ (same reasoning as the
+  # akira cleanup above) — 'none' removes both, leaving rag_agent (shared
+  # retrieval infra for the MCP tool) as the sole example agent.
+  - "{{ 'true' if (not scaffold_full_project) or primary_chat_agent in ['lg_agent', 'both'] else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/agents/lg_agent ' ~ _copier_conf.dst_path ~ '/_scaffold/tests/unit/agents' }}"
+  - "{{ 'true' if (not scaffold_full_project) or primary_chat_agent in ['adk_agent', 'both'] else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/agents/adk_agent' }}"
+  - "{{ 'true' if enable_structure_guard else 'rm -f ' ~ _copier_conf.dst_path ~ '/.claude/hooks/structure_guard.sh' }}"
+  # labs/ (classical ML/stats toolkit) is staged under _scaffold/ like the
+  # other optional full-project-tier content — removed from staging (not the
+  # final path) if not requested, same reasoning as the akira/lg_agent cleanup above.
+  - "{{ 'true' if (not scaffold_full_project) or include_ml_labs else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/labs ' ~ _copier_conf.dst_path ~ '/_scaffold/tests/unit/labs' }}"
+  - "{{ 'true' if has_typescript else 'rm -f ' ~ _copier_conf.dst_path ~ '/.claude/hooks/ts_quality.sh ' ~ _copier_conf.dst_path ~ '/.claude/hooks/ts_typecheck.sh' }}"
+  # ts_lint.sh is the real eslint-equivalent of ts_quality.sh's ad-hoc pattern
+  # checks — only meaningful when a real TS backend is actually scaffolded
+  # (primary_backend_language), not for has_typescript's original
+  # frontend-hooks-only, layering use case. (The "run tests before commit" gate
+  # for TS lives inline in settings.json.jinja, mirroring the Python pytest gate
+  # there — not a separate hook script, same as that one isn't.)
+  - "{{ 'true' if (not scaffold_full_project) or primary_backend_language in ['typescript', 'both'] else 'rm -f ' ~ _copier_conf.dst_path ~ '/.claude/hooks/ts_lint.sh' }}"
+  # Vercel AI SDK agent/ subtree is staged under _scaffold/<ts_project_root>/<ts_source_root>/agent
+  # (same staging convention as the Python agents above) — remove it before the
+  # big ts_project_root mv below if not requested, so ts_agent_framework=none
+  # renders the plain TS backend with no agent/LLM code at all.
+  - "{{ 'true' if (not scaffold_full_project) or (not has_typescript) or ts_agent_framework == 'vercel_ai_sdk' else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ ts_project_root ~ '/' ~ ts_source_root ~ '/agent ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ ts_project_root ~ '/tests/agent.test.ts' }}"
+  # TS backend service (package.json/tsconfig/eslint/jest/src/tests) is staged
+  # under _scaffold/<ts_project_root> — only relevant when has_typescript is true
+  # (short-circuited below, so ts_project_root is safe to reference) AND
+  # primary_backend_language actually wants it (has_typescript can independently
+  # be true for a frontend-only, layering-only TS project that this backend
+  # scaffold has nothing to do with). split_service replaces this Express tree
+  # with the Next.js staging tree below, so it's discarded here too — not just
+  # when primary_backend_language excludes typescript.
+  - "{{ 'true' if (not scaffold_full_project) or (not has_typescript) or (primary_backend_language in ['typescript', 'both'] and frontend_backend_topology != 'split_service') else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ ts_project_root }}"
+  # split_service's Next.js frontend is staged under a template-exclusive path
+  # (_split_service_frontend_staging/<ts_project_root> — same rationale as
+  # _mcp_ts_staging below: it can never collide with a pre-existing repo).
+  # Discarded whenever split_service isn't chosen, regardless of why (not
+  # requested, or has_typescript/scaffold_full_project off entirely).
+  - "{{ 'true' if (scaffold_full_project and has_typescript and frontend_backend_topology == 'split_service') else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_split_service_frontend_staging' }}"
+  # middleware/auth.py lives inside the normal _scaffold/<source_root> Python
+  # tree (moved by the big unconditional mv above, same as every other Python
+  # file) — remove it from staging before that mv when split_service isn't
+  # chosen, so a Python-only or single-topology project never gets an unused
+  # Supabase-JWT dependency it has no frontend to pair with.
+  - "{{ 'true' if (not scaffold_full_project) or frontend_backend_topology == 'split_service' else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/middleware' }}"
+  # railway.toml (Python backend deploy config) is split_service-only, same
+  # reasoning as labs/promptfoo.config.yaml below — can't sit in the big
+  # unconditional mv list since it may not exist in staging at all.
+  - "{{ 'true' if (not scaffold_full_project) or frontend_backend_topology == 'split_service' else 'rm -f ' ~ _copier_conf.dst_path ~ '/_scaffold/railway.toml' }}"
+  # Full-project scaffold content is staged under _scaffold/ (a template-exclusive
+  # path that can never collide with a pre-existing repo) so it's safe either way:
+  # when enabled, move it into place; when disabled, it's simply discarded below —
+  # never written into (and never rm -rf'd from) the target's real src/tests/etc.
+  - >-
+    {{ ('mv ' ~ _copier_conf.dst_path ~ '/_scaffold/pyproject.toml '
+    ~ _copier_conf.dst_path ~ '/_scaffold/Makefile '
+    ~ _copier_conf.dst_path ~ '/_scaffold/.gitignore '
+    ~ _copier_conf.dst_path ~ '/_scaffold/.pre-commit-config.yaml '
+    ~ _copier_conf.dst_path ~ '/_scaffold/renovate.json '
+    ~ _copier_conf.dst_path ~ '/_scaffold/.env.example '
+    ~ _copier_conf.dst_path ~ '/_scaffold/README.md '
+    ~ _copier_conf.dst_path ~ '/_scaffold/project_init.sh '
+    ~ _copier_conf.dst_path ~ '/_scaffold/.vscode '
+    ~ _copier_conf.dst_path ~ '/_scaffold/.github '
+    ~ _copier_conf.dst_path ~ '/_scaffold/configs '
+    ~ _copier_conf.dst_path ~ '/_scaffold/data '
+    ~ _copier_conf.dst_path ~ '/_scaffold/core '
+    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ ' '
+    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ eval_root ~ ' '
+    ~ _copier_conf.dst_path ~ '/_scaffold/nbks '
+    ~ _copier_conf.dst_path ~ '/_scaffold/tests '
+    ~ _copier_conf.dst_path ~ '/_scaffold/infrastructure '
+    ~ _copier_conf.dst_path ~ '/') if scaffold_full_project else 'true' }}
+  # Separate mv (not part of the big one above) — the labs/ cleanup task above
+  # rm -rf's the whole _scaffold/labs directory when include_ml_labs is false,
+  # so it may not exist at all by the time the big mv runs; folding it into
+  # that unconditional list would make `mv` fail on a missing source path.
+  - "{{ ('mv ' ~ _copier_conf.dst_path ~ '/_scaffold/labs ' ~ _copier_conf.dst_path ~ '/') if (scaffold_full_project and include_ml_labs) else 'true' }}"
+  # Same reasoning — railway.toml is rm -f'd above when split_service isn't chosen.
+  - "{{ ('mv ' ~ _copier_conf.dst_path ~ '/_scaffold/railway.toml ' ~ _copier_conf.dst_path ~ '/') if (scaffold_full_project and frontend_backend_topology == 'split_service') else 'true' }}"
+  # Same reasoning — promptfoo.config.yaml is rm -f'd by the include_promptfoo
+  # cleanup task below when the toggle is off, so it can't be in the big
+  # unconditional mv list either.
+  - "{{ ('mv ' ~ _copier_conf.dst_path ~ '/_scaffold/promptfoo.config.yaml ' ~ _copier_conf.dst_path ~ '/') if (scaffold_full_project and include_promptfoo) else 'true' }}"
+  # Separate mv (not part of the big one above) — ts_project_root only exists
+  # when has_typescript is true, and the big mv's expression is built unconditionally
+  # whenever scaffold_full_project is true, so it can't safely reference a variable
+  # that might not be defined. This one short-circuits on has_typescript first.
+  # split_service's TS side is frontend-only (Next.js, not the Express backend
+  # service), so it's excluded here — moved from its own staging dir instead,
+  # by the task below.
+  - "{{ ('mv ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ ts_project_root ~ ' ' ~ _copier_conf.dst_path ~ '/') if (scaffold_full_project and has_typescript and primary_backend_language in ['typescript', 'both'] and frontend_backend_topology != 'split_service') else 'true' }}"
+  - "rm -rf {{ _copier_conf.dst_path }}/_scaffold"
+  # split_service: swap in the Next.js frontend from its own staging dir (same
+  # convention as the MCP TS-server swap below) and stage the Python auth
+  # middleware alongside the chosen agent's FastAPI app.
+  - >-
+    {{ ('mv ' ~ _copier_conf.dst_path ~ '/_split_service_frontend_staging/' ~ ts_project_root ~ ' '
+    ~ _copier_conf.dst_path ~ '/') if (scaffold_full_project and has_typescript and
+    frontend_backend_topology == 'split_service') else 'true' }}
+  - "rm -rf {{ _copier_conf.dst_path }}/_split_service_frontend_staging"
+  # MCP server language: python (FastMCP) is copied straight to its final path
+  # like always; typescript replaces it with the Node/TS staging tree (kept in
+  # _mcp_ts_staging/ — a template-exclusive path, same rationale as _scaffold/ —
+  # so it never collides with a pre-existing repo). Always discarded afterward
+  # regardless of which language was chosen.
+  - "{{ ('rm -rf ' ~ _copier_conf.dst_path ~ '/mcp_servers/' ~ mcp_server_slug ~ ' && mv ' ~ _copier_conf.dst_path ~ '/_mcp_ts_staging/' ~ mcp_server_slug ~ ' ' ~ _copier_conf.dst_path ~ '/mcp_servers/') if (include_mcp_server and mcp_server_language == 'typescript') else 'true' }}"
+  - "rm -rf {{ _copier_conf.dst_path }}/_mcp_ts_staging"

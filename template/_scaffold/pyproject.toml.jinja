@@ -1,0 +1,110 @@
+[project]
+name = "{{ project_slug }}"
+version = "0.1.0"
+description = "{{ project_description }}"
+requires-python = ">={{ python_version }}"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "langgraph>=0.2.60",
+    "langchain-core>=0.3.28",
+{%- if primary_chat_agent in ["lg_agent", "both"] %}
+    "langchain-mcp-adapters>=0.1.0",
+{%- endif %}
+    "langchain-anthropic>=0.3.0",
+    "duckdb>=1.1.0",
+    "sentence-transformers>=3.0.0",
+{%- if vector_backend == "opensearch" %}
+    "opensearch-py>=2.7.0",
+{%- endif %}
+{%- if vector_backend == "postgres" %}
+    "psycopg[binary]>=3.2.0",
+    "pgvector>=0.3.6",
+{%- endif %}
+{%- if enable_postgres_checkpointer %}
+    "langgraph-checkpoint-postgres>=2.0.0",
+{%- endif %}
+{%- if include_calendar_integration %}
+    "google-api-python-client>=2.150.0",
+    "google-auth-oauthlib>=1.2.0",
+{%- endif %}
+{%- if include_ragas_grader %}
+    # KNOWN ISSUE (verified 2026-07-14): ragas 0.4.3's import currently crashes
+    # due to an upstream packaging bug — see evals/graders/ragas_grader.py.
+    # uv sync succeeds; `import ragas` doesn't, until ragas ships a fix.
+    "ragas>=0.4.3",
+    "datasets>=2.14.0",
+{%- endif %}
+{%- if include_composio %}
+    "composio>=0.17.0",
+{%- endif %}
+{%- if include_web_research %}
+    "gpt-researcher>=0.15.0",
+{%- endif %}
+{%- if primary_chat_agent in ["adk_agent", "both"] %}
+    "google-adk>=1.0.0",
+    "mcp>=1.0.0",
+{%- endif %}
+{%- if frontend_backend_topology == "split_service" %}
+    "pyjwt[crypto]>=2.9.0",
+{%- endif %}
+    "wandb>=0.18.0",
+    "pyyaml>=6.0.0",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.6.0",
+    "httpx>=0.27.0",
+    "anthropic>=0.40.0",
+    "python-dotenv>=1.0.0",
+{%- if include_ml_labs %}
+    "scikit-learn>=1.5.0",
+    "statsmodels>=0.14.0",
+    "scipy>=1.13.0",
+    "pandas>=2.2.0",
+    "matplotlib>=3.9.0",
+    "lightgbm>=4.5.0",
+    "statsforecast>=1.7.0",
+{%- endif %}
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.8.0",
+    "pyright>=1.1.390",
+]
+notebooks = [
+    "marimo>=0.13.3",
+]
+
+# This is an app, not a library — skip building/installing it as a package.
+# "agents" (from {{ source_root }}/agents), "core", and "{{ eval_root }}" are made
+# importable via pythonpath below (pytest) and PYTHONPATH in the Makefile (everything
+# else) — mirrors playground's actual PYTHONPATH convention rather than fighting
+# hatchling's editable-install semantics for multiple disjoint package roots.
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["{{ source_root }}", "."]
+asyncio_mode = "auto"
+addopts = "-v --ignore=tests/integration"
+markers = ["integration: real external calls, opt-in only"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py{{ python_version.replace('.', '') }}"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP"]
+
+# middleware/ only exists in split_service renders — pin it first-party so the
+# agents' try/except import blocks sort identically whether or not it's present
+# (ruff otherwise classifies it by directory existence, flipping I001 per config).
+[tool.ruff.lint.isort]
+known-first-party = ["middleware"]
+
+[tool.pyright]
+include = ["{{ source_root }}", "core", "{{ eval_root }}", "tests"{% if include_ml_labs %}, "labs"{% endif %}]
+extraPaths = ["{{ source_root }}"]
+pythonVersion = "{{ python_version }}"

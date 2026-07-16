@@ -1,0 +1,29 @@
+from __future__ import annotations
+
+from typing import Literal
+
+from langgraph.graph import END, START, StateGraph
+
+from agents.lg_agent.checkpointer import get_checkpointer
+from agents.lg_agent.nodes.generate import generate_node
+from agents.lg_agent.nodes.guardrail import guardrail_node
+from agents.lg_agent.nodes.retrieve import retrieve_node
+from agents.lg_agent.state import State
+
+
+def _route_after_guardrail(state: State) -> Literal["retrieve", "generate"]:
+    return "generate" if state.get("blocked", False) else "retrieve"
+
+
+def build_graph():
+    builder = (
+        StateGraph(State)
+        .add_node("guardrail", guardrail_node)
+        .add_node("retrieve", retrieve_node)
+        .add_node("generate", generate_node)
+        .add_edge(START, "guardrail")
+        .add_conditional_edges("guardrail", _route_after_guardrail, ["retrieve", "generate"])
+        .add_edge("retrieve", "generate")
+        .add_edge("generate", END)
+    )
+    return builder.compile(checkpointer=get_checkpointer())

@@ -1,0 +1,41 @@
+{
+  "name": "{{ project_slug }}-service",
+  "version": "0.1.0",
+  "description": "{{ project_description }}",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "tsx watch {{ ts_source_root }}/index.ts",
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-vm-modules node_modules/.bin/jest"{% if ts_agent_framework == "vercel_ai_sdk" %},
+    "eval": "tsx {{ ts_source_root }}/agent/eval/run.ts"{% endif %}
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.0"{% if ts_agent_framework == "vercel_ai_sdk" %},
+    "ai": "^5.0.0",
+    "@ai-sdk/anthropic": "^2.0.0",
+    "zod": "^3.24.0"{% endif %}
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.15.0",
+    "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.10.0",
+    "@types/supertest": "^6.0.2",
+    "eslint": "^9.15.0",
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.2.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.15.0"
+  }
+}

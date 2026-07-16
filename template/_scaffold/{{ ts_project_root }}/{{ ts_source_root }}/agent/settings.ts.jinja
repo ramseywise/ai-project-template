@@ -1,0 +1,19 @@
+/**
+ * {{ project_name }} — Vercel AI SDK agent settings.
+ *
+ * Env-var-driven, same shape as the Python agents' settings.py.jinja
+ * (pydantic-settings) — one place to read process.env, everything else
+ * imports from here rather than touching process.env directly.
+ *
+ * No port here — the agent is mounted into the existing Express app
+ * (app.ts's POST /agent/chat route), which listens on the app's own PORT.
+ * A standalone TS agent service would add its own port setting when that
+ * deployment shape actually exists (see Phase 3 of the scaffold plan).
+ */
+
+export const settings = {
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
+  agentModel: process.env.TS_AGENT_MODEL ?? "claude-haiku-4-5-20251001",
+  generationTemperature: Number(process.env.TS_AGENT_TEMPERATURE ?? 0.3),
+  maxSteps: Number(process.env.TS_AGENT_MAX_STEPS ?? 5),
+};

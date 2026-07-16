@@ -1,0 +1,14 @@
+# Eval metric targets — DESIGN.md's Evaluation table, made executable.
+#
+# Uncomment a metric to activate it. `make eval-heuristic` prints PASS/FAIL per
+# activated metric; `make eval-gate` additionally exits non-zero on any FAIL
+# (wire that into CI once the golden set is real). Keys must match
+# HeuristicReport fields in the eval runner (pipelines/run.py) — every backend
+# present in the project is held to the same targets.
+#
+# Shipped fully commented out: a fresh project's golden set is example data —
+# set real targets when DESIGN.md's Evaluation section is filled in.
+
+# hit_rate: 0.8
+# mean_reciprocal_rank: 0.6
+# mean_answer_overlap: 0.5

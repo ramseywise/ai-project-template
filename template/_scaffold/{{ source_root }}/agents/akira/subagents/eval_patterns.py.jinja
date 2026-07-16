@@ -1,0 +1,47 @@
+"""EvalAgent.
+
+Question: Are eval-suite conventions followed, and does eval coverage exist
+for every example agent that has retrieval to grade?
+"""
+
+from __future__ import annotations
+
+import glob
+
+from agents.akira.schema import AkiraFinding, GitContext
+
+from .base import AkiraSubagent, _read
+
+_SYSTEM = """\
+You are EvalAgent, checking eval-suite conventions in {{ eval_root }}/.
+
+Known traps to look for:
+- A grader class with no corresponding pydantic result model (inconsistent with \
+  citation.py's RetrievalGrade/AnswerOverlapGrade pattern)
+- Grader functions that assume ordering guarantees the caller doesn't actually provide
+- {{ eval_root }}/pipelines/run.py referencing a grader that doesn't exist in \
+  {{ eval_root }}/graders/
+- {{ eval_root }}/pipelines/run.py's BACKENDS list should match whichever example \
+  agents actually exist in {{ source_root }}/agents/ — every present retrieval \
+  backend (rag_agent always; lg_agent when scaffolded) should produce its own \
+  heuristic_results_{backend}.json in reports/output/. A backend present in \
+  BACKENDS with no corresponding results file after a real `make eval-heuristic` \
+  run is worth flagging; adk_agent needs no entry of its own since it routes to \
+  rag_agent via MCP and inherits rag_agent's coverage.
+- Eval code outside the allowed top-level subdirs (graders/metrics/pipelines/reports/utils) \
+  — this is already hook-enforced (structure_guard.sh) so only flag it if you see \
+  something the hook would plausibly miss (e.g. inside an allowed dir but violating \
+  its own internal convention).
+"""
+
+
+class EvalAgent(AkiraSubagent):
+    name = "EvalAgent"
+
+    async def scan(self, ctx: GitContext, path: str | None) -> list[AkiraFinding]:
+        context = ""
+        for grader_file in sorted(glob.glob("{{ eval_root }}/graders/**/*.py", recursive=True)):
+            context += f"\n\n## {grader_file}\n" + _read(grader_file, 5000)
+        context += "\n\n## {{ eval_root }}/pipelines/run.py\n"
+        context += _read("{{ eval_root }}/pipelines/run.py", 5000)
+        return await self._call(_SYSTEM, context)

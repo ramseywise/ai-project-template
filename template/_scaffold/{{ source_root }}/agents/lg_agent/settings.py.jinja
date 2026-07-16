@@ -1,0 +1,32 @@
+from __future__ import annotations
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    anthropic_api_key: str = ""
+    lg_model: str = "claude-haiku-4-5-20251001"
+    lg_port: int = 8010
+    vectordb_path: str = "data/stores/vectordb.duckdb"
+    # Always defaults to "memory" — checkpointer construction happens eagerly at
+    # graph-compile time (unlike vector_backend, which is lazy per-call), so
+    # defaulting this to "postgres" would make `make test`/import fail hard
+    # without a live Postgres reachable. Opt in via LG_CHECKPOINTER=postgres once
+    # POSTGRES_DSN actually points at a reachable database.
+    lg_checkpointer: str = "memory"  # memory | postgres
+    postgres_dsn: str = ""  # used by the postgres checkpointer
+
+    retrieval_top_k: int = 5
+    generation_temperature: float = 0.3
+
+    mcp_enabled: bool = {{ include_mcp_server }}
+    mcp_server_dir: str = "mcp_servers/{{ mcp_server_slug | default(project_slug) }}"
+
+    wandb_api_key: str = ""
+    wandb_project: str = "{{ project_slug }}"
+    data_sensitivity: str = "{{ data_sensitivity }}"
+
+
+settings = Settings()

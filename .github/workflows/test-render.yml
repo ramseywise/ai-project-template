@@ -1,0 +1,123 @@
+name: Test template renders
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # --- render+lint tier ---
+          - name: defaults
+            args: ""
+          - name: layering-only
+            args: "-d scaffold_full_project=false"
+          - name: primary_chat_agent-lg_agent
+            args: "-d primary_chat_agent=lg_agent"
+          - name: primary_chat_agent-adk_agent
+            args: "-d primary_chat_agent=adk_agent"
+          - name: primary_chat_agent-none
+            args: "-d primary_chat_agent=none"
+          # --- full tier: real test execution, one config per feature axis ---
+          - name: defaults-tested
+            args: ""
+            tier: test-py
+          - name: ts-backend
+            args: "-d primary_backend_language=typescript"
+            tier: test-ts
+          - name: split-service
+            args: "-d primary_backend_language=both -d frontend_backend_topology=split_service"
+            tier: test-split
+          - name: ml-labs
+            args: "-d include_ml_labs=true"
+            tier: test-py
+          - name: mcp-ts
+            args: "-d mcp_server_language=typescript"
+            tier: test-mcp-ts
+          - name: vector-memory
+            args: "-d vector_backend=memory"
+            tier: test-py
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install copier
+        run: pip install copier
+
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      # Renders have no package-lock.json, so npm caching (which keys on a
+      # lockfile) is deliberately not enabled here.
+      - uses: actions/setup-node@v4
+        if: contains(matrix.tier || '', 'ts') || matrix.tier == 'test-split'
+        with:
+          node-version: "22"
+
+      - name: Render (${{ matrix.name }})
+        run: |
+          copier copy --vcs-ref HEAD --trust --defaults \
+            -d "project_name_input=Render Test" \
+            ${{ matrix.args }} \
+            . out/
+
+      # .agents/ is vendored reference material that mentions copier variables in
+      # prose (e.g. framework-selection's SKILL.md) — excluded here for the same
+      # reason the generated Makefile's LINT_PATHS and pre-commit exclude it.
+      - name: Check for leftover Jinja
+        run: |
+          if grep -rn '{{' out/ --exclude-dir='.agents' --include='*.py' --include='*.md' --include='*.toml' --include='*.yaml' --include='*.yml' | grep -v 'font-family\|border-collapse\|padding: 0.4rem\|background: #f2f2f2\|margin-bottom\|font-weight: bold'; then
+            echo "Leftover unrendered Jinja found"
+            exit 1
+          fi
+
+      # Delegates to the render's own `make lint-check` (LINT_PATHS) rather than
+      # repo-wide ruff — .claude/ ships vendored reference scripts (mcp-builder)
+      # that are deliberately outside the project's lint boundary.
+      - name: Lint rendered project
+        working-directory: out
+        run: |
+          if [ -f pyproject.toml ]; then
+            uv sync --group dev
+            make lint-check
+          fi
+
+      - name: Run Python tests
+        if: matrix.tier == 'test-py' || matrix.tier == 'test-split'
+        working-directory: out
+        run: uv run pytest tests/unit -q
+
+      # ts_project_root defaults to project_slug — "Render Test" → render-test.
+      - name: TS backend — install/lint/typecheck/test/build
+        if: matrix.tier == 'test-ts'
+        working-directory: out/render-test
+        run: |
+          npm install
+          npm run lint
+          npm run typecheck
+          npm test
+          npm run build
+
+      - name: split_service frontend — install/build
+        if: matrix.tier == 'test-split'
+        working-directory: out/render-test
+        run: |
+          npm install
+          npm run build
+
+      - name: TS MCP server — install/build
+        if: matrix.tier == 'test-mcp-ts'
+        working-directory: out/mcp_servers/render-test
+        run: |
+          npm install
+          npm run build

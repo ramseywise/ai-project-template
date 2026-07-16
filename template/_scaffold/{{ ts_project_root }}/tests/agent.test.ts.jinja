@@ -1,0 +1,10 @@
+import request from "supertest";
+import { createApp } from "../{{ ts_source_root }}/app";
+
+describe("agent chat", () => {
+  it("POST /agent/chat rejects a missing messages array", async () => {
+    const app = createApp();
+    const res = await request(app).post("/agent/chat").send({});
+    expect(res.status).toBe(400);
+  });
+});

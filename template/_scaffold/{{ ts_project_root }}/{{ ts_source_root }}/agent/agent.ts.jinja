@@ -1,0 +1,26 @@
+/**
+ * {{ project_name }} — Vercel AI SDK agent loop.
+ *
+ * TS-native equivalent of the Python agents' graph.py/main.py combo: one
+ * streamText() call with a tool registry and automatic multi-step tool-calling
+ * (stopWhen: stepCountIs(settings.maxSteps)), returning a UIMessageStream
+ * response the caller (handler.ts) turns into an HTTP Response.
+ */
+
+import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from "ai";
+import { getModel } from "./clients/llm.js";
+import { settings } from "./settings.js";
+import { tools } from "./tools/index.js";
+
+const SYSTEM_PROMPT = "You are a helpful assistant for {{ project_name }}.";
+
+export function runAgent(messages: UIMessage[]) {
+  return streamText({
+    model: getModel(),
+    system: SYSTEM_PROMPT,
+    messages: convertToModelMessages(messages),
+    tools,
+    temperature: settings.generationTemperature,
+    stopWhen: stepCountIs(settings.maxSteps),
+  });
+}
