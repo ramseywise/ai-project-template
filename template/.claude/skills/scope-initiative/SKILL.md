@@ -15,6 +15,8 @@ Scope the following initiative into a Linear-ready backlog: `$ARGUMENTS`
 4. **Existing assets** — prototypes, research, analogous systems
 5. **Team roles available**
 6. **MVP scope** — in vs out
+7. **Milestones** — the initiative's checkpoint list from `/define-milestones`
+   (`.claude/docs/milestones/<initiative-slug>.md`); if missing, run that first
 
 ## Sections
 
@@ -23,7 +25,7 @@ Scope the following initiative into a Linear-ready backlog: `$ARGUMENTS`
 3. **Task backlog** — initiative goal + MVP definition of done. Per task: goal, deliverable (concrete, not "implement X"), key work bullets, risks/questions, size (S/M/L/XL).
 4. **Summary table + critical path** — # | Task | Failure mode | Size | Key dep | Owner | MVP? Plus: week-1 decisions, highest-risk dependency, tasks that must be designed together.
 5. **Open questions** — numbered, each names who must answer. Categories: data access, infra, product, ownership, policy, phasing.
-6. **Linear hierarchy** — Initiative → Projects (workstreams) → Issues (tasks) with acceptance criteria (Given/When/Then + metric + integration criterion) and blocking relationships.
+6. **Linear hierarchy** — Initiative → Project → Milestone → Issues (tasks): every task attaches to one of the initiative's milestones (from `/define-milestones`), with acceptance criteria (Given/When/Then + metric + integration criterion) and blocking relationships. A task that fits no milestone means either the backlog has scope creep or the milestone list is missing a checkpoint — resolve, don't orphan.
 
 ## Task constraints
 
@@ -52,6 +54,6 @@ explicitly in the summary table:
 
 ---
 
-**Upstream**: `/design-sprint` if still ideating what to build — run that first to get named initiatives and workstream clusters.
+**Upstream**: `/design-sprint` if still ideating what to build — run that first to get named initiatives and workstream clusters. `/define-milestones <initiative>` for the checkpoint list this backlog attaches to.
 
 **Next step**: `/doc-to-linear-tickets` to push the task backlog (Section 6 Linear hierarchy) into actual Linear issues once the scope is reviewed and agreed.

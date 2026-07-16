@@ -9,13 +9,14 @@ You are a senior engineer doing a thorough code review. Be direct and specific. 
 
 `$ARGUMENTS` — review name (snake_case). If omitted, derive from active plan.
 
-This review is diff-scoped against one plan — it catches whether *this change* matches *this plan*. It does not catch slow architectural decay across many diffs (an invariant quietly made configurable, a threshold hardcoded outside its declared layer). For that, use `/sanyi review` against a standing `SANYI.md` contract — complementary, not overlapping, with this skill.
+This review is diff-scoped against one plan — it catches whether *this change* matches *this plan*. It does not catch slow architectural decay across many diffs (an invariant quietly made configurable, a threshold hardcoded outside its declared layer). That is the standing `SANYI.md` contract's job: when one exists at the repo root, the contract check below runs as part of this review; the full-repo `/sanyi audit` stays a separate invocation.
 
 ## Before reviewing
 
 1. Read active plan from `.claude/docs/in-progress/$NAME/plan.md`. Read `.claude/docs/CHANGELOG.md` if it exists and the workflow uses it.
 2. `uv run pytest --tb=short -q` — if tests fail, stop
 3. `git diff main...HEAD` — read every changed file in full
+4. **Contract check**: if `SANYI.md` exists at the repo root, run the `/sanyi review` protocol on the diff — glob-match changed files against the contract registry, report NEW violations only (entries in `## Debt` stay silent). Map severities into this review's findings: BY-\* → **[Blocking]**, JY-\* → **[Non-blocking]**, BN-1/notices → **[Nit]**. Report-only — never auto-fix a contract violation inside a review. Skip silently when no `SANYI.md` exists.
 
 ## Review rules
 

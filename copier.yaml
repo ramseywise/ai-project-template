@@ -45,7 +45,11 @@ _message_after_copy: >+
   {%- if include_dev_companion %}
   - `.claude/docs/companion/collaboration.md` starts blank — /grow-companion fills it in as real sessions happen.
   {%- endif %}
+  {%- if scaffold_full_project %}
+  - Review the seeded SANYI.md (change contract) — Jianyi/Bianyi entries are pre-filled from your answers; complete the 不易 Buyi interview with `/sanyi init` before the first review run.
+  {%- else %}
   - Run `/sanyi init` to define this project's change-contract (变易/简易/不易 layers) now that its shape is set.
+  {%- endif %}
 
 _exclude:
   - __pycache__
@@ -666,6 +670,7 @@ _tasks:
     ~ _copier_conf.dst_path ~ '/_scaffold/renovate.json '
     ~ _copier_conf.dst_path ~ '/_scaffold/.env.example '
     ~ _copier_conf.dst_path ~ '/_scaffold/README.md '
+    ~ _copier_conf.dst_path ~ '/_scaffold/SANYI.md '
     ~ _copier_conf.dst_path ~ '/_scaffold/project_init.sh '
     ~ _copier_conf.dst_path ~ '/_scaffold/.vscode '
     ~ _copier_conf.dst_path ~ '/_scaffold/.github '

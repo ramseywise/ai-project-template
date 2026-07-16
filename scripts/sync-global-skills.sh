@@ -30,6 +30,7 @@ SKILLS=(
   plan-refactor
   prototype
   skill-creator
+  sanyi
 )
 
 changed=()

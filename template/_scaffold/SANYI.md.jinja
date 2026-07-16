@@ -1,0 +1,136 @@
+# SANYI.md — change contract
+
+project: {{ project_slug }}
+version: 1
+last-audit: pending — complete /sanyi init
+
+<!-- Seeded by the scaffold from your copier answers. The Jianyi/Bianyi entries
+     below are inferred from the scaffolded structure; 不易 Buyi CANNOT be
+     inferred from code — business/safety intent isn't in any AST. Complete the
+     Buyi interview with `/sanyi init` before the first review run. -->
+
+## 不易 Buyi
+
+<!-- TODO (interview required — /sanyi init). Admission test: something is Buyi
+     only if violating it causes a security, legal, financial, or trust failure.
+     Every entry needs a deterministic code-layer implementation (a prompt-only
+     invariant is BY-4 debt) and must never be bypassable via config/env/flag.
+
+     Question bank:
+     - What must the agent never do, say, or promise?
+     - Which compliance constraints apply (data classification here: {{ data_sensitivity }})?
+     - Which escalation fallbacks must always fire?
+     - Which data must never leave the system boundary?
+     - Which actions are irreversible, and what guards them?
+     - What would a misbehaving agent concretely cost?
+
+     Candidates from your scaffold answers (confirm, don't rubber-stamp):
+{%- if frontend_backend_topology == 'split_service' %}
+     - Supabase-JWT auth middleware ({{ source_root }}/middleware/auth.py) — every
+       API request authenticated; not bypassable.
+{%- endif %}
+     - data_sensitivity = {{ data_sensitivity }}{% if data_sensitivity in ['restricted', 'secret'] %} — restricted/secret data needs a
+       named boundary invariant with a code-layer guard{% endif %}
+     - "make eval-gate must pass before release" — the threshold VALUES are
+       Bianyi (targets.yaml); "the gate must run" is the Buyi part once you
+       wire it into CI. -->
+
+## 简易 Jianyi
+
+{% if scaffold_full_project -%}
+### Agent response schemas
+
+- paths: {{ source_root }}/agents/rag_agent/schema.py{% if primary_chat_agent in ['lg_agent', 'both'] %}, {{ source_root }}/agents/lg_agent/schema.py{% endif %}{% if primary_chat_agent in ['adk_agent', 'both'] %}, {{ source_root }}/agents/adk_agent/schema.py{% endif %}
+- contract: Response/state shapes are inter-component interfaces. New fields
+  need justification in the PR; untyped catch-alls (dict/Any/**kwargs) are
+  JY-3 unbounded growth, not "one field".
+- budget: each new field needs justification; set a numeric ceiling at first
+  audit
+- current: baseline at first audit (pending first audit)
+
+### Graph control flow
+
+- paths: {{ source_root }}/agents/rag_agent/graph.py{% if primary_chat_agent in ['lg_agent', 'both'] %}, {{ source_root }}/agents/lg_agent/graph.py{% endif %}
+- contract: The execution graph is usually the dominant complexity carrier —
+  a perfect schema can wrap a hellish graph. New nodes, edges, branches, or
+  retry cycles need justification in the PR.
+- budget: qualitative until scripted flow metrics; topology changes bump the
+  contract version
+- current: baseline at first audit (pending first audit)
+{%- if primary_chat_agent in ['adk_agent', 'both'] %}
+
+### ADK tool signatures
+
+- paths: {{ source_root }}/agents/adk_agent/schema.py, {{ source_root }}/agents/adk_agent/prompts/
+- contract: ADK output schemas and FunctionTool signatures are the agent's
+  external contract — added/removed params or fields without a schema bump
+  are JY-3 tool-signature drift. Keep output schemas total (no Any), so the
+  agent can't go off the rails past its declared shape.
+- budget: signature changes need justification and a contract version bump
+- current: baseline at first audit (pending first audit)
+{%- endif %}
+
+### Eval suite topology
+
+- paths: {{ eval_root }}/
+- contract: Top-level layout (graders/, metrics/, pipelines/, reports/,
+  utils/) is fixed; new eval code fits in one of these.
+- budget: no new top-level directories without a contract version bump
+- current: 5 directories (pending first audit)
+{%- endif %}
+{%- if include_mcp_server %}
+
+### MCP tool surface
+
+- paths: mcp_servers/{{ mcp_server_slug }}/
+- contract: Tool schemas are an external interface consumed by other agents;
+  signature changes are JY-3 drift.
+- budget: tool additions need justification
+- current: baseline at first audit (pending first audit)
+{%- endif %}
+
+## 变易 Bianyi
+
+{% if scaffold_full_project -%}
+### Eval targets
+
+- paths: {{ eval_root }}/targets.yaml
+- contract: Metric thresholds live here and only here — `make eval-gate`
+  reads them. A literal threshold in grader/pipeline code is BN-1.
+
+### Agent settings
+
+- paths: {{ source_root }}/agents/rag_agent/settings.py{% if primary_chat_agent in ['lg_agent', 'both'] %}, {{ source_root }}/agents/lg_agent/settings.py{% endif %}
+- contract: Model names, retrieval parameters, and tunables live in settings
+  (env-overridable); changing a value must not require touching node/graph
+  logic.
+{%- if primary_chat_agent in ['adk_agent', 'both'] %}
+
+### Prompts
+
+- paths: {{ source_root }}/agents/adk_agent/prompts/
+- contract: All prompt text lives here; an inline prompt string in business
+  logic is BN-1.
+{%- endif %}
+{%- if include_promptfoo %}
+
+### Promptfoo config
+
+- paths: promptfoo.config.yaml
+- contract: Prompt-eval cases and providers are config, editable without a
+  deploy.
+{%- endif %}
+{%- endif %}
+
+## Migrations
+
+<!-- Empty at init. Format: - YYYY-MM-DD: <from> → <to> / <entry> — <rationale>. (author: <who>) -->
+
+## Pending
+
+<!-- Disputed assignments park here; enforced as Buyi until resolved. -->
+
+## Debt
+
+<!-- Filled by init's closing audit and by accepted review findings.
+     Format: - [CODE] <location> — <one-line description> (recorded YYYY-MM-DD) -->

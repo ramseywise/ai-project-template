@@ -45,6 +45,15 @@ Verify the changes against:
 - Proper error handling at system boundaries
 - No backwards-compatibility hacks unless explicitly required
 
+### Change Contract (SANYI)
+If `SANYI.md` exists at the repo root, run the `/sanyi review` protocol on the
+PR diff: glob-match changed files against the contract's component registry and
+report NEW violations, blockers first (BY-\* = Buyi touched/downgraded/unguarded,
+JY-\* = entropy budget pressure, BN-1 = hardcoded tunable). Violations already
+recorded in the contract's `## Debt` section stay silent. BY-\* findings are
+**[blocking]**; report-only — never auto-fix a contract violation from inside a
+review. Skip this section silently when no `SANYI.md` exists.
+
 ## Step 3: Build Verification
 
 Run verification commands if the PR is checked out locally or in a worktree:
