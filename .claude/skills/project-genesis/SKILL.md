@@ -99,6 +99,13 @@ defaults are right):**
    `meeting_intelligence`/`marketing`/`n8n_webhook`/`composio`/`ml_labs`).
    Mention only the ones the design implies — e.g. classical ML/stats work
    (baselines, forecasting, A/B) → add `ml_labs`.
+10. **Which interaction metrics matter?** → `eval_metrics` (multiselect:
+    `escalation`/`friction`/`intent`/`language` — each ships a heuristic
+    grader + LLM judge + report section; agent-shaped projects seed
+    escalation + friction). Ask in the design's terms, not copier's: "when
+    should this assistant hand off to a human?" → escalation; "does it route
+    queries to the right place?" → intent; multilingual users → language.
+    Retrieval eval ships regardless — don't offer it as a choice.
 
 Skip questions whose answer is obvious from context already given (e.g. if
 they've already said "no existing repo, brand new thing", `project_type` can't
@@ -139,6 +146,7 @@ copier copy --vcs-ref HEAD --trust --defaults \
   -d "agent_memory=<none|conversation|long_term>" \
   -d "human_approval=<none|sometimes|always>" \
   -d "optional_features=[<akira, dev_companion, ...>]" \
+  -d "eval_metrics=[<escalation, friction, intent, language>]" \
   . "<output_dir>"
 ```
 

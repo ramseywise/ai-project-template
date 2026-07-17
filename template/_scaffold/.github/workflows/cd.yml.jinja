@@ -1,0 +1,44 @@
+name: CD
+
+# Rendered only when deployment_target is docker/cloud AND the lg_agent chat
+# agent is scaffolded — infrastructure/containers/lg_agent/Dockerfile is the
+# only image the template ships (see copier.yaml's cd.yml cleanup task).
+#
+# This is the "build" half of CD: image pushed to GHCR, tagged latest + sha.
+# Wire the "deploy" half (Railway/ECS/Cloud Run/...) as a follow-on job for
+# your actual target — serverless/split_service projects don't get this file
+# at all (Vercel and Railway deploy from their own git integrations).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: {% raw %}${{ github.actor }}{% endraw %}
+          password: {% raw %}${{ secrets.GITHUB_TOKEN }}{% endraw %}
+      # metadata-action also lowercases the image name (GHCR requires it).
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: {% raw %}ghcr.io/${{ github.repository }}{% endraw %}/lg_agent
+          tags: |
+            type=sha
+            type=raw,value=latest
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infrastructure/containers/lg_agent/Dockerfile
+          push: true
+          tags: {% raw %}${{ steps.meta.outputs.tags }}{% endraw %}
+          labels: {% raw %}${{ steps.meta.outputs.labels }}{% endraw %}

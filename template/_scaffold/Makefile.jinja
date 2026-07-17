@@ -10,6 +10,9 @@
         akira-kiyoko akira-kaneda akira-dao \
 {%- endif %}
         eval-heuristic eval-gate eval-render \
+{%- if include_interaction_evals %}
+        eval-grade eval-grade-gate eval-interactions-report eval-calibrate \
+{%- endif %}
 {%- if include_promptfoo %}
         promptfoo-eval \
 {%- endif %}
@@ -133,6 +136,23 @@ eval-gate:
 eval-render:
 	$(PY) -m {{ eval_root }}.pipelines.run render
 
+{% if include_interaction_evals -%}
+# Interaction evals ({{ eval_root }}/graders/{heuristic,judges}) — heuristics
+# always run; LLM judges join when ANTHROPIC_API_KEY is set.
+eval-grade:
+	$(PY) -m {{ eval_root }}.pipelines.grade run
+
+eval-grade-gate:
+	$(PY) -m {{ eval_root }}.pipelines.grade run --gate
+
+eval-interactions-report:
+	$(PY) -m {{ eval_root }}.pipelines.grade report
+
+# Heuristic-vs-judge agreement (needs a graded run that included judges).
+eval-calibrate:
+	$(PY) -m {{ eval_root }}.pipelines.calibration
+
+{% endif -%}
 {% if include_promptfoo -%}
 promptfoo-eval:
 	npx promptfoo eval -c promptfoo.config.yaml

@@ -47,6 +47,13 @@ jobs:
           - name: vector-memory
             args: "-d vector_backend=memory"
             tier: test-py
+          # defaults-tested already exercises the seeded escalation+friction
+          # pair (chat_app is agent-shaped); this row covers all four
+          # interaction metrics. The zero-metric removal path is covered by
+          # project_type-eval_suite/mcp_server above (not agent-shaped).
+          - name: eval-metrics-all
+            args: "-d eval_metrics=[escalation,friction,intent,language]"
+            tier: test-py
     steps:
       - uses: actions/checkout@v4
 

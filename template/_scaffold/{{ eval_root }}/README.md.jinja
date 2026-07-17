@@ -1,5 +1,13 @@
 # Evals
+{% if include_interaction_evals %}
+Two eval suites live here:
 
+1. **Retrieval golden-QA** (`pipelines/run.py`) — grades search quality per
+   backend against `data/corpus/golden_qa.jsonl`. Documented below.
+2. **Interaction evals** (`pipelines/grade.py`) — grades recorded assistant
+   conversations on the metrics this project selected at generation time
+   (see `graders/metrics_registry.py`). See "Interaction evals" at the end.
+{% endif %}
 Heuristic eval suite, run independently against every retrieval backend
 actually present in this project (`rag_agent`'s embeddings always; `lg_agent`'s
 BM25 index if scaffolded — see `pipelines/run.py`'s `BACKENDS` list).
@@ -74,3 +82,36 @@ that backend's results file.
 
 Everything under `reports/output/` is generated, not committed — see the root
 `.gitignore`.
+{% if include_interaction_evals %}
+## Interaction evals
+
+Grades recorded user↔assistant exchanges (JSONL, one object per line — see
+`data/evals/interactions_sample.jsonl` for the shape and replace it with real
+traffic). Every enabled metric has a matched pair:
+
+- `graders/heuristic/<metric>.py` — deterministic flags, free, always run
+- `graders/judges/<metric>.py` — LLM judge (score + written reasoning), runs
+  when `ANTHROPIC_API_KEY` is set; model overridable via `EVAL_JUDGE_MODEL`
+- `metrics/<metric>.py` — aggregation into the summary the report renders
+
+`graders/metrics_registry.py` is the single wiring point — pipelines and
+reports discover metrics there, so adding a project-specific metric is: write
+the grader module(s), register the `MetricDefinition`, done.
+
+```
+make eval-grade                 # heuristics (+judges if key set) -> graded JSONL + summary
+make eval-grade-gate            # same, exits non-zero on targets.yaml misses
+make eval-interactions-report   # HTML report, one card per metric
+make eval-calibrate             # heuristic-vs-judge agreement (Cohen's kappa)
+```
+
+Supporting pipeline steps, each also runnable standalone:
+
+- `pipelines/sampling.py` — seeded (optionally stratified) subsampling for
+  experiments and judge-cost control
+- `pipelines/redaction.py` — regex PII scrub, applied before grading (and
+  before any text reaches a judge); the default follows the project's
+  data-sensitivity answer, override with `--redact`/`--no-redact`
+- `pipelines/calibration.py` — how well the free heuristics track the judges;
+  high kappa means heuristic-only CI runs are trustworthy proxies
+{% endif %}

@@ -171,3 +171,6 @@ isn't in the multiselect — it derives directly from Calendar in `external_syst
   to be layered onto a project that may already exist and already have its own git history.
 - All Python-stack assumptions (`uv`, `pytest`, `ruff`, `pyright`) are load-bearing defaults, not yet
   optional — this template currently targets Python (+ optional TypeScript) projects.
+- Rendered projects plug into a machine-level review ladder if present (workspace Makefile +
+  global `/review-sweep`, refs, and agent defs in `~/.claude/`) — the template ships only the
+  per-repo halves: Makefile lint/test targets, `Refs:` lines in CLAUDE.md, optional SANYI contract.

@@ -4,5 +4,11 @@
   your own `.md` files (one `# Title` heading per file, body below it) and re-run
   `make corpus-ingest`.
 - `corpus/golden_qa.jsonl` — example question/answer pairs used by the eval suite.
+{%- if include_interaction_evals %}
+- `evals/interactions_sample.jsonl` — example recorded interactions for the
+  interaction-eval suite (`make eval-grade`). Replace with real traffic dumps
+  in the same shape; PII redaction runs before grading (see
+  `{{ eval_root }}/pipelines/redaction.py`).
+{%- endif %}
 - `processed/`, `stores/` — gitignored runtime outputs of `make corpus-preprocess`
   and `make corpus-ingest`. Never commit these.
