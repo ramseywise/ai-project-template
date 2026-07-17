@@ -11,7 +11,9 @@ empty reports/) while playground/evals has the mature layout: heuristic graders 
 LLM judges per metric, a metrics registry, experiment runner, and HTML reports.
 Evals are where this template can differentiate most for DSSG projects.
 
-## Workstream 1 — evals port (primary)
+## Workstream 1 — evals port (primary) ✓ DONE — 2026-07-17
+
+Executed as specified below, with deviations recorded at the end of this doc.
 
 Target layout under `_scaffold/{{ eval_root }}/` (mirrors playground/evals):
 
@@ -41,7 +43,7 @@ Copier axes:
 CI: extend `.github/workflows/test-render.yml` matrix with at least one
 render exercising a non-default metric set.
 
-## Workstream 2 — agent slug cleanup
+## Workstream 2 — agent slug cleanup ✓ DONE — 2026-07-17
 
 Agent directory names are hardcoded framework names (`agents/lg_agent/` etc.).
 Add `agent_slug` copier var (genesis proposes it from project domain, e.g.
@@ -51,8 +53,9 @@ framework choice picking the implementation inside. Touches: staging paths,
 docker-compose service name, Dockerfile path, cd.yml image name, CI matrix.
 Keep `rag_agent` name for the shared retrieval backend (it IS its function),
 but demote it from mandatory to a default-on choice (custom-RAG option).
+Executed as specified; deviations in the notes at the end of this doc.
 
-## Workstream 3 — akira restructure
+## Workstream 3 — akira restructure ✓ DONE — 2026-07-17
 
 Keep akira as an optional feature, but vendored-skill-only: drop
 `src/agents/akira/` (LangGraph agent in product source) and ship just
@@ -60,6 +63,9 @@ Keep akira as an optional feature, but vendored-skill-only: drop
 globalized to ~/.claude on 2026-07-17. Rendered repos keep akira because DSSG
 volunteers don't have the global config. Remove `make akira-kaneda` or repoint
 it at the skill flow.
+Pulled forward into the W2 session at user request (user spotted akira still
+under src/ while reviewing renders); executed as specified — make targets
+removed, not repointed.
 
 ## Sequencing
 
@@ -69,7 +75,35 @@ removal is simpler once slugs are parameterized). Each workstream = one PR.
 ## Done when
 
 - Render matrix passes with metrics selected/deselected in combinations.
+  ✓ W1: verified locally (all-metrics / defaults / eval_suite renders; CI row
+  `eval-metrics-all` added).
 - A rendered project can run `pipelines/run.py` on sample data and get an HTML
   report with one section per enabled metric.
+  ✓ W1: `pipelines/grade.py run` + `report` verified end-to-end on the shipped
+  sample data (heuristic-only path); 19/19 unit tests pass in the all-metrics
+  render, 14/14 in the defaults render; ruff check+format clean.
 - No framework-named agent dirs in a fresh render; akira present only under
-  `.claude/`.
+  `.claude/`. (Workstreams 2–3, not started.)
+
+## Workstream 1 execution notes (2026-07-17)
+
+- Entry point is `pipelines/grade.py` (new CLI: `run`/`report`), not an
+  extension of `run.py` — the retrieval golden-QA flow stays untouched.
+  Make targets: eval-grade, eval-grade-gate, eval-interactions-report,
+  eval-calibrate.
+- Deviation: reports are rendered by a pure-Python `reports/renderer.py`
+  (CSS constant + string assembly, playground suite.html look) instead of
+  jinja2 `html/` templates — the scaffold deliberately has no jinja2 dep.
+- Deviation: `targets.yaml`, eval `README.md`, and `data/README.md` became
+  `.jinja` files to gate interaction-eval content.
+- Judge default model is `claude-opus-4-8` (per claude-api skill guidance),
+  overridable via `EVAL_JUDGE_MODEL`; judges degrade to None without
+  `ANTHROPIC_API_KEY` — same contract as answer-overlap grading.
+- Redaction default follows `data_sensitivity` (restricted/secret → on).
+- Pre-existing, untouched: `pipelines/run.py` RUF010 finding appears only
+  under ruff newer than the project pin.
+- Same-session extras (committed with this work): `_mcp_ts_staging` →
+  `_mcp_ts` rename, cd.yml.jinja (docker/cloud + lg_agent only), PR-template
+  `Linked issue` line.
+
+_compact: 2026-07-17 18:03_

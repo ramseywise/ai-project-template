@@ -40,7 +40,6 @@ def test_registry_wiring_is_consistent() -> None:
         assert definition.description
 {% if include_metric_escalation %}
 
-
 class TestEscalationHeuristic:
     def test_no_ground_truth_returns_none(self) -> None:
         assert METRICS["escalation"].heuristic(_interaction()) is None
@@ -65,9 +64,7 @@ class TestEscalationHeuristic:
             )
         )
         assert result is not None and result.is_correct
-{% endif %}
-{% if include_metric_friction %}
-
+{% endif %}{% if include_metric_friction %}
 
 class TestFrictionHeuristic:
     def test_direct_answer_passes(self) -> None:
@@ -85,9 +82,7 @@ class TestFrictionHeuristic:
         )
         assert result is not None and not result.is_correct
         assert "hedging" in result.dimensions
-{% endif %}
-{% if include_metric_intent %}
-
+{% endif %}{% if include_metric_intent %}
 
 class TestIntentHeuristic:
     def test_matching_route_passes(self) -> None:
@@ -104,9 +99,7 @@ class TestIntentHeuristic:
 
     def test_missing_fields_returns_none(self) -> None:
         assert METRICS["intent"].heuristic(_interaction(routed_to="brewing")) is None
-{% endif %}
-{% if include_metric_language %}
-
+{% endif %}{% if include_metric_language %}
 
 class TestLanguageHeuristic:
     def test_english_answer_to_spanish_query_fails(self) -> None:
@@ -129,7 +122,6 @@ class TestLanguageHeuristic:
         )
         assert result is not None and result.is_correct
 {% endif %}
-
 
 def test_redaction_scrubs_pii() -> None:
     text = (

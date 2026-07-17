@@ -10,7 +10,7 @@ from agents.rag_agent.settings import settings
 
 @lru_cache(maxsize=1)
 def get_checkpointer() -> BaseCheckpointSaver:
-    """InMemorySaver for local dev — see agents/lg_agent/checkpointer.py for the
+    """InMemorySaver for local dev — see the LangGraph chat agent's checkpointer.py for the
     full rationale (identical pattern here: set RAG_CHECKPOINTER=postgres +
     POSTGRES_DSN for production, cached via @lru_cache since the connection pool
     is meant to live for the process lifetime)."""

@@ -31,7 +31,7 @@ This directory holds the command-style workflows used in this repo.
 | `skill-creator` | Capturing a workflow as a reusable skill | Creates or improves a SKILL.md, iterates from test results | No |
 | `sanyi` | Enforcing an architectural change-contract across many diffs | Classifies components into 变易/简易/不易 layers, catches decay `code-review` structurally can't see | No |
 {%- if include_akira %}
-| `akira` | Proactive quality check — "what did we miss?" | Delegates to the akira agent (kiyoko/kaneda/dao modes) | No |
+| `akira` | Proactive quality check — "what did we miss?" | Runs in-session (kiyoko questions, dao fixes) + spawns the vendored `akira-scan` agent for the kaneda scan | No |
 {%- endif %}
 {%- if include_dev_companion %}
 | `grow-companion` | A durable collaboration pattern shifted mid-session | Transforms `.claude/docs/companion/collaboration.md` — not append-only logging | No |

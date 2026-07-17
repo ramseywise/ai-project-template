@@ -26,6 +26,15 @@ mkdir -p data/processed data/stores
 
 echo "Done. Next steps:"
 echo "  1. Edit .env with your ANTHROPIC_API_KEY"
+{%- if primary_chat_agent in ["lg_agent", "both"] %}
 echo "  2. make corpus-ingest   # build the example FTS index from data/corpus/"
-echo "  3. make lg-up           # start the example LangGraph agent"
-echo "  4. make lg-chat         # smoke-test it"
+echo "  3. make {{ lg_agent_dir | replace('_', '-') }}-up   # start the {{ lg_agent_dir }} chat agent (LangGraph)"
+echo "  4. make {{ lg_agent_dir | replace('_', '-') }}-chat # smoke-test it"
+{%- elif primary_chat_agent == "adk_agent" %}
+echo "  2. make {{ adk_agent_dir | replace('_', '-') }}-up   # start the {{ adk_agent_dir }} chat agent (Google ADK)"
+echo "  3. make {{ adk_agent_dir | replace('_', '-') }}-chat # smoke-test it"
+{%- elif include_rag_agent %}
+echo "  2. make rag-corpus-ingest  # build rag_agent's embedding index from data/corpus/"
+echo "  3. make rag-up             # start the rag_agent retrieval service"
+echo "  4. make rag-chat           # smoke-test it"
+{%- endif %}

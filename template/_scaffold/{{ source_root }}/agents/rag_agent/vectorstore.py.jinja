@@ -40,7 +40,7 @@ from agents.rag_agent.settings import settings
 
 
 def _dot(a: list[float], b: list[float]) -> float:
-    return sum(x * y for x, y in zip(a, b))
+    return sum(x * y for x, y in zip(a, b, strict=True))
 
 
 class DuckDBVectorIndex:
@@ -69,7 +69,7 @@ class DuckDBVectorIndex:
         if not records:
             return
         vectors = self._embeddings.embed_documents([text for _, _, text in records])
-        for (rid, title, text), vec in zip(records, vectors):
+        for (rid, title, text), vec in zip(records, vectors, strict=True):
             self._con.execute(
                 "INSERT OR REPLACE INTO rag_chunks (id, text, title, embedding) "
                 "VALUES (?, ?, ?, ?)",
@@ -127,7 +127,7 @@ class MemoryVectorIndex:
         if not records:
             return
         vectors = self._embeddings.embed_documents([text for _, _, text in records])
-        for (rid, title, text), vec in zip(records, vectors):
+        for (rid, title, text), vec in zip(records, vectors, strict=True):
             self._records[rid] = (title, text, vec)
         self._save_snapshot()
 
@@ -232,7 +232,7 @@ class OpenSearchVectorIndex:
                 "_id": rid,
                 "_source": {"title": title, "text": text, "embedding": vec},
             }
-            for (rid, title, text), vec in zip(records, vectors)
+            for (rid, title, text), vec in zip(records, vectors, strict=True)
         ]
         bulk(self._client, actions, refresh="wait_for")
 
@@ -322,7 +322,10 @@ class PostgresVectorIndex:
         with self._conn.cursor() as cur:
             cur.executemany(
                 query,
-                [(rid, title, text, vec) for (rid, title, text), vec in zip(records, vectors)],
+                [
+                    (rid, title, text, vec)
+                    for (rid, title, text), vec in zip(records, vectors, strict=True)
+                ],
             )
 
     def similarity_search(self, query: str, k: int = 5) -> list[tuple[str, str, str, float]]:

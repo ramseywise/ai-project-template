@@ -88,8 +88,23 @@ defaults are right):**
 7. **Which chat agent(s)** — LangGraph (`lg_agent`), Google ADK (`adk_agent`),
    both, or neither (build on `rag_agent` alone)? → `primary_chat_agent`.
    Copier derives a sensible default from `project_type`; only ask if the
-   design names a framework. `rag_agent` and `akira` ship regardless — they're
-   shared LangGraph-based infra, not "the framework" being picked.
+   design names a framework. `akira` ships independently as a .claude
+   skill + vendored scan agent — not product source, not "the framework".
+7b. **What is the agent called?** → `agent_slug` — ALWAYS propose this from
+   the project's domain (an intake assistant → `intake_triage`, a grants
+   helpdesk → `grants_qa`), never leave the generic `assistant` default
+   without offering a better name. It names `{{ source_root }}/agents/<slug>/`
+   and the Makefile targets (`<slug>-up`/`-chat`); with `both`, ADK gets
+   `<slug>_adk`. Must be a lowercase Python identifier; `rag_agent`,
+   `lg_agent`, `adk_agent`, `akira` are reserved.
+7c. **Prebuilt retrieval backend, or custom RAG?** → `include_rag_agent`
+   (default on). Only surface this when the design describes its own
+   retrieval/RAG architecture — turning it off drops `rag_agent` and the
+   project points `RAG_AGENT_URL` at the custom service instead. Flag the
+   conflict if `promptfoo` is selected with `include_rag_agent=false` (its
+   config targets rag_agent's /chat), and note that the golden-QA retrieval
+   eval then needs the LangGraph chat agent (BM25) or a custom backend
+   registered in `evals/pipelines/run.py`.
 8. **Vector store at production scale, or just getting started?** →
    `vector_backend` (`duckdb` default / `memory` zero-setup / `opensearch`
    cluster / `postgres` pgvector — auto-defaulted to `postgres` when `database`
@@ -145,6 +160,8 @@ copier copy --vcs-ref HEAD --trust --defaults \
   -d "agent_tools=[<search, mcp, ...>]" \
   -d "agent_memory=<none|conversation|long_term>" \
   -d "human_approval=<none|sometimes|always>" \
+  -d "agent_slug=<domain_based_name>" \
+  -d "include_rag_agent=<true|false>" \
   -d "optional_features=[<akira, dev_companion, ...>]" \
   -d "eval_metrics=[<escalation, friction, intent, language>]" \
   . "<output_dir>"
@@ -205,8 +222,8 @@ on/off), report whether a DESIGN.md was carried over and which Evaluation
 targets landed in `evals/targets.yaml` (vs. manual-grading targets that stayed
 in DESIGN.md only), and surface the template's own next steps (mirrors `_message_after_copy`
 in `copier.yaml`: review `CLAUDE.md`'s Hard Rules, `chmod +x .claude/hooks/*.sh`
-if needed, `make setup` then whichever of `make lg-up`/`make adk-up`/`make rag-up`
-matches `primary_chat_agent` if `scaffold_full_project`, `uv sync` inside
+if needed, `make setup` then the chat agent's `make <agent_slug>-up` (or
+`make rag-up` when only rag_agent ships) if `scaffold_full_project`, `uv sync` inside
 `mcp_servers/<slug>` if `include_mcp_server`, and `/sanyi init` to define the
 project's change-contract now that its shape is set).
 

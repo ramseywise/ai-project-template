@@ -1,13 +1,14 @@
+{% set lg = lg_agent_dir | replace("_", "-") -%}
+{% set adk = adk_agent_dir | replace("_", "-") -%}
 .PHONY: setup corpus-preprocess \
 {%- if primary_chat_agent in ["lg_agent", "both"] %}
-        corpus-ingest lg-up lg-down lg-wait lg-chat \
+        corpus-ingest {{ lg }}-up {{ lg }}-down {{ lg }}-wait {{ lg }}-chat \
 {%- endif %}
+{%- if include_rag_agent %}
         rag-corpus-ingest rag-up rag-down rag-wait rag-chat \
-{%- if primary_chat_agent in ["adk_agent", "both"] %}
-        adk-up adk-down adk-wait adk-chat \
 {%- endif %}
-{%- if include_akira %}
-        akira-kiyoko akira-kaneda akira-dao \
+{%- if primary_chat_agent in ["adk_agent", "both"] %}
+        {{ adk }}-up {{ adk }}-down {{ adk }}-wait {{ adk }}-chat \
 {%- endif %}
         eval-heuristic eval-gate eval-render \
 {%- if include_interaction_evals %}
@@ -26,7 +27,7 @@
 {%- endif %}
         docker-up docker-down
 
-# {{ source_root }}/ holds "agents" (imported bare, e.g. `agents.lg_agent`); "core"
+# {{ source_root }}/ holds "agents" (imported bare, e.g. `agents.{{ lg_agent_dir }}`); "core"
 # and "{{ eval_root }}" live at the project root — both need to be on PYTHONPATH
 # for anything invoked outside of pytest (which reads pythonpath from pyproject.toml).
 PY := PYTHONPATH={{ source_root }}:. uv run python
@@ -43,26 +44,27 @@ corpus-preprocess:
 corpus-ingest: corpus-preprocess
 	$(PY) -m core ingest
 
-# --- Example agent ({{ source_root }}/agents/lg_agent) ---
-lg-up:
-	$(UVICORN) agents.lg_agent.main:app --port $${LG_PORT:-8010} --reload &
+# --- Chat agent ({{ source_root }}/agents/{{ lg_agent_dir }}, LangGraph) ---
+{{ lg }}-up:
+	$(UVICORN) agents.{{ lg_agent_dir }}.main:app --port $${LG_PORT:-8010} --reload &
 
-lg-down:
-	pkill -f "uvicorn agents.lg_agent.main:app" 2>/dev/null || true
+{{ lg }}-down:
+	pkill -f "uvicorn agents.{{ lg_agent_dir }}.main:app" 2>/dev/null || true
 
-lg-wait:
+{{ lg }}-wait:
 	@for i in $$(seq 1 30); do \
-		curl -sf http://localhost:$${LG_PORT:-8010}/health >/dev/null && echo "lg_agent is up" && exit 0; \
+		curl -sf http://localhost:$${LG_PORT:-8010}/health >/dev/null && echo "{{ lg_agent_dir }} is up" && exit 0; \
 		sleep 1; \
 	done; \
-	echo "lg_agent did not become healthy in time" >&2; exit 1
+	echo "{{ lg_agent_dir }} did not become healthy in time" >&2; exit 1
 
-lg-chat:
+{{ lg }}-chat:
 	curl -s -X POST http://localhost:$${LG_PORT:-8010}/chat \
 		-H "Content-Type: application/json" \
 		-d '{"message": "How do I descale the machine?", "thread_id": "smoke-test"}' | uv run python -m json.tool
 
 {% endif -%}
+{% if include_rag_agent -%}
 # --- Example agent ({{ source_root }}/agents/rag_agent) — same corpus, embedding-based retrieval ---
 rag-corpus-ingest: corpus-preprocess
 	$(PY) -m core rag-ingest
@@ -85,24 +87,25 @@ rag-chat:
 		-H "Content-Type: application/json" \
 		-d '{"message": "How do I descale the machine?", "thread_id": "smoke-test"}' | uv run python -m json.tool
 
+{% endif -%}
 {% if primary_chat_agent in ["adk_agent", "both"] -%}
-# --- Example agent ({{ source_root }}/agents/adk_agent) — Google ADK, MCP via McpToolset ---
-adk-up:
-	$(UVICORN) agents.adk_agent.gateway.main:app --port $${ADK_PORT:-8000} --reload &
+# --- Chat agent ({{ source_root }}/agents/{{ adk_agent_dir }}, Google ADK) — MCP via McpToolset ---
+{{ adk }}-up:
+	$(UVICORN) agents.{{ adk_agent_dir }}.gateway.main:app --port $${ADK_PORT:-8000} --reload &
 
-adk-down:
-	pkill -f "uvicorn agents.adk_agent.gateway.main:app" 2>/dev/null || true
+{{ adk }}-down:
+	pkill -f "uvicorn agents.{{ adk_agent_dir }}.gateway.main:app" 2>/dev/null || true
 
-adk-wait:
+{{ adk }}-wait:
 	@for i in $$(seq 1 30); do \
-		curl -sf http://localhost:$${ADK_PORT:-8000}/health >/dev/null && echo "adk_agent is up" && exit 0; \
+		curl -sf http://localhost:$${ADK_PORT:-8000}/health >/dev/null && echo "{{ adk_agent_dir }} is up" && exit 0; \
 		sleep 1; \
 	done; \
-	echo "adk_agent did not become healthy in time" >&2; exit 1
+	echo "{{ adk_agent_dir }} did not become healthy in time" >&2; exit 1
 
 # SSE requires the stream open before POSTing — background curl on the stream,
 # give it a moment to connect, then trigger the turn.
-adk-chat:
+{{ adk }}-chat:
 	curl -sN "http://localhost:$${ADK_PORT:-8000}/chat/stream?session_id=smoke-test" & \
 	STREAM_PID=$$!; \
 	sleep 1; \
@@ -110,18 +113,6 @@ adk-chat:
 		-H "Content-Type: application/json" \
 		-d '{"session_id": "smoke-test", "request_id": "smoke-1", "message": "How do I descale the machine?"}'; \
 	sleep 5; kill $$STREAM_PID 2>/dev/null || true
-
-{% endif -%}
-{% if include_akira -%}
-# --- akira ({{ source_root }}/agents/akira) — proactive codebase quality agent ---
-akira-kiyoko:
-	$(PY) -m agents.akira kiyoko
-
-akira-kaneda:
-	$(PY) -m agents.akira kaneda
-
-akira-dao:
-	$(PY) -m agents.akira dao
 
 {% endif -%}
 # --- Evals ({{ eval_root }}/) ---

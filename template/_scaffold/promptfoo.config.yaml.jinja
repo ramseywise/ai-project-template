@@ -1,8 +1,9 @@
 # Promptfoo eval config — runs alongside (not replacing) the Python heuristic
-# eval suite in evals/. Targets rag_agent's /chat endpoint (shared infra,
-# always present regardless of primary_chat_agent) via promptfoo's http
-# provider. Start the server first, then run the eval:
-#   make rag-up
+# eval suite in evals/. Targets rag_agent's /chat endpoint (the default-on
+# shared retrieval backend{% if not include_rag_agent %} — NOT scaffolded here: include_rag_agent=false,
+# so point this config at your custom RAG service's /chat instead{% endif %}) via promptfoo's
+# http provider. Start the server first, then run the eval:
+#   {% if include_rag_agent %}make rag-up{% else %}<start your custom RAG service on port 8011>{% endif %}
 #   make promptfoo-eval
 #
 # Port matches rag_agent/settings.py's rag_port default (8011) — update both

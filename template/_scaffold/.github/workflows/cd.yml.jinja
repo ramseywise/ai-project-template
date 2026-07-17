@@ -1,7 +1,7 @@
 name: CD
 
-# Rendered only when deployment_target is docker/cloud AND the lg_agent chat
-# agent is scaffolded — infrastructure/containers/lg_agent/Dockerfile is the
+# Rendered only when deployment_target is docker/cloud AND the LangGraph chat
+# agent is scaffolded — infrastructure/containers/{{ lg_agent_dir }}/Dockerfile is the
 # only image the template ships (see copier.yaml's cd.yml cleanup task).
 #
 # This is the "build" half of CD: image pushed to GHCR, tagged latest + sha.
@@ -31,14 +31,14 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: {% raw %}ghcr.io/${{ github.repository }}{% endraw %}/lg_agent
+          images: {% raw %}ghcr.io/${{ github.repository }}{% endraw %}/{{ lg_agent_dir }}
           tags: |
             type=sha
             type=raw,value=latest
       - uses: docker/build-push-action@v6
         with:
           context: .
-          file: infrastructure/containers/lg_agent/Dockerfile
+          file: infrastructure/containers/{{ lg_agent_dir }}/Dockerfile
           push: true
           tags: {% raw %}${{ steps.meta.outputs.tags }}{% endraw %}
           labels: {% raw %}${{ steps.meta.outputs.labels }}{% endraw %}

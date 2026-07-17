@@ -9,9 +9,9 @@ Two eval suites live here:
    (see `graders/metrics_registry.py`). See "Interaction evals" at the end.
 {% endif %}
 Heuristic eval suite, run independently against every retrieval backend
-actually present in this project (`rag_agent`'s embeddings always; `lg_agent`'s
-BM25 index if scaffolded — see `pipelines/run.py`'s `BACKENDS` list).
-`adk_agent` has no entry of its own since it routes to `rag_agent` via MCP and
+actually present in this project — see `pipelines/run.py`'s `BACKENDS` list
+({% if include_rag_agent %}`rag_agent`'s embeddings{% endif %}{% if primary_chat_agent in ['lg_agent', 'both'] %}{% if include_rag_agent %}; {% endif %}`{{ lg_agent_dir }}`'s BM25 index{% endif %}).
+the ADK chat agent has no entry of its own since it routes retrieval through MCP and
 inherits its coverage. Everything here runs without an LLM call or API key for
 the retrieval grade itself — it grades retrieval quality and (best-effort,
 when a key is available) coarse answer overlap against a small golden QA set.
@@ -47,7 +47,7 @@ should surface for that question.
 
 For each backend, for each row:
 
-1. The backend's own search function (`core.index.search` for `lg_agent`'s BM25
+1. The backend's own search function (`core.index.search` for the LangGraph chat agent's BM25
    index, `agents.rag_agent.vectorstore.get_vector_index().similarity_search` for
    `rag_agent`'s embeddings — backend picked by `vector_backend`: duckdb/memory/
    opensearch) returns the top-k `SearchResult`s, wrapped into a common shape so
@@ -70,8 +70,8 @@ make eval-render      # == python -m evals.pipelines.run render
 ```
 
 Both commands loop over every backend in `BACKENDS`. `eval-heuristic` requires
-each backend's vector DB to exist first — run `make corpus-ingest` (`lg_agent`)
-and/or `make rag-corpus-ingest` (`rag_agent`) if you see a "vector DB not
+each backend's vector DB to exist first — run{% if primary_chat_agent in ['lg_agent', 'both'] %} `make corpus-ingest` (`{{ lg_agent_dir }}`){% endif %}{% if include_rag_agent %}{% if primary_chat_agent in ['lg_agent', 'both'] %}
+and/or{% endif %} `make rag-corpus-ingest` (`rag_agent`){% endif %} if you see a "vector DB not
 found" error. It prints a per-backend summary table to stdout and writes
 `reports/output/heuristic_results_{backend}.json` for each.
 

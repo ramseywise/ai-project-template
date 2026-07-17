@@ -54,6 +54,12 @@ jobs:
           - name: eval-metrics-all
             args: "-d eval_metrics=[escalation,friction,intent,language]"
             tier: test-py
+          # Workstream-2 axes: a domain agent_slug (no framework-named dirs in
+          # the render) and the custom-RAG path (include_rag_agent=false, BM25
+          # backend still present for the golden-QA retrieval eval).
+          - name: agent-slug-custom-rag
+            args: "-d primary_chat_agent=lg_agent -d agent_slug=helpdesk -d include_rag_agent=false"
+            tier: test-py
     steps:
       - uses: actions/checkout@v4
 

@@ -7,9 +7,9 @@ Subcommands, wired up by the project Makefile:
 
 Grades retrieval quality against the golden QA set in
 ``data/corpus/golden_qa.jsonl`` for each retrieval backend actually present in
-this project — rag_agent's embedding-based retrieval always (it's shared MCP-
-backing infra, present regardless of primary_chat_agent), plus lg_agent's BM25
-retrieval when scaffolded. Each backend gets its own results/report file and
+this project — rag_agent's embedding-based retrieval (default-on shared
+MCP-backing infra) and the LangGraph chat agent's BM25 retrieval, whichever
+are scaffolded. Each backend gets its own results/report file and
 (optionally) its own W&B run tagged by backend — grading one backend never
 depends on another being present. Both are pure heuristics (BM25/embedding
 rank + token overlap) — no LLM calls required for the retrieval grade itself;
@@ -41,9 +41,11 @@ TARGETS_PATH = Path(__file__).resolve().parent.parent / "targets.yaml"
 
 BACKENDS = [
 {%- if primary_chat_agent in ["lg_agent", "both"] %}
-    "lg_agent",
+    "{{ lg_agent_dir }}",
 {%- endif %}
+{%- if include_rag_agent %}
     "rag_agent",
+{%- endif %}
 ]
 
 
@@ -130,30 +132,30 @@ def _check_targets(report: HeuristicReport, targets: dict[str, float]) -> list[s
 
 {% if primary_chat_agent in ["lg_agent", "both"] -%}
 def _search_lg_agent(question: str) -> list[SearchResult]:
-    from agents.lg_agent.settings import settings
+    from agents.{{ lg_agent_dir }}.settings import settings
     from core.index import search
 
     if settings.vectordb_path != ":memory:" and not Path(settings.vectordb_path).exists():
         raise SystemExit(
-            f"error: lg_agent vector DB not found at '{settings.vectordb_path}'.\n"
+            f"error: {{ lg_agent_dir }} vector DB not found at '{settings.vectordb_path}'.\n"
             "Build it first with `make corpus-ingest`."
         )
     return search(settings.vectordb_path, question, k=settings.retrieval_top_k)
 
 
 def _try_generate_answer_lg_agent(question: str, thread_id: str) -> str | None:
-    """Best-effort answer generation via lg_agent's full graph.
+    """Best-effort answer generation via the LangGraph chat agent's full graph.
 
     Requires ``ANTHROPIC_API_KEY`` to be set — this is optional enrichment on
     top of the retrieval grading, so any failure (missing key, network,
     whatever) degrades to "no answer graded" rather than crashing the run.
     """
-    from agents.lg_agent.settings import settings
+    from agents.{{ lg_agent_dir }}.settings import settings
 
     if not settings.anthropic_api_key:
         return None
     try:
-        from agents.lg_agent.graph import build_graph
+        from agents.{{ lg_agent_dir }}.graph import build_graph
 
         graph = build_graph()
         result = graph.invoke({"message": question}, {"configurable": {"thread_id": thread_id}})
@@ -163,6 +165,7 @@ def _try_generate_answer_lg_agent(question: str, thread_id: str) -> str | None:
 
 
 {% endif -%}
+{% if include_rag_agent -%}
 def _search_rag_agent(question: str) -> list[SearchResult]:
     from agents.rag_agent.settings import settings
     from agents.rag_agent.vectorstore import get_vector_index
@@ -183,7 +186,7 @@ def _search_rag_agent(question: str) -> list[SearchResult]:
 def _try_generate_answer_rag_agent(question: str, thread_id: str) -> str | None:
     """Best-effort answer generation via rag_agent's retrieve->generate graph.
 
-    Same graceful-degradation contract as the lg_agent variant: requires
+    Same graceful-degradation contract as the LangGraph variant: requires
     ANTHROPIC_API_KEY, any failure degrades to "no answer graded".
     """
     from agents.rag_agent.settings import settings
@@ -200,11 +203,14 @@ def _try_generate_answer_rag_agent(question: str, thread_id: str) -> str | None:
         return None
 
 
+{% endif -%}
 _SEARCH_FNS = {
 {%- if primary_chat_agent in ["lg_agent", "both"] %}
-    "lg_agent": (_search_lg_agent, _try_generate_answer_lg_agent),
+    "{{ lg_agent_dir }}": (_search_lg_agent, _try_generate_answer_lg_agent),
 {%- endif %}
+{%- if include_rag_agent %}
     "rag_agent": (_search_rag_agent, _try_generate_answer_rag_agent),
+{%- endif %}
 }
 
 
@@ -215,11 +221,13 @@ def _try_log_to_wandb(backend: str, report: HeuristicReport) -> None:
     of the eval run, so any failure (missing key, network, whatever) degrades
     to "not logged" rather than crashing the run.
     """
-{%- if primary_chat_agent in ["lg_agent", "both"] %}
-    if backend == "lg_agent":
-        from agents.lg_agent.settings import settings
+{%- if primary_chat_agent in ["lg_agent", "both"] and include_rag_agent %}
+    if backend == "{{ lg_agent_dir }}":
+        from agents.{{ lg_agent_dir }}.settings import settings
     else:
         from agents.rag_agent.settings import settings
+{%- elif primary_chat_agent in ["lg_agent", "both"] %}
+    from agents.{{ lg_agent_dir }}.settings import settings
 {%- else %}
     from agents.rag_agent.settings import settings
 {%- endif %}
@@ -385,7 +393,7 @@ def _print_summary(backend: str, report: HeuristicReport) -> None:
     for row in report.rows:
         rank_str = "-" if row.rank is None else str(row.rank)
         overlap_str = "-" if row.answer_overlap_ratio is None else f"{row.answer_overlap_ratio:.2f}"
-        print(f"{row.id:<8} {str(row.hit):<5} {rank_str:<6} {overlap_str:<8} {row.category}")
+        print(f"{row.id:<8} {row.hit!s:<5} {rank_str:<6} {overlap_str:<8} {row.category}")
     print("-" * len(header))
     print(f"queries:            {report.total_queries}")
     print(f"hit_rate:           {report.hit_rate:.3f}")
@@ -507,6 +515,14 @@ def main(argv: list[str] | None = None) -> None:
     )
 
     args = parser.parse_args(argv)
+    if not BACKENDS:
+        print(
+            "error: no retrieval backend scaffolded (include_rag_agent=false and no "
+            "LangGraph chat agent) — the golden-QA retrieval eval needs one. "
+            "Register your custom backend in BACKENDS/_SEARCH_FNS in this file.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
 
     if args.command == "heuristic":
         run_all_heuristic(gate=args.gate)

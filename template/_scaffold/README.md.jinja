@@ -1,20 +1,23 @@
+{% set lgmk = lg_agent_dir | replace('_', '-') -%}
+{% set adkmk = adk_agent_dir | replace('_', '-') -%}
 # {{ project_name }}
 
 {{ project_description }}
 
 Scaffolded by `ai-project-template` — working example agent(s) over the same
 tiny FAQ corpus:
+{%- if include_rag_agent %}
 `{{ source_root }}/agents/rag_agent` (embedding-based semantic retrieval,
-standalone service — always present, it's the shared retrieval backend the
-MCP tool calls)
-{%- if primary_chat_agent in ["lg_agent", "both"] %}, `lg_agent` (LangGraph, BM25 retrieval){% endif %}
-{%- if primary_chat_agent in ["adk_agent", "both"] %}, `adk_agent` (Google ADK, routes to rag_agent){% endif %}.
+standalone service — the shared retrieval backend the MCP tool calls)
+{%- endif %}
+{%- if primary_chat_agent in ["lg_agent", "both"] %}{% if include_rag_agent %},{% endif %} `{{ lg_agent_dir }}` (LangGraph, BM25 retrieval){% endif %}
+{%- if primary_chat_agent in ["adk_agent", "both"] %}, `{{ adk_agent_dir }}` (Google ADK, routes retrieval through the MCP tool){% endif %}.
 {% if primary_chat_agent in ["lg_agent", "adk_agent", "both"] %}Each consumes the project's MCP server
 via its framework's native client — see `.claude/skills/mcp-builder/SKILL.md`'s
 "Consuming your server" section.
 {% endif -%}
-{%- if include_akira %} Plus `akira`, a proactive codebase quality agent (three
-modes — see `.claude/skills/akira/SKILL.md`).{%- endif %}
+{%- if include_akira %} Plus `/akira`, a proactive quality-scan skill
+(vendored `akira-scan` agent — see `.claude/skills/akira/SKILL.md`).{%- endif %}
 Plus the project shell (evals, infra, tests, CI) to build real agents on top
 of. See `CLAUDE.md` for AI-assistant conventions and `.agents/skills/README.md`
 for the ADK/LangGraph framework reference library.
@@ -23,15 +26,17 @@ for the ADK/LangGraph framework reference library.
 
 ```bash
 ./project_init.sh                          # uv sync, .env from example, git init if needed
+{%- if include_rag_agent %}
 make rag-corpus-ingest                      # build rag_agent's embedding index from data/corpus/
 make rag-up && make rag-wait && make rag-chat   # start + smoke test rag_agent
+{%- endif %}
 ```
 
 {% if primary_chat_agent in ["lg_agent", "both"] -%}
-Try `lg_agent` (BM25 retrieval) with `make corpus-ingest && make lg-up && make lg-chat`.
+Try `{{ lg_agent_dir }}` (BM25 retrieval) with `make corpus-ingest && make {{ lgmk }}-up && make {{ lgmk }}-chat`.
 {% endif -%}
 {% if primary_chat_agent in ["adk_agent", "both"] -%}
-Try `adk_agent` (Google ADK — requires `GOOGLE_API_KEY`) with `make adk-up && make adk-chat`.
+Try `{{ adk_agent_dir }}` (Google ADK — requires `GOOGLE_API_KEY`) with `make {{ adkmk }}-up && make {{ adkmk }}-chat`.
 {% endif %}
 {%- if has_typescript and ts_agent_framework == "vercel_ai_sdk" %}
 Try the TS agent (Vercel AI SDK) with `make ts-install && make ts-dev`, then
@@ -44,14 +49,13 @@ Try the TS agent (Vercel AI SDK) with `make ts-install && make ts-dev`, then
 ```
 {{ project_slug }}/
 {%- if primary_chat_agent in ["lg_agent", "both"] %}
-├── {{ source_root }}/agents/lg_agent/   Working example: guardrail -> retrieve -> generate (BM25)
+├── {{ source_root }}/agents/{{ lg_agent_dir }}/   Chat agent (LangGraph): guardrail -> retrieve -> generate (BM25)
 {%- endif %}
+{%- if include_rag_agent %}
 ├── {{ source_root }}/agents/rag_agent/  Working example: embedding-based retrieval, standalone service
-{%- if primary_chat_agent in ["adk_agent", "both"] %}
-├── {{ source_root }}/agents/adk_agent/  Working example: Google ADK, routes to rag_agent via MCP
 {%- endif %}
-{%- if include_akira %}
-├── {{ source_root }}/agents/akira/      Proactive codebase quality agent (kiyoko/kaneda/dao)
+{%- if primary_chat_agent in ["adk_agent", "both"] %}
+├── {{ source_root }}/agents/{{ adk_agent_dir }}/  Chat agent (Google ADK), retrieval via the MCP tool
 {%- endif %}
 ├── core/                                Corpus ingestion + preprocessing (feeds every backend's index)
 ├── data/corpus/                         Example FAQ corpus (swap this out for your own)
@@ -92,10 +96,9 @@ file to start with a single `# Title` line; everything else is body text.
 ## Everyday commands
 
 See the `Makefile` for the full list (
-{%- if primary_chat_agent in ["lg_agent", "both"] %}`corpus-ingest`, `lg-up`/`lg-down`/`lg-chat`, {% endif -%}
-`rag-corpus-ingest`/`rag-up`/`rag-down`/`rag-chat`,
-{%- if primary_chat_agent in ["adk_agent", "both"] %} `adk-up`/`adk-down`/`adk-chat`,{%- endif %}
-{%- if include_akira %} `akira-kiyoko`/`akira-kaneda`/`akira-dao`,{%- endif %}
+{%- if primary_chat_agent in ["lg_agent", "both"] %}`corpus-ingest`, `{{ lgmk }}-up`/`{{ lgmk }}-down`/`{{ lgmk }}-chat`, {% endif -%}
+{%- if include_rag_agent %}`rag-corpus-ingest`/`rag-up`/`rag-down`/`rag-chat`,{% endif %}
+{%- if primary_chat_agent in ["adk_agent", "both"] %} `{{ adkmk }}-up`/`{{ adkmk }}-down`/`{{ adkmk }}-chat`,{%- endif %}
 `eval-heuristic`/`eval-render`, `nbks-corpus`, `test`/`test-smoke`/`test-integration`,
 `lint`/`typecheck`, `docker-up`/`docker-down`
 {%- if has_typescript and ts_agent_framework == "vercel_ai_sdk" %}, `ts-agent-eval`{% endif %}).
@@ -128,11 +131,15 @@ for how to raise it via `vercel.json`.
 ## Integrations
 
 **n8n calling this project** (outbound from n8n's perspective): every agent's
-`POST /chat` (and `rag_agent`'s `POST /api/v1/retrieval`) is plain JSON over
-HTTP — callable directly from n8n's HTTP Request node. `adk_agent`'s gateway
+`POST /chat`{% if include_rag_agent %} (and `rag_agent`'s `POST /api/v1/retrieval`){% endif %} is plain JSON over
+HTTP — callable directly from n8n's HTTP Request node.
+{%- if primary_chat_agent in ["adk_agent", "both"] %} `{{ adk_agent_dir }}`'s gateway
 already supports an optional `X-API-Key` header (`GATEWAY_API_KEY` env var, a
-no-op when unset); `lg_agent`/`rag_agent` don't have this yet — add the same
-pattern before exposing either one outside a private network.
+no-op when unset); the LangGraph FastAPI apps don't have this yet — add the
+same pattern before exposing one outside a private network.
+{%- else %} None of the FastAPI apps require auth out of the box — add an
+API-key check before exposing one outside a private network.
+{%- endif %}
 {%- if include_n8n_webhook %}
 
 **This project calling n8n back** (inbound webhook, the reverse direction): a
@@ -181,7 +188,8 @@ on this.
 {%- if include_promptfoo %}
 
 **Promptfoo** (`promptfoo.config.yaml`): a config-driven eval harness, run via
-`make promptfoo-eval` (needs `rag_agent` running — `make rag-up` first).
+`make promptfoo-eval`{% if include_rag_agent %} (needs `rag_agent` running — `make rag-up` first){% else %} (targets `RAG_AGENT_URL`-style `/chat` on port 8011 — point it
+at your custom RAG service){% endif %}.
 Hits `/chat` directly over HTTP with its own assertions, alongside (not
 instead of) the Python eval suite.
 {%- endif %}
@@ -213,7 +221,7 @@ Next.js App Router route handler unchanged if this project is (or becomes)
 Next.js-based. Reads `ANTHROPIC_API_KEY` (same key as the Python agents).
 See `.agents/skills/framework-selection/SKILL.md` for when to reach for
 this vs. ADK/LangGraph. Answer-only smoke eval (NOT retrieval grading — the
-TS agent has no search step, unlike `lg_agent`/`rag_agent`): `make ts-dev`
+TS agent has no search step, unlike the Python backends): `make ts-dev`
 in one terminal, `make ts-agent-eval` in another — scores token overlap
 against `data/corpus/golden_qa.jsonl` the same way `citation.py`'s
 `grade_answer_overlap` does for the Python backends, writes
@@ -228,14 +236,14 @@ process. `{{ ts_project_root }}/src/middleware.ts` is the Next.js Edge
 route gate (session check, redirects unauthenticated requests to `/login`);
 `{{ source_root }}/middleware/auth.py`'s `get_current_user_id` FastAPI
 dependency verifies the same JWT server-side (HS256 or RS256/JWKS,
-auto-detected) and is mounted on `rag_agent`'s and `lg_agent`'s FastAPI apps.
+auto-detected) and is mounted on every present agent's FastAPI app.
 Local dev needs no live Supabase project — `get_current_user_id` returns a
 fixed `DEV_USER_ID` whenever `SUPABASE_URL` is unset.
 
 Run both sides locally: `make ts-install && make ts-dev` (frontend, port
-3000) and `make rag-up` (backend, port 8011) in separate terminals. Deploy
-split: `vercel.json` builds the frontend for Vercel; `railway.toml` starts
-`agents.rag_agent.main:app` under uvicorn for Railway. Fill in
+3000) and {% if include_rag_agent %}`make rag-up` (backend, port 8011){% else %}`make {{ lgmk }}-up` (backend){% endif %} in separate
+terminals. Deploy split: `vercel.json` builds the frontend for Vercel;
+`railway.toml` starts the backend under uvicorn for Railway. Fill in
 `SUPABASE_URL`/`SUPABASE_ANON_KEY`/`SUPABASE_JWT_SECRET`/`BACKEND_CORS_ORIGINS`
 (backend) and `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY`
 (frontend) from a real Supabase project before first deploy — both sides run

@@ -33,16 +33,18 @@ mcp = FastMCP("{{ mcp_server_name }}")
 async def search_articles(query: str) -> str:
     """Search the project's knowledge base for relevant articles.
 
-    Calls rag_agent's /api/v1/retrieval endpoint (retrieval only, no answer
-    synthesis) — see agents/rag_agent/main.py and .claude/skills/mcp-builder/
-    SKILL.md's "Consuming your server" section. Requires rag_agent running
-    (`make rag-up`); RAG_AGENT_URL overrides the default http://localhost:8011.
+    Calls the retrieval backend's /api/v1/retrieval endpoint (retrieval only,
+    no answer synthesis) — see .claude/skills/mcp-builder/SKILL.md's "Consuming
+    your server" section.{% if include_rag_agent %} Requires rag_agent running (`make rag-up`);
+    RAG_AGENT_URL overrides the default http://localhost:8011.{% else %} include_rag_agent=false:
+    point RAG_AGENT_URL (default http://localhost:8011) at your custom RAG
+    service's compatible endpoint.{% endif %}
 
     Args:
         query: Natural language search query.
 
     Returns:
-        Retrieved article context, or an error message if rag_agent is unreachable.
+        Retrieved article context, or an error message if the retrieval backend is unreachable.
     """
     try:
         async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
@@ -52,7 +54,7 @@ async def search_articles(query: str) -> str:
             )
             r.raise_for_status()
     except httpx.HTTPError as exc:
-        return f"[rag_agent unavailable: {exc}]"
+        return f"[retrieval backend unavailable: {exc}]"
 
     data = r.json()
     context = data.get("context") or "(no matching articles found)"

@@ -18,15 +18,16 @@ _message_before_copy: >+
   mcp_servers and touching nothing else (equivalent to the old
   scaffold_full_project=false). All other project types scaffold a full
   project. rag_agent (LangGraph-based retrieval backend for the MCP tool)
-  ships with every full scaffold regardless of the chat-agent choice — it's
-  shared infra, not "the framework."
+  ships with every full scaffold by default — it's shared infra, not "the
+  framework" — but can be turned off (include_rag_agent) when you're building
+  a custom RAG service behind the same retrieval contract.
 
 _message_after_copy: >+
   Done. Next steps:
   - Review CLAUDE.md and fill in the "Hard Rules" placeholder section.
   - Review DESIGN.md — the scoping answers you just gave are seeded there; finish the blank sections before sprint 1.
   - Run `chmod +x .claude/hooks/*.sh` if hooks aren't executable.
-  - If scaffold_full_project: run `make setup` (uv sync + .env from example), then {% if primary_chat_agent in ["lg_agent", "both"] %}`make lg-up`{% elif primary_chat_agent == "adk_agent" %}`make adk-up`{% else %}`make rag-up`{% endif %} to try the example agent.
+  - If scaffold_full_project: run `make setup` (uv sync + .env from example){% if primary_chat_agent in ["lg_agent", "both"] %}, then `make {{ lg_agent_dir | replace('_', '-') }}-up` to try the example agent{% elif primary_chat_agent == "adk_agent" %}, then `make {{ adk_agent_dir | replace('_', '-') }}-up` to try the example agent{% elif include_rag_agent %}, then `make rag-up` to try the example agent{% endif %}.
   {%- if scaffold_full_project and primary_backend_language in ["typescript", "both"] and frontend_backend_topology != "split_service" %}
   - TS backend service scaffolded at {{ ts_project_root }}/ — run `make ts-install` then `make ts-dev`.
   {%- endif %}
@@ -40,7 +41,7 @@ _message_after_copy: >+
   - MCP server: `cd mcp_servers/{{ mcp_server_slug }} && {% if mcp_server_language == "typescript" %}npm install{% else %}uv sync{% endif %}`.
   {%- endif %}
   {%- if include_akira %}
-  - Run `make akira-kaneda` for a proactive quality scan once you have real code to scan.
+  - Run the `/akira` skill (Claude Code) for a proactive quality scan once you have real code to scan.
   {%- endif %}
   {%- if include_dev_companion %}
   - `.claude/docs/companion/collaboration.md` starts blank — /grow-companion fills it in as real sessions happen.
@@ -247,11 +248,12 @@ source_root:
 primary_chat_agent:
   type: str
   help: >-
-    Which prebuilt chat agent(s) do you want? rag_agent (the retrieval backend
-    the MCP tool calls) and akira (quality scanning) are LangGraph-based and
-    ship regardless of this choice — this only picks the user-facing chat
-    agent(s) and trims their framework-specific dependencies accordingly.
-    "none" means build your own on top of rag_agent alone.
+    Which prebuilt chat-agent implementation(s) do you want? This picks the
+    framework(s) of the user-facing chat agent — the agent itself is named by
+    the next question (agent_slug), not after the framework. rag_agent (the
+    LangGraph-based retrieval backend the MCP tool calls) ships independently
+    of this choice; akira (quality scanning) is a .claude skill + agent, not
+    product source. "none" means build your own on top of rag_agent alone.
   choices:
     lg_agent: "lg_agent"
     adk_agent: "adk_agent"
@@ -259,6 +261,51 @@ primary_chat_agent:
     none: "none"
   default: "{{ 'both' if project_type in ['chat_app', 'agent'] else ('lg_agent' if project_type in ['workflow', 'prototype'] else 'none') }}"
   when: "{{ scaffold_full_project and project_type not in ['mcp_server', 'eval_suite'] }}"
+
+agent_slug:
+  type: str
+  help: >-
+    Directory/package name for your chat agent under
+    {{ source_root }}/agents/ — name it for what the agent DOES
+    (intake_triage, helpdesk, grants_qa), not the framework it's built on.
+    Makefile targets follow it (<slug>-up/-down/-chat). With
+    primary_chat_agent=both, the LangGraph implementation gets this name and
+    the ADK one gets <slug>_adk.
+  placeholder: assistant
+  default: assistant
+  validator: >-
+    {% if not (agent_slug | regex_search('^[a-z][a-z0-9_]*$')) %}agent_slug
+    must be a lowercase Python identifier (letters/digits/underscores, letter
+    first){% endif %}{% if agent_slug in ['rag_agent', 'lg_agent', 'adk_agent',
+    'akira', 'agents', 'core', 'tests'] %} agent_slug '{{ agent_slug }}' is
+    reserved{% endif %}
+  when: "{{ scaffold_full_project and primary_chat_agent != 'none' and project_type not in ['mcp_server', 'eval_suite'] }}"
+
+# Derived directory names the templates and _tasks actually consume. When a
+# framework isn't the chosen one its tree keeps the framework name in staging
+# (it's removed by _tasks before the big mv, so the name never reaches the
+# rendered project). agent_slug values colliding with these staging names are
+# rejected by the validator above.
+lg_agent_dir:
+  type: str
+  default: "{{ agent_slug if primary_chat_agent in ['lg_agent', 'both'] else 'lg_agent' }}"
+  when: false
+
+adk_agent_dir:
+  type: str
+  default: "{{ (agent_slug ~ '_adk') if primary_chat_agent == 'both' else (agent_slug if primary_chat_agent == 'adk_agent' else 'adk_agent') }}"
+  when: false
+
+include_rag_agent:
+  type: bool
+  help: >-
+    Ship the prebuilt rag_agent retrieval backend (LangGraph + vector store —
+    the service the project's MCP retrieval tool calls)? Default on: it's the
+    working end-to-end retrieval example. Turn off only when you're building a
+    custom RAG service — the MCP tool keeps calling RAG_AGENT_URL either way,
+    so point that at your own service's compatible /api/v1/retrieval endpoint.
+  default: true
+  when: "{{ scaffold_full_project and project_type not in ['mcp_server', 'rag', 'eval_suite'] }}"
 
 vector_backend:
   type: str
@@ -399,7 +446,7 @@ optional_features:
     (Calendar isn't listed here — selecting Calendar in external systems
     already scaffolds the Google Calendar client.)
   choices:
-    "akira — proactive code-quality agent (kiyoko/kaneda/dao modes)": akira
+    "akira — proactive quality scans (.claude skill + vendored akira-scan agent)": akira
     "dev companion — living how-we-work doc + /dream maintenance audits": dev_companion
     "promptfoo — config-driven HTTP eval harness alongside the Python evals": promptfoo
     "ragas — LLM-judge eval grader (KNOWN ISSUE: ragas 0.4.3 import bug upstream, degrades gracefully, no real scores until fixed)": ragas
@@ -437,8 +484,7 @@ eval_metrics:
 
 # Both gated on scaffold_full_project: optional_features is skipped in
 # layering-only mode but still computes its full default list, which would
-# otherwise flip these on and ship .claude/skills/akira (pointing at a
-# src/agents/akira that layering mode never scaffolds) into an existing repo.
+# otherwise flip these on in an existing repo that never asked for them.
 include_akira:
   type: bool
   default: "{{ scaffold_full_project and 'akira' in optional_features }}"
@@ -634,15 +680,13 @@ _tasks:
     _copier_conf.dst_path ~ '/.claude/skills/plan-refactor ' ~
     _copier_conf.dst_path ~ '/.claude/skills/prototype ' ~
     _copier_conf.dst_path ~ '/.claude/skills/skill-creator' }}
-  # NB: agents/akira is staged under _scaffold/ (only moved into place by the mv
-  # task below when scaffold_full_project=true) — must be removed from ITS
-  # _scaffold/ staging path, not the final source_root path, or this runs before
-  # the mv ever populates the final location and silently does nothing.
-  # Guarded on include_* alone (not `(not scaffold_full_project) or ...`): these
-  # skills/docs live under .claude/, which layering-only mode DOES ship, so the
-  # removal must fire there too when the toggles are off — unlike the _scaffold/
-  # cleanups below, which layering mode discards wholesale anyway.
-  - "{{ 'true' if include_akira else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/agents/akira ' ~ _copier_conf.dst_path ~ '/.claude/skills/akira' }}"
+  # akira is .claude-only (vendored skill + akira-scan agent definition) — no
+  # product source. Guarded on include_* alone (not `(not scaffold_full_project)
+  # or ...`): these skills/docs live under .claude/, which layering-only mode
+  # DOES ship, so the removal must fire there too when the toggles are off —
+  # unlike the _scaffold/ cleanups below, which layering mode discards
+  # wholesale anyway.
+  - "{{ 'true' if include_akira else 'rm -rf ' ~ _copier_conf.dst_path ~ '/.claude/skills/akira ' ~ _copier_conf.dst_path ~ '/.claude/agents/akira-scan.md' }}"
   - "{{ 'true' if include_dev_companion else 'rm -rf ' ~ _copier_conf.dst_path ~ '/.claude/skills/dream ' ~ _copier_conf.dst_path ~ '/.claude/skills/grow-companion ' ~ _copier_conf.dst_path ~ '/.claude/docs/companion' }}"
   # integrations/ sub-modules are independently removable — a blanket rm -rf tied
   # to one toggle would also delete modules gated by the OTHER toggles below.
@@ -690,11 +734,18 @@ _tasks:
   - "{{ 'true' if (not scaffold_full_project) or (deployment_target in ['docker', 'cloud'] and primary_chat_agent in ['lg_agent', 'both']) else 'rm -f ' ~ _copier_conf.dst_path ~ '/_scaffold/.github/workflows/cd.yml' }}"
   - "{{ 'true' if (not scaffold_full_project) or include_composio else 'rm -f ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/integrations/composio.py' }}"
   - "{{ 'true' if (not scaffold_full_project) or include_web_research else 'rm -f ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/integrations/web_research.py' }}"
-  # lg_agent and adk_agent are staged under _scaffold/ (same reasoning as the
-  # akira cleanup above) — 'none' removes both, leaving rag_agent (shared
-  # retrieval infra for the MCP tool) as the sole example agent.
-  - "{{ 'true' if (not scaffold_full_project) or primary_chat_agent in ['lg_agent', 'both'] else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/agents/lg_agent ' ~ _copier_conf.dst_path ~ '/_scaffold/tests/unit/agents' }}"
-  - "{{ 'true' if (not scaffold_full_project) or primary_chat_agent in ['adk_agent', 'both'] else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/agents/adk_agent' }}"
+  # The chat-agent trees are staged under _scaffold/ at their rendered
+  # {{ lg_agent_dir }}/{{ adk_agent_dir }} names (same reasoning as the akira
+  # cleanup above) — when a framework isn't chosen its dir var falls back to
+  # the framework name and the tree is removed here. 'none' removes both,
+  # leaving rag_agent (shared retrieval infra for the MCP tool, if included)
+  # as the sole example agent.
+  - "{{ 'true' if (not scaffold_full_project) or primary_chat_agent in ['lg_agent', 'both'] else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/agents/' ~ lg_agent_dir ~ ' ' ~ _copier_conf.dst_path ~ '/_scaffold/tests/unit/agents' }}"
+  - "{{ 'true' if (not scaffold_full_project) or primary_chat_agent in ['adk_agent', 'both'] else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/agents/' ~ adk_agent_dir }}"
+  # rag_agent demoted from mandatory to default-on (include_rag_agent) — when
+  # off, the tree goes; the MCP retrieval tool keeps its RAG_AGENT_URL
+  # contract for the project's custom RAG service.
+  - "{{ 'true' if (not scaffold_full_project) or include_rag_agent else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/agents/rag_agent' }}"
   - "{{ 'true' if enable_structure_guard else 'rm -f ' ~ _copier_conf.dst_path ~ '/.claude/hooks/structure_guard.sh' }}"
   # labs/ (classical ML/stats toolkit) is staged under _scaffold/ like the
   # other optional full-project-tier content — removed from staging (not the

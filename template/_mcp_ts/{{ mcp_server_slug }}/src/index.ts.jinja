@@ -6,7 +6,7 @@
  *   npm run dev
  *
  * TypeScript counterpart to the Python FastMCP scaffold — same tool
- * (search_articles), same rag_agent HTTP contract, different SDK. See
+ * (search_articles), same retrieval HTTP contract, different SDK. See
  * .claude/skills/mcp-builder/reference/node_mcp_server.md.
  */
 
@@ -32,10 +32,10 @@ server.registerTool(
   {
     title: "Search articles",
     description:
-      "Search the project's knowledge base for relevant articles. Calls rag_agent's " +
+      "Search the project's knowledge base for relevant articles. Calls the retrieval backend's " +
       "/api/v1/retrieval endpoint (retrieval only, no answer synthesis) — see " +
-      "{{ source_root }}/agents/rag_agent/main.py. Requires rag_agent running " +
-      "(`make rag-up`); RAG_AGENT_URL overrides the default http://localhost:8011.",
+      "the /api/v1/retrieval contract{% if include_rag_agent %} in {{ source_root }}/agents/rag_agent/main.py. Requires rag_agent " +
+      "running (`make rag-up`){% else %} — point RAG_AGENT_URL at your custom RAG service{% endif %}; RAG_AGENT_URL overrides the default http://localhost:8011.",
     inputSchema: SearchArticlesInputSchema.shape,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
   },
@@ -51,7 +51,7 @@ server.registerTool(
       });
       if (!res.ok) {
         return {
-          content: [{ type: "text" as const, text: `[rag_agent unavailable: HTTP ${res.status}]` }],
+          content: [{ type: "text" as const, text: `[retrieval backend unavailable: HTTP ${res.status}]` }],
         };
       }
       const data = (await res.json()) as { context?: string; confidence?: number };
@@ -62,7 +62,7 @@ server.registerTool(
       };
     } catch (err) {
       return {
-        content: [{ type: "text" as const, text: `[rag_agent unavailable: ${String(err)}]` }],
+        content: [{ type: "text" as const, text: `[retrieval backend unavailable: ${String(err)}]` }],
       };
     } finally {
       clearTimeout(timeout);

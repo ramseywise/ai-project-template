@@ -197,9 +197,9 @@ Create an XML file with this structure:
 
 Building the server is half the job — an agent still needs to call it. Worked examples in this project:
 
-**LangGraph** (`langchain-mcp-adapters`): see `{source_root}/agents/lg_agent/clients/mcp.py` (confirm the actual source directory name from the project layout — not always literally `src`) — a thin `MultiServerMCPClient` wrapper spawning the project's own MCP server as a stdio subprocess via `uv run --project mcp_servers/<slug>`, with `get_mcp_tools()` returning `[]` (not raising) when disabled or unreachable so callers can treat MCP as optional.
+**LangGraph** (`langchain-mcp-adapters`): see the LangGraph chat agent's `clients/mcp.py` (under `{source_root}/agents/<agent_slug>/` — confirm the actual directory names from the project layout) — a thin `MultiServerMCPClient` wrapper spawning the project's own MCP server as a stdio subprocess via `uv run --project mcp_servers/<slug>`, with `get_mcp_tools()` returning `[]` (not raising) when disabled or unreachable so callers can treat MCP as optional.
 
-**Google ADK**: uses the native `MCPToolset` class instead — see `{source_root}/agents/adk_agent/mcp_tools.py` (once scaffolded; also stdio transport against the same server).
+**Google ADK**: uses the native `MCPToolset` class instead — see the ADK chat agent's `mcp_tools.py` (once scaffolded; also stdio transport against the same server).
 
 Both point at the same server — nothing here is framework-specific to the server implementation itself.
 

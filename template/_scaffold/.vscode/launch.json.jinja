@@ -10,11 +10,11 @@
       "justMyCode": true
     },
     {
-      "name": "lg_agent (uvicorn)",
+      "name": "{{ lg_agent_dir }} (uvicorn)",
       "type": "debugpy",
       "request": "launch",
       "module": "uvicorn",
-      "args": ["agents.lg_agent.main:app", "--reload", "--port", "8010"],
+      "args": ["agents.{{ lg_agent_dir }}.main:app", "--reload", "--port", "8010"],
       "console": "integratedTerminal"
     }
   ]

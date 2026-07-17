@@ -38,30 +38,35 @@ last-audit: pending — complete /sanyi init
 ## 简易 Jianyi
 
 {% if scaffold_full_project -%}
+{% if include_rag_agent or primary_chat_agent != 'none' -%}
 ### Agent response schemas
 
-- paths: {{ source_root }}/agents/rag_agent/schema.py{% if primary_chat_agent in ['lg_agent', 'both'] %}, {{ source_root }}/agents/lg_agent/schema.py{% endif %}{% if primary_chat_agent in ['adk_agent', 'both'] %}, {{ source_root }}/agents/adk_agent/schema.py{% endif %}
+{% set schema_paths = ([source_root ~ '/agents/rag_agent/schema.py'] if include_rag_agent else []) + ([source_root ~ '/agents/' ~ lg_agent_dir ~ '/schema.py'] if primary_chat_agent in ['lg_agent', 'both'] else []) + ([source_root ~ '/agents/' ~ adk_agent_dir ~ '/schema.py'] if primary_chat_agent in ['adk_agent', 'both'] else []) -%}
+- paths: {{ schema_paths | join(', ') }}
 - contract: Response/state shapes are inter-component interfaces. New fields
   need justification in the PR; untyped catch-alls (dict/Any/**kwargs) are
   JY-3 unbounded growth, not "one field".
 - budget: each new field needs justification; set a numeric ceiling at first
   audit
 - current: baseline at first audit (pending first audit)
-
+{% endif -%}
+{% if include_rag_agent or primary_chat_agent in ['lg_agent', 'both'] -%}
 ### Graph control flow
 
-- paths: {{ source_root }}/agents/rag_agent/graph.py{% if primary_chat_agent in ['lg_agent', 'both'] %}, {{ source_root }}/agents/lg_agent/graph.py{% endif %}
+{% set graph_paths = ([source_root ~ '/agents/rag_agent/graph.py'] if include_rag_agent else []) + ([source_root ~ '/agents/' ~ lg_agent_dir ~ '/graph.py'] if primary_chat_agent in ['lg_agent', 'both'] else []) -%}
+- paths: {{ graph_paths | join(', ') }}
 - contract: The execution graph is usually the dominant complexity carrier —
   a perfect schema can wrap a hellish graph. New nodes, edges, branches, or
   retry cycles need justification in the PR.
 - budget: qualitative until scripted flow metrics; topology changes bump the
   contract version
 - current: baseline at first audit (pending first audit)
+{% endif -%}
 {%- if primary_chat_agent in ['adk_agent', 'both'] %}
 
 ### ADK tool signatures
 
-- paths: {{ source_root }}/agents/adk_agent/schema.py, {{ source_root }}/agents/adk_agent/prompts/
+- paths: {{ source_root }}/agents/{{ adk_agent_dir }}/schema.py, {{ source_root }}/agents/{{ adk_agent_dir }}/prompts/
 - contract: ADK output schemas and FunctionTool signatures are the agent's
   external contract — added/removed params or fields without a schema bump
   are JY-3 tool-signature drift. Keep output schemas total (no Any), so the
@@ -98,17 +103,20 @@ last-audit: pending — complete /sanyi init
 - contract: Metric thresholds live here and only here — `make eval-gate`
   reads them. A literal threshold in grader/pipeline code is BN-1.
 
+{% if include_rag_agent or primary_chat_agent in ['lg_agent', 'both'] -%}
 ### Agent settings
 
-- paths: {{ source_root }}/agents/rag_agent/settings.py{% if primary_chat_agent in ['lg_agent', 'both'] %}, {{ source_root }}/agents/lg_agent/settings.py{% endif %}
+{% set settings_paths = ([source_root ~ '/agents/rag_agent/settings.py'] if include_rag_agent else []) + ([source_root ~ '/agents/' ~ lg_agent_dir ~ '/settings.py'] if primary_chat_agent in ['lg_agent', 'both'] else []) -%}
+- paths: {{ settings_paths | join(', ') }}
 - contract: Model names, retrieval parameters, and tunables live in settings
   (env-overridable); changing a value must not require touching node/graph
   logic.
+{% endif -%}
 {%- if primary_chat_agent in ['adk_agent', 'both'] %}
 
 ### Prompts
 
-- paths: {{ source_root }}/agents/adk_agent/prompts/
+- paths: {{ source_root }}/agents/{{ adk_agent_dir }}/prompts/
 - contract: All prompt text lives here; an inline prompt string in business
   logic is BN-1.
 {%- endif %}

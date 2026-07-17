@@ -16,43 +16,19 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-{% if include_metric_escalation %}
-from evals.graders.heuristic import escalation as _h_escalation
-{% endif %}
-{% if include_metric_friction %}
-from evals.graders.heuristic import friction as _h_friction
-{% endif %}
-{% if include_metric_intent %}
-from evals.graders.heuristic import intent as _h_intent
-{% endif %}
-{% if include_metric_language %}
-from evals.graders.heuristic import language as _h_language
-{% endif %}
-{% if include_metric_escalation %}
-from evals.graders.judges.escalation import EscalationJudge
-{% endif %}
-{% if include_metric_friction %}
-from evals.graders.judges.friction import FrictionJudge
-{% endif %}
-{% if include_metric_intent %}
-from evals.graders.judges.intent import IntentJudge
-{% endif %}
-{% if include_metric_language %}
-from evals.graders.judges.language import LanguageJudge
-{% endif %}
-{% if include_metric_escalation %}
-from evals.metrics import escalation as _m_escalation
-{% endif %}
-{% if include_metric_friction %}
-from evals.metrics import friction as _m_friction
-{% endif %}
-{% if include_metric_intent %}
-from evals.metrics import intent as _m_intent
-{% endif %}
-{% if include_metric_language %}
-from evals.metrics import language as _m_language
-{% endif %}
-from evals.models import EvalInteraction, GraderResult, MetricSummary
+{% if include_metric_escalation %}from evals.graders.heuristic import escalation as _h_escalation
+{% endif %}{% if include_metric_friction %}from evals.graders.heuristic import friction as _h_friction
+{% endif %}{% if include_metric_intent %}from evals.graders.heuristic import intent as _h_intent
+{% endif %}{% if include_metric_language %}from evals.graders.heuristic import language as _h_language
+{% endif %}{% if include_metric_escalation %}from evals.graders.judges.escalation import EscalationJudge
+{% endif %}{% if include_metric_friction %}from evals.graders.judges.friction import FrictionJudge
+{% endif %}{% if include_metric_intent %}from evals.graders.judges.intent import IntentJudge
+{% endif %}{% if include_metric_language %}from evals.graders.judges.language import LanguageJudge
+{% endif %}{% if include_metric_escalation %}from evals.metrics import escalation as _m_escalation
+{% endif %}{% if include_metric_friction %}from evals.metrics import friction as _m_friction
+{% endif %}{% if include_metric_intent %}from evals.metrics import intent as _m_intent
+{% endif %}{% if include_metric_language %}from evals.metrics import language as _m_language
+{% endif %}from evals.models import EvalInteraction, GraderResult, MetricSummary
 
 
 @dataclass(frozen=True)

@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     rag_model: str = "claude-haiku-4-5-20251001"
     rag_port: int = 8011
-    # Always defaults to "memory" — see agents/lg_agent/settings.py.jinja for why
+    # Always defaults to "memory" — see the LangGraph chat agent's settings.py for why
     # (checkpointer construction is eager at graph-compile time, so defaulting to
     # "postgres" would break `make test`/import without a live Postgres reachable).
     rag_checkpointer: str = "memory"  # memory | postgres
