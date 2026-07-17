@@ -1,0 +1,38 @@
+from __future__ import annotations
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    anthropic_api_key: str = ""
+    rag_model: str = "claude-haiku-4-5-20251001"
+    rag_port: int = 8011
+    # Always defaults to "memory" — see the LangGraph chat agent's settings.py for why
+    # (checkpointer construction is eager at graph-compile time, so defaulting to
+    # "postgres" would break `make test`/import without a live Postgres reachable).
+    rag_checkpointer: str = "memory"  # memory | postgres
+    postgres_dsn: str = ""  # used by the postgres checkpointer
+
+    # Named rag_vectordb_path (not vectordb_path) — lg_agent's Settings also has a
+    # field named vectordb_path, and pydantic-settings binds both to the identically-
+    # named env var VECTORDB_PATH regardless of which class declares it. Same name
+    # here would silently point both agents' separate, incompatible-schema DuckDB
+    # files at whichever one env var happened to be set.
+    rag_vectordb_path: str = "data/stores/rag_vectordb.duckdb"
+    embedding_model: str = "all-MiniLM-L6-v2"
+    embedding_model_revision: str = ""
+
+    retrieval_top_k: int = 5
+    confidence_threshold: float = 0.25
+    generation_temperature: float = 0.3
+
+    vector_backend: str = "duckdb"
+
+    wandb_api_key: str = ""
+    wandb_project: str = "my-project"
+    data_sensitivity: str = "internal"
+
+
+settings = Settings()
