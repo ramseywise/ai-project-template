@@ -34,7 +34,7 @@ Before writing the note, determine these three fields from the conversation:
 ## 1. Save active artifacts
 
 For each plan, research, or review doc discussed or edited this session:
-- Confirm it's written to `.claude/docs/plans/`, `.claude/docs/research/`, or `.claude/docs/reviews/`
+- Confirm it's written to `.claude/docs/plans/YYYY-MM-DD-<slug>.md` (one doc per work item — research/plan/review are sections of the same file)
 - If draft content exists only in chat, write it to the appropriate file now before context is lost
 - Mark completed steps as done in any active plan file
 

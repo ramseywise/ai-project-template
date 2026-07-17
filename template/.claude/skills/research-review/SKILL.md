@@ -1,6 +1,6 @@
 ---
 name: research-review
-description: "Phase 1. Review, iterate, and deepen research artifacts. Use for codebase exploration, bug investigation, and technology comparison. Writes to .claude/docs/in-progress/<name>/research.md."
+description: "Phase 1. Review, iterate, and deepen research artifacts. Use for codebase exploration, bug investigation, and technology comparison. Writes the ## Research section of .claude/docs/plans/YYYY-MM-DD-<slug>.md."
 disable-model-invocation: true
 allowed-tools: Read Bash Grep Glob WebSearch Write
 ---
@@ -13,13 +13,15 @@ Parse `$ARGUMENTS`:
 - First word is `review` → **Review mode**: re-read the active research file, check for gaps in evidence, unsupported conclusions, missing alternatives. Flag issues as BLOCKER / QUESTION / NOTE.
 - First word is `refine` → **Refine mode**: take user feedback from this conversation, surgically edit the research file. Report what changed and why.
 - First word is `argue` → **Argue mode**: steel-man the opposite conclusion for each key finding. Actively seek disconfirming evidence. Update the Disconfirming Evidence section.
-- Otherwise → **Start mode**: treat entire argument as the research name (snake_case).
+- Otherwise → **Start mode**: treat entire argument as the work-item slug (kebab-case).
 
 Reserved words: `review`, `refine`, `argue`. If no name provided, ask for one.
 
+For `review`/`refine`/`argue`, the active doc is the `.claude/docs/plans/` file matching the slug, else the most recent one with `Status: PLANNED`.
+
 ## Start mode
 
-Write to `.claude/docs/in-progress/$NAME/research.md`. Update `## Active docs` in `.claude/docs/SESSION.md`.
+Write to `.claude/docs/plans/$DATE-$SLUG.md` — `$DATE` is today (`YYYY-MM-DD`); prefix the slug with the issue id when a tracker issue exists (e.g. `2026-07-17-lin-12-add-auth.md`). One doc per work item — plan and review phases append to this same file. No SESSION.md, no in-progress/: the dated filename and `Status:` line are the index.
 
 ### Constraints
 
@@ -31,29 +33,31 @@ Write to `.claude/docs/in-progress/$NAME/research.md`. Update `## Active docs` i
 ### Output template
 
 ```markdown
-# Research: [topic]
+# [task name]
 Date: [today]
+Status: PLANNED
 
-## Summary
+## Research
+
+### Summary
 2-3 sentence TL;DR.
 
-## Scope
+### Scope
 What was investigated. What is explicitly out of scope.
 
-## Findings
-### [Section]
+### Findings
 Each finding carries a confidence label. For comparisons, use tables. For codebase findings, use file:line references.
 
-## Assumptions
+### Assumptions
 - **Assumption:** [statement] — **Evidence:** [ref] — **If wrong:** [consequence] — **Confidence:** [level]
 
-## Disconfirming Evidence
+### Disconfirming Evidence
 For each key finding: what would contradict it? Did you look? What did you find?
 
-## Key Unknowns
+### Key Unknowns
 Things that could not be determined.
 
-## Recommendation
+### Recommendation
 One paragraph — what the research suggests, without prescribing implementation.
 ```
 

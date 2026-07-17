@@ -15,7 +15,7 @@ before acting, don't silently default), scoped much narrower than puffin's
 `/genesis`. This is a **project-scoping-to-copier-answers translator**, not an
 identity-emergence protocol — no multi-phase engagement ritual, no identity
 files. That distinction is deliberate: see
-`.claude/docs/in-progress/puffin-integration/plan.md`'s "Out of Scope" section,
+`.claude/docs/plans/2026-07-12-puffin-integration.md`'s "Out of Scope" section,
 which already decided against porting puffin's genesis verbatim into this
 template. If you're tempted to add phases, growth logs, or reflection steps
 here, that's scope creep back toward the thing that was explicitly ruled out —

@@ -1,5 +1,6 @@
 # Plan: puffin-integration
 Date: 2026-07-12
+Status: EXECUTED
 Based on: direct codebase inspection (puffin `.claude/skills/{genesis,dream,grow,reflect,research}`, playground `src/agents/{lg_agent,rag_agent,adk_agent,akira}` + `.claude/skills/{SANYI,akira}` + `mcp_servers/knowledge_base`, ai-project-template `copier.yaml` + `template/_scaffold` + `template/.agents/skills` + `template/.claude/skills`) — no separate research doc; conversation covered this ground directly.
 
 ## Goal

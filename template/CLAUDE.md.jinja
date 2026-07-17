@@ -28,6 +28,22 @@
 {%- endif %}
 ```
 
+## Refs (read before writing code here)
+
+<!-- Machine-wide stack conventions; skip any that don't exist on this machine. -->
+- `~/.claude/refs/python.md`, `~/.claude/refs/logging.md`
+{%- if primary_chat_agent in ["lg_agent", "both"] %}
+- `~/.claude/refs/langgraph.md`
+{%- endif %}
+{%- if primary_chat_agent in ["adk_agent", "both"] %}
+- `~/.claude/refs/google-adk.md`
+{%- endif %}
+
+Folder-level refs live in nested CLAUDE.md stubs (auto-load on file access):
+{%- if has_typescript %} `{{ ts_project_root }}/`,{%- endif %}
+{%- if enable_structure_guard %} `{{ eval_root }}/`,{%- endif %}
+{%- if include_ml_labs %} `labs/`{%- endif %}
+
 ## Hard Rules
 
 <!-- Add project-specific hard rules here, e.g. confidentiality/naming boundaries, module ownership,

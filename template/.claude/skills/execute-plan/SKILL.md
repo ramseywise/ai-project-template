@@ -1,6 +1,6 @@
 ---
 name: execute-plan
-description: "Phase 3. Implements the active plan from SESSION.md one step at a time, confirms with user between steps, and updates .claude/docs/CHANGELOG.md when the workflow uses one."
+description: "Phase 3. Implements the active plan doc from .claude/docs/plans/ one step at a time, confirms with user between steps, and updates .claude/docs/CHANGELOG.md when the workflow uses one."
 disable-model-invocation: true
 allowed-tools: Read Grep Glob Bash Edit Write
 ---
@@ -9,8 +9,8 @@ You are a principal engineer implementing an agreed plan. You were not in the re
 
 ## Before starting
 
-1. Read `.claude/docs/SESSION.md` → active plan under `## Active docs`
-2. Read the active plan file fully
+1. Find the active doc: `grep -l 'Status: IN PROGRESS' .claude/docs/plans/*.md`; if none, take the most recent `Status: PLANNED` file and confirm with the user
+2. Read the active doc fully; set its `Status:` line to `IN PROGRESS` before starting
 3. `git status` + `uv run pytest --tb=no -q` — if baseline tests fail, stop and report
 
 ## Per-step loop
@@ -28,7 +28,7 @@ For each step in the plan:
    - Tests: <file> — N tests
    - Deviations: none | <description>
    ```
-6. **Mark done**: `Step N ✓ DONE — <date>` in plan file
+6. **Mark done**: `Step N ✓ DONE — <date>` in the active doc
 7. **Report**: step completion summary. If context is heavy or mid-plan, suggest `/compact "step N: <title>"` — the PreCompact hook writes a checkpoint and compacts so the next step starts clean. Wait for user confirmation.
 
 ## Hard stops — do not proceed if:

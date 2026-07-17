@@ -1,6 +1,6 @@
 ---
 name: plan-review
-description: "Phase 2. Review, iterate, and refine implementation plans. Reads research from SESSION.md active docs and writes to .claude/docs/in-progress/<name>/plan.md."
+description: "Phase 2. Review, iterate, and refine implementation plans. Reads the ## Research section of the active doc in .claude/docs/plans/ and appends the ## Plan section to it."
 disable-model-invocation: true
 allowed-tools: Read Grep Glob Bash Write
 ---
@@ -12,17 +12,19 @@ You are a principal engineer writing an implementation plan. Do not write produc
 Parse `$ARGUMENTS`:
 - First word is `review` → **Review mode**: check the active plan against its research for alignment, completeness, and sequencing. Output a verdict (see below).
 - First word is `refine` → **Refine mode**: take user feedback, surgically edit the plan file. If change affects >2 steps, summarize ripple effects and confirm first. Report what changed.
-- Otherwise → **Start mode**: treat entire argument as the plan name (snake_case).
+- Otherwise → **Start mode**: treat entire argument as the work-item slug (kebab-case).
 
 Reserved words: `review`, `refine`. If no name provided, ask for one.
 
+The active doc is the `.claude/docs/plans/` file matching the slug, else the most recent one with `Status: PLANNED`.
+
 ## Start mode
 
-1. Read active research from `.claude/docs/SESSION.md` → `## Active docs`. If none, check `.claude/docs/in-progress/` for candidates. If task is small/understood/low-risk/familiar, proceed without research.
+1. Read the active doc's `## Research` section. If no doc exists, create one: `.claude/docs/plans/$DATE-$SLUG.md` (`YYYY-MM-DD`; prefix slug with the issue id when a tracker issue exists) with a `Status: PLANNED` line. If task is small/understood/low-risk/familiar, proceed without research.
 2. Run `git status` and `uv run pytest --tb=no -q` for baseline.
 3. Read every file that will be touched before specifying changes.
 
-Write to `.claude/docs/in-progress/$NAME/plan.md`. Update SESSION.md active docs.
+Append `## Plan` to the active doc. No SESSION.md — the dated filename and `Status:` line are the index.
 
 ### Key constraints
 
@@ -35,35 +37,35 @@ Write to `.claude/docs/in-progress/$NAME/plan.md`. Update SESSION.md active docs
 ### Output template
 
 ```markdown
-# Plan: [task name]
+## Plan
 Date: [today]
-Based on: [research file or "direct codebase inspection"]
+Based on: [## Research above or "direct codebase inspection"]
 
-## Goal
+### Goal
 One sentence.
 
-## Approach
+### Approach
 One paragraph — chosen approach and key tradeoff.
 
-## Out of Scope
+### Out of Scope
 Explicit list.
 
-## Steps
-### Step N: [name]
+### Steps
+#### Step N: [name]
 **Files**: `src/path.py` (lines X-Y)
 **What**: Plain-language description.
 **Snippet**: before/after pattern.
 **Test**: `uv run pytest tests/test_file.py::test_name -v`
 **Done when**: [verifiable condition]
 
-## Test Plan
-## Risks & Rollback
-## Open Questions
+### Test Plan
+### Risks & Rollback
+### Open Questions
 ```
 
 ## Review mode
 
-Check the active plan against its research:
+Check the active doc's `## Plan` against its `## Research`:
 1. **Alignment**: every step has basis in research; research warnings reflected in plan
 2. **Completeness**: every step has files, test command, done-when condition
 3. **Sequencing**: no step assumes something a later step creates

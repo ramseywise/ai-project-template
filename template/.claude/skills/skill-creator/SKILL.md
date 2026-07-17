@@ -7,6 +7,11 @@ description: Create new skills, modify and improve existing skills, and measure 
 
 A skill for creating new skills and iteratively improving them.
 
+> Debugging a skill that won't trigger, silently disappeared, or misbehaves? Read
+> `references/gotchas.md` (token-budget starvation, YAML traps, discovery failures,
+> `disable-model-invocation` side effects). Frontmatter field semantics and discovery
+> mechanics live in `references/frontmatter-and-discovery.md`.
+
 At a high level, the process of creating a skill goes like this:
 
 - Decide what you want the skill to do and roughly how it should do it

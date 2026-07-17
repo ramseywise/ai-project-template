@@ -1,6 +1,7 @@
 # Backlog: template follow-ups after the governance/project-genesis work
 
 Date: 2026-07-14
+Status: EXECUTED
 Context: while testing the just-completed `data_sensitivity` + `project-genesis` skill
 work (see git history / session notes around this date — this repo has no commits yet
 so there's no earlier plan doc to link beyond `../puffin-integration/plan.md`), four

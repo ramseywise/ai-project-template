@@ -80,29 +80,8 @@ initiative's Linear project (done-condition in the description). Skip for repos 
   fake dates on gated work hide the real critical path (the gate)
 - Defer rather than stretch — fewer verifiable milestones beat many vague ones
 
-## Semester/cohort-aligned patterns (DSSG / volunteer teams)
-
-When the driving event is a semester or cohort cycle (signals: user mentions DSSG,
-cohort, demo day, volunteer rotation, hackathon), apply these milestone patterns:
-
-| Sprint block | Weeks | Milestone focus | Done when |
-|-------------|-------|-----------------|-----------|
-| **Foundation** (sprints 1-2) | Weeks 1-4 | Scaffold, core data model, first integration working | `make test` passes; one real data source ingested; team can run the system locally |
-| **Core value** (sprints 3-4) | Weeks 5-8 | The demo-day deliverable — the thing that makes the nonprofit say "yes" | Demo scenario works end-to-end; eval metrics meet targets; stakeholder has seen it |
-| **Handoff** (sprints 5-6) | Weeks 9-12 | Documentation, operator training, sustainability plan | Next cohort can run/modify without original team; README + runbook + known-issues complete |
-
-**Key constraints for cohort milestones:**
-- **Demo day is non-negotiable** — treat it as a hard external deadline, not a soft target
-- **Handoff milestone is mandatory** — DSSG volunteers rotate; a project with no handoff docs dies when the cohort ends
-- **Each milestone maps to ~2 volunteer sprints (4 weeks)** — don't plan 6 milestones for a 12-week cohort; 3 is the maximum
-- **"Core value" milestone is the only one the nonprofit sees** — Foundation is internal; Handoff is for the next team. Core value is the product.
-
-If the cohort is shorter (e.g., a 4-week hackathon sprint), compress to 2 milestones:
-Foundation (week 1) + Core Value (weeks 2-4). Skip Handoff — hackathon output is a prototype, not a maintained system.
-
 ---
 
 **Upstream**: `/design-sprint` if the initiative list itself isn't agreed yet.
-`/project-discovery` if a Project Profile exists — read capacity constraints for timeline.
 **Next**: `/scope-initiative <initiative-name>` to break each milestone into a task backlog
 with acceptance criteria; tasks attach to the milestones defined here.

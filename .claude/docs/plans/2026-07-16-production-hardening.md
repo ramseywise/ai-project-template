@@ -1,7 +1,8 @@
 # Plan: production_hardening
 Date: 2026-07-16
+Status: EXECUTED
 Based on: direct codebase inspection (no research doc — gaps identified against
-`.claude/docs/in-progress/template-backlog/backlog.md`'s completed state)
+`.claude/docs/plans/2026-07-14-template-backlog.md`'s completed state)
 
 ## Goal
 

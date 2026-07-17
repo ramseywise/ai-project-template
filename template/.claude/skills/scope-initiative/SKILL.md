@@ -34,24 +34,6 @@ Scope the following initiative into a Linear-ready backlog: `$ARGUMENTS`
 - T-shirt sizes: S (<1wk, few unknowns), M (1-2wk, some unknowns), L (2-4wk, significant unknowns), XL (>sprint, major decisions)
 - Day-one decisions (embedding model, schema, vector store) appear first in critical path
 
-## DSSG volunteer capacity calibration
-
-When the team includes DSSG volunteers (rotating cohorts, limited hours), convert
-the standard t-shirt sizes using these calibrations and note "volunteer-hours"
-explicitly in the summary table:
-
-| Size | Volunteer-hours | Sessions | What fits |
-|------|----------------|----------|-----------|
-| S | <4 hours | Single session | One clear deliverable, no unknowns, no external dependencies |
-| M | 4-12 hours | 1-2 sessions | Some investigation, one decision point, may need async follow-up |
-| L | 12-24 hours | 2-4 sessions | Significant unknowns, needs pairing or review, cross-team coordination |
-| XL | >24 hours | Full sprint (4+ sessions) | Major decisions, multiple stakeholders, should be broken down |
-
-**Flags for DSSG scoping:**
-- Any task > M should name a specific owner (not "the team") — rotating volunteers lose context
-- Any task with external dependencies (API keys, org approvals, data access) should be started week 1 — these block on other people's timelines
-- "Day-one decisions" are even more critical with volunteers — an unresolved decision wastes an entire session
-
 ---
 
 **Upstream**: `/design-sprint` if still ideating what to build — run that first to get named initiatives and workstream clusters. `/define-milestones <initiative>` for the checkpoint list this backlog attaches to.
