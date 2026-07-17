@@ -56,17 +56,23 @@ manual process), and what must the AI beat, by how much, to justify itself? -->
 
 | Decision | Status | Choice | Rationale |
 |----------|--------|--------|-----------|
-| Auth / identity | <!-- Resolved / Open --> | | |
-| Data model ownership | <!-- Resolved / Open --> | | |
+| Auth / identity | <!-- Resolved / Open / Deferred(<trigger>) --> | | |
+| Data model ownership | <!-- Resolved / Open / Deferred(<trigger>) --> | | |
 | AI approach | Resolved | {{ project_type }} | Set at scaffold time — revisit if the shape changes |
 | Data sensitivity | Resolved | {{ data_sensitivity }} | Set at scaffold time |
 | Deployment target | Resolved | {{ deployment_target }} | Set at scaffold time |
-| Multi-tenancy | <!-- Resolved / Open --> | | |
+| Multi-tenancy | <!-- Resolved / Open / Deferred(<trigger>) --> | | |
+| Service surface | Deferred(first external consumer identified) | REST `/api/v1/*` is the boundary | MCP is a logic-free adapter over REST — add one when an MCP host actually consumes this project; revisit at that trigger |
 {%- if is_agent_shaped %}
 | Agent tools | Resolved | {{ agent_tools | join(', ') if agent_tools else 'none' }} | Set at scaffold time |
 | Agent memory | Resolved | {{ agent_memory }} | Set at scaffold time{% if agent_memory == 'long_term' %} — postgres checkpointer dependency seeded on{% endif %} |
 | Human approval | Resolved | {{ human_approval }} | Set at scaffold time — constrains every tool that writes to an external system |
 {%- endif %}
+
+Status semantics: `Deferred(<trigger>)` records the default choice now and names the
+concrete event that reopens the decision — a Deferred without a real trigger counts
+as Open. Open items block the discovery-exit gate (see LIFECYCLE.md / `/gate-check`);
+Deferred items don't.
 
 ---
 

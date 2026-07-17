@@ -17,15 +17,16 @@ _message_before_copy: >+
   mode — safe to run into an existing repo, only adding .claude/.agents/
   mcp_servers and touching nothing else (equivalent to the old
   scaffold_full_project=false). All other project types scaffold a full
-  project. rag_agent (LangGraph-based retrieval backend for the MCP tool)
-  ships with every full scaffold by default — it's shared infra, not "the
-  framework" — but can be turned off (include_rag_agent) when you're building
-  a custom RAG service behind the same retrieval contract.
+  project. The scaffold is minimal by default: one chat-agent example where
+  the shape calls for it (lg_agent), and no MCP server or rag_agent unless
+  the project IS one (mcp_server / rag shapes) or you ask for them — every
+  component stays a `copier update -d include_<x>=true` away after genesis.
 
 _message_after_copy: >+
   Done. Next steps:
   - Review CLAUDE.md and fill in the "Hard Rules" placeholder section.
   - Review DESIGN.md — the scoping answers you just gave are seeded there; finish the blank sections before sprint 1.
+  - LIFECYCLE.md tracks phase + gates (Discovery → Delivery → Deployment) — run /gate-check once discovery artifacts exist; it's the file DSSG's project-mgmt-ai reads for status updates.
   - Run `chmod +x .claude/hooks/*.sh` if hooks aren't executable.
   - If scaffold_full_project: run `make setup` (uv sync + .env from example){% if primary_chat_agent in ["lg_agent", "both"] %}, then `make {{ lg_agent_dir | replace('_', '-') }}-up` to try the example agent{% elif primary_chat_agent == "adk_agent" %}, then `make {{ adk_agent_dir | replace('_', '-') }}-up` to try the example agent{% elif include_rag_agent %}, then `make rag-up` to try the example agent{% endif %}.
   {%- if scaffold_full_project and primary_backend_language in ["typescript", "both"] and frontend_backend_topology != "split_service" %}
@@ -195,9 +196,10 @@ agent_tools:
   type: str
   multiselect: true
   help: >-
-    Will the agent use tools? Recorded in DESIGN.md; "MCP" seeds the
-    MCP-server default. The scaffold's example agents already call the
-    project's own MCP retrieval tool, which is why MCP defaults on.
+    Will the agent use tools? Recorded in DESIGN.md; selecting "MCP" (a
+    declared MCP host consumer) seeds the MCP-server default. Nothing is
+    pre-selected beyond what your external-systems answer implies — REST is
+    the standard service boundary, MCP an adapter over it.
   choices:
     "Web search": search
     "Filesystem": filesystem
@@ -205,7 +207,7 @@ agent_tools:
     "Database": database
     "MCP (expose/consume tools)": mcp
     "Custom (project-specific)": custom
-  default: "[{% if 'github' in external_systems %}'github', {% endif %}{% if 'database' in external_systems %}'database', {% endif %}'mcp']"
+  default: "{{ (['github'] if 'github' in external_systems else []) + (['database'] if 'database' in external_systems else []) }}"
   when: "{{ is_agent_shaped }}"
 
 agent_memory:
@@ -250,16 +252,17 @@ primary_chat_agent:
   help: >-
     Which prebuilt chat-agent implementation(s) do you want? This picks the
     framework(s) of the user-facing chat agent — the agent itself is named by
-    the next question (agent_slug), not after the framework. rag_agent (the
-    LangGraph-based retrieval backend the MCP tool calls) ships independently
-    of this choice; akira (quality scanning) is a .claude skill + agent, not
-    product source. "none" means build your own on top of rag_agent alone.
+    the next question (agent_slug), not after the framework. A new project
+    needs one working example (lg_agent by default); the other framework is a
+    `copier update -d primary_chat_agent=…` away. akira (quality scanning) is
+    a .claude skill + agent, not product source. "none" means no prebuilt
+    chat agent — build your own.
   choices:
     lg_agent: "lg_agent"
     adk_agent: "adk_agent"
     both: "both"
     none: "none"
-  default: "{{ 'both' if project_type in ['chat_app', 'agent'] else ('lg_agent' if project_type in ['workflow', 'prototype'] else 'none') }}"
+  default: "{{ 'lg_agent' if project_type in ['chat_app', 'agent', 'workflow', 'prototype'] else 'none' }}"
   when: "{{ scaffold_full_project and project_type not in ['mcp_server', 'eval_suite'] }}"
 
 agent_slug:
@@ -299,12 +302,13 @@ adk_agent_dir:
 include_rag_agent:
   type: bool
   help: >-
-    Ship the prebuilt rag_agent retrieval backend (LangGraph + vector store —
-    the service the project's MCP retrieval tool calls)? Default on: it's the
-    working end-to-end retrieval example. Turn off only when you're building a
-    custom RAG service — the MCP tool keeps calling RAG_AGENT_URL either way,
-    so point that at your own service's compatible /api/v1/retrieval endpoint.
-  default: true
+    Ship the prebuilt rag_agent retrieval backend (LangGraph + vector store)?
+    Default on only for the rag project shape — it's that shape's working
+    end-to-end example, not shared infrastructure. Other shapes opt in here
+    (or later via `copier update -d include_rag_agent=true`). The MCP
+    retrieval tool, when scaffolded, calls RAG_AGENT_URL either way — point
+    it at any compatible /api/v1/retrieval endpoint.
+  default: "{{ project_type == 'rag' }}"
   when: "{{ scaffold_full_project and project_type not in ['mcp_server', 'rag', 'eval_suite'] }}"
 
 vector_backend:
@@ -406,8 +410,10 @@ frontend_backend_topology:
 include_mcp_server:
   type: bool
   help: >-
-    Scaffold a parameterized MCP server for this project? Defaults on when the
-    project IS an MCP server or the agent's tools include MCP.
+    Scaffold a parameterized MCP server for this project? Defaults on only
+    when the project IS an MCP server, or when you explicitly listed MCP in
+    agent_tools (a declared MCP host consumer). MCP servers here are thin
+    adapters over the REST boundary, never the primary surface.
   default: "{{ project_type == 'mcp_server' or 'mcp' in agent_tools }}"
 
 mcp_server_name:
@@ -637,10 +643,12 @@ expensive_command_patterns:
 # Independent of scaffold_full_project — available in layering-only mode too.
 # .agents/skills/ is a tool-agnostic agent-framework reference library (ADK +
 # LangGraph scaffolding and patterns) shared across Claude, ADK's own tooling,
-# or any other agent harness; also enables the /new-agent skill.
+# or any other agent harness; also enables the /new-agent skill. Default off:
+# its canonical home is this template and vendoring it into every render
+# creates N drifting copies — opt in (-d) for offline/team-portability cases.
 include_agent_reference_library:
   type: bool
-  default: true
+  default: false
   when: false
 
 # Maintainer knob: "vendored" copies this template's own snapshot of the
@@ -742,9 +750,9 @@ _tasks:
   # as the sole example agent.
   - "{{ 'true' if (not scaffold_full_project) or primary_chat_agent in ['lg_agent', 'both'] else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/agents/' ~ lg_agent_dir ~ ' ' ~ _copier_conf.dst_path ~ '/_scaffold/tests/unit/agents' }}"
   - "{{ 'true' if (not scaffold_full_project) or primary_chat_agent in ['adk_agent', 'both'] else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/agents/' ~ adk_agent_dir }}"
-  # rag_agent demoted from mandatory to default-on (include_rag_agent) — when
-  # off, the tree goes; the MCP retrieval tool keeps its RAG_AGENT_URL
-  # contract for the project's custom RAG service.
+  # rag_agent ships default-on only for the rag shape (include_rag_agent) —
+  # when off, the tree goes; the MCP retrieval tool keeps its RAG_AGENT_URL
+  # contract for whatever compatible retrieval service the project points at.
   - "{{ 'true' if (not scaffold_full_project) or include_rag_agent else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/agents/rag_agent' }}"
   - "{{ 'true' if enable_structure_guard else 'rm -f ' ~ _copier_conf.dst_path ~ '/.claude/hooks/structure_guard.sh' }}"
   # labs/ (classical ML/stats toolkit) is staged under _scaffold/ like the
@@ -797,6 +805,15 @@ _tasks:
   # path that can never collide with a pre-existing repo) so it's safe either way:
   # when enabled, move it into place; when disabled, it's simply discarded below —
   # never written into (and never rm -rf'd from) the target's real src/tests/etc.
+  #
+  # Directories are MERGED into place, not `mv`'d: a plain `mv _scaffold/src ./`
+  # fails ("Directory not empty") on any re-render because src/ already exists
+  # from the first render — which is exactly the copier-update / add-capability
+  # re-entry path. `mkdir -p dst && cp -R _scaffold/X/. dst/` merges the staged
+  # contents into the existing (or fresh) target dir on both first render and
+  # re-render; the final `rm -rf _scaffold` below clears the staging copies. Bare
+  # files (pyproject.toml, Makefile, …) stay `mv` — `mv file ./` overwrites fine
+  # even on re-render.
   - >-
     {{ ('mv ' ~ _copier_conf.dst_path ~ '/_scaffold/pyproject.toml '
     ~ _copier_conf.dst_path ~ '/_scaffold/Makefile '
@@ -807,43 +824,62 @@ _tasks:
     ~ _copier_conf.dst_path ~ '/_scaffold/README.md '
     ~ _copier_conf.dst_path ~ '/_scaffold/SANYI.md '
     ~ _copier_conf.dst_path ~ '/_scaffold/project_init.sh '
-    ~ _copier_conf.dst_path ~ '/_scaffold/.vscode '
-    ~ _copier_conf.dst_path ~ '/_scaffold/.github '
-    ~ _copier_conf.dst_path ~ '/_scaffold/configs '
-    ~ _copier_conf.dst_path ~ '/_scaffold/data '
-    ~ _copier_conf.dst_path ~ '/_scaffold/core '
-    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ ' '
-    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ eval_root ~ ' '
-    ~ _copier_conf.dst_path ~ '/_scaffold/nbks '
-    ~ _copier_conf.dst_path ~ '/_scaffold/tests '
-    ~ _copier_conf.dst_path ~ '/_scaffold/infrastructure '
     ~ _copier_conf.dst_path ~ '/') if scaffold_full_project else 'true' }}
-  # Separate mv (not part of the big one above) — the labs/ cleanup task above
+  # Directory merges (idempotent on re-render — see note above). Each: create the
+  # target if absent, copy staged contents in (merging with any existing files).
+  # .vscode/ and .github/ are DIRECTORIES (not bare files) so they merge here, not
+  # in the mv list above — `mv .vscode ./` would fail "Directory not empty" on
+  # re-render.
+  - >-
+    {{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/.vscode && cp -R '
+    ~ _copier_conf.dst_path ~ '/_scaffold/.vscode/. ' ~ _copier_conf.dst_path ~ '/.vscode/'
+    ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/.github && cp -R '
+    ~ _copier_conf.dst_path ~ '/_scaffold/.github/. ' ~ _copier_conf.dst_path ~ '/.github/'
+    ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/configs && cp -R '
+    ~ _copier_conf.dst_path ~ '/_scaffold/configs/. ' ~ _copier_conf.dst_path ~ '/configs/'
+    ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/data && cp -R '
+    ~ _copier_conf.dst_path ~ '/_scaffold/data/. ' ~ _copier_conf.dst_path ~ '/data/'
+    ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/core && cp -R '
+    ~ _copier_conf.dst_path ~ '/_scaffold/core/. ' ~ _copier_conf.dst_path ~ '/core/'
+    ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/' ~ source_root ~ ' && cp -R '
+    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/. ' ~ _copier_conf.dst_path ~ '/' ~ source_root ~ '/'
+    ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/' ~ eval_root ~ ' && cp -R '
+    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ eval_root ~ '/. ' ~ _copier_conf.dst_path ~ '/' ~ eval_root ~ '/'
+    ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/nbks && cp -R '
+    ~ _copier_conf.dst_path ~ '/_scaffold/nbks/. ' ~ _copier_conf.dst_path ~ '/nbks/'
+    ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/tests && cp -R '
+    ~ _copier_conf.dst_path ~ '/_scaffold/tests/. ' ~ _copier_conf.dst_path ~ '/tests/'
+    ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/infrastructure && cp -R '
+    ~ _copier_conf.dst_path ~ '/_scaffold/infrastructure/. ' ~ _copier_conf.dst_path ~ '/infrastructure/'
+    ) if scaffold_full_project else 'true' }}
+  # Separate merge (not part of the block above) — the labs/ cleanup task above
   # rm -rf's the whole _scaffold/labs directory when include_ml_labs is false,
-  # so it may not exist at all by the time the big mv runs; folding it into
-  # that unconditional list would make `mv` fail on a missing source path.
-  - "{{ ('mv ' ~ _copier_conf.dst_path ~ '/_scaffold/labs ' ~ _copier_conf.dst_path ~ '/') if (scaffold_full_project and include_ml_labs) else 'true' }}"
+  # so it may not exist at all; folding it in would make the copy fail on a
+  # missing source path.
+  - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/labs && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/labs/. ' ~ _copier_conf.dst_path ~ '/labs/') if (scaffold_full_project and include_ml_labs) else 'true' }}"
   # Same reasoning — railway.toml is rm -f'd above when split_service isn't chosen.
+  # (bare file → mv, overwrites fine on re-render)
   - "{{ ('mv ' ~ _copier_conf.dst_path ~ '/_scaffold/railway.toml ' ~ _copier_conf.dst_path ~ '/') if (scaffold_full_project and frontend_backend_topology == 'split_service') else 'true' }}"
   # Same reasoning — promptfoo.config.yaml is rm -f'd by the include_promptfoo
-  # cleanup task below when the toggle is off, so it can't be in the big
-  # unconditional mv list either.
+  # cleanup task below when the toggle is off, so it can't be in the block above.
+  # (bare file → mv)
   - "{{ ('mv ' ~ _copier_conf.dst_path ~ '/_scaffold/promptfoo.config.yaml ' ~ _copier_conf.dst_path ~ '/') if (scaffold_full_project and include_promptfoo) else 'true' }}"
-  # Separate mv (not part of the big one above) — ts_project_root only exists
-  # when has_typescript is true, and the big mv's expression is built unconditionally
+  # Separate merge (not part of the block above) — ts_project_root only exists
+  # when has_typescript is true, and the block's expression is built unconditionally
   # whenever scaffold_full_project is true, so it can't safely reference a variable
   # that might not be defined. This one short-circuits on has_typescript first.
   # split_service's TS side is frontend-only (Next.js, not the Express backend
   # service), so it's excluded here — moved from its own staging dir instead,
   # by the task below.
-  - "{{ ('mv ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ ts_project_root ~ ' ' ~ _copier_conf.dst_path ~ '/') if (scaffold_full_project and has_typescript and primary_backend_language in ['typescript', 'both'] and frontend_backend_topology != 'split_service') else 'true' }}"
+  - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/' ~ ts_project_root ~ ' && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ ts_project_root ~ '/. ' ~ _copier_conf.dst_path ~ '/' ~ ts_project_root ~ '/') if (scaffold_full_project and has_typescript and primary_backend_language in ['typescript', 'both'] and frontend_backend_topology != 'split_service') else 'true' }}"
   - "rm -rf {{ _copier_conf.dst_path }}/_scaffold"
   # split_service: swap in the Next.js frontend from its own staging dir (same
   # convention as the MCP TS-server swap below) and stage the Python auth
   # middleware alongside the chosen agent's FastAPI app.
   - >-
-    {{ ('mv ' ~ _copier_conf.dst_path ~ '/_split_service_frontend_staging/' ~ ts_project_root ~ ' '
-    ~ _copier_conf.dst_path ~ '/') if (scaffold_full_project and has_typescript and
+    {{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/' ~ ts_project_root ~ ' && cp -R '
+    ~ _copier_conf.dst_path ~ '/_split_service_frontend_staging/' ~ ts_project_root ~ '/. '
+    ~ _copier_conf.dst_path ~ '/' ~ ts_project_root ~ '/') if (scaffold_full_project and has_typescript and
     frontend_backend_topology == 'split_service') else 'true' }}
   - "rm -rf {{ _copier_conf.dst_path }}/_split_service_frontend_staging"
   # MCP server language: python (FastMCP) is copied straight to its final path

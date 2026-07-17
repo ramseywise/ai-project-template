@@ -52,6 +52,25 @@ never built an AI system. Meet them where they are:
 
 ## Steps
 
+### Step 0 — Intake: who's in the room
+
+Before the project, the people. Two minutes, conversational — not a form:
+
+- **Who are you?** Role and background (engineer, data scientist, designer,
+  domain expert, first-time volunteer). Calibrates every later explanation.
+- **What's your setup?** OS, editor, languages they're comfortable in, tools
+  they already use daily (Google Workspace, Notion, Slack, ...).
+- **Team working rules?** Anything the team has already agreed on: review
+  requirements, branch conventions, meeting cadence, "never touch X".
+
+Record the answers in the profile's Intake section. Downstream: tooling
+preferences and team rules become the rendered project's `CLAUDE.md`
+conventions and hard rules at `/project-genesis` time; the people named here
+seed DESIGN.md's actor table in `/scope-poc`.
+
+On re-entry (a profile already exists), skip what's answered and fill only
+what's blank — same as every other step.
+
 ### Step 1 — Pain point elicitation
 
 Open with: **"Tell me about the nonprofit you're working with. What's painful for
@@ -143,6 +162,12 @@ actors, evaluation, and data classification to produce a full DESIGN.md."**
 
 ---
 
+## Intake
+
+- **Volunteer(s):** [name / role / background — who's building this]
+- **Dev setup & tooling preferences:** [OS, editor, languages, daily tools]
+- **Team rules:** [agreed conventions — reviews, branches, comms — or "none yet"]
+
 ## The Pain Point
 
 [2-3 sentences: who has this problem, what they do today, why it's painful.
@@ -210,6 +235,10 @@ rather than guess. /scope-poc will ask about anything not listed here.]
   profile speaks in outcomes and constraints.
 - **Copier hints are suggestions:** Mark them as "suggested" not "decided." /scope-poc
   may override based on deeper analysis.
+- **"I don't know" is a valid answer everywhere.** Write `unknown` in the profile
+  rather than guessing — `/scope-poc` parks unknowns in DESIGN.md's Open Questions
+  with a revisit trigger and offers the research path to close them. Re-running this
+  skill later fills the gaps; the profile is updated in place, never started over.
 
 ---
 

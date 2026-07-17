@@ -28,9 +28,29 @@ jobs:
             args: "-d primary_chat_agent=adk_agent"
           - name: primary_chat_agent-none
             args: "-d primary_chat_agent=none"
+          # A1 flips: .agents/ and the MCP server no longer render by default —
+          # these rows keep the opt-in paths (and the agent_tools=[mcp] seed)
+          # render-covered.
+          - name: agent-reference-library
+            args: "-d include_agent_reference_library=true"
+          - name: mcp-via-agent-tools
+            args: "-d agent_tools=[mcp]"
           # --- full tier: real test execution, one config per feature axis ---
+          # defaults-tested is the post-A1 minimal chat_app: lg_agent only, no
+          # MCP server, no rag_agent, no .agents/.
           - name: defaults-tested
             args: ""
+            tier: test-py
+          # The pre-A1 default config — full demo chain (both chat agents +
+          # rag_agent + MCP server). Keeps the lg_agent → MCP tool →
+          # rag_agent wiring tested now that defaults no longer render it.
+          - name: full-chain
+            args: "-d primary_chat_agent=both -d include_rag_agent=true -d include_mcp_server=true"
+            tier: test-py
+          # rag shape: the one project_type whose include_rag_agent default is
+          # on (plus vector_backend + structure guard).
+          - name: project_type-rag
+            args: "-d project_type=rag"
             tier: test-py
           - name: ts-backend
             args: "-d primary_backend_language=typescript"
@@ -54,11 +74,11 @@ jobs:
           - name: eval-metrics-all
             args: "-d eval_metrics=[escalation,friction,intent,language]"
             tier: test-py
-          # Workstream-2 axes: a domain agent_slug (no framework-named dirs in
-          # the render) and the custom-RAG path (include_rag_agent=false, BM25
-          # backend still present for the golden-QA retrieval eval).
-          - name: agent-slug-custom-rag
-            args: "-d primary_chat_agent=lg_agent -d agent_slug=helpdesk -d include_rag_agent=false"
+          # Domain agent_slug axis: no framework-named dirs in the render.
+          # (lg_agent-without-rag_agent is now the defaults-tested config, so
+          # this row only carries the slug axis.)
+          - name: agent-slug
+            args: "-d agent_slug=helpdesk"
             tier: test-py
     steps:
       - uses: actions/checkout@v4
@@ -120,6 +140,27 @@ jobs:
         if: matrix.tier == 'test-py' || matrix.tier == 'test-split'
         working-directory: out
         run: uv run pytest tests/unit -q
+
+      # Re-entry idempotency: the /add-capability flow drives `copier update -d`
+      # on an already-rendered repo. That exercises the _tasks staging moves a
+      # SECOND time — where a plain `mv _scaffold/src ./` fails "Directory not
+      # empty" (the merge-based cp -R moves in copier.yaml exist to survive this).
+      # Fresh-render-only CI missed that class of bug; this step guards it. Uses
+      # the working-tree re-render form (copier copy --overwrite --vcs-ref HEAD),
+      # matching how these jobs render — `copier update` needs a tagged _commit.
+      - name: Re-entry — add a capability onto the rendered repo
+        if: matrix.tier == 'test-py'
+        working-directory: out
+        run: |
+          git init -q && git add -A
+          git -c user.email=ci@ci -c user.name=ci commit -qm "genesis render"
+          copier copy --overwrite --vcs-ref HEAD --trust --defaults \
+            -d include_rag_agent=true "$GITHUB_WORKSPACE" .
+          test -d src/agents/rag_agent \
+            || { echo "add-capability re-entry did not land rag_agent"; exit 1; }
+          test ! -e _scaffold \
+            || { echo "staging dir survived re-render (mv/cp task not idempotent)"; exit 1; }
+          uv run pytest tests/unit -q
 
       # ts_project_root defaults to project_slug — "Render Test" → render-test.
       - name: TS backend — install/lint/typecheck/test/build

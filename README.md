@@ -9,7 +9,9 @@ it runs in **phases** (see "The interview" below), and the tiers describe what l
 
 1. **Always scaffolded**: `CLAUDE.md` (style conventions, hook-enforced standards, commit convention, a
    placeholder for project-specific hard rules — plus a data-classification hard rule driven by
-   `data_sensitivity`), `.claude/settings.json` (hook wiring: secrets scan, branch naming, code quality,
+   `data_sensitivity`), `LIFECYCLE.md` (Discovery → Delivery → Deployment phase/gate status,
+   maintained by `/gate-check` — the status contract project-mgmt-ai reads),
+   `.claude/settings.json` (hook wiring: secrets scan, branch naming, code quality,
    test coverage, SDK-pattern checks, docs hygiene, memory-duplication guard, commit gates), and
    `.claude/hooks/*.sh` + `.claude/skills/` (21 workflow skills — research-review, plan-review,
    execute-plan, code-review, quick-pr, mcp-builder, new-agent, etc. — see `.claude/skills/README.md` in
@@ -23,11 +25,12 @@ it runs in **phases** (see "The interview" below), and the tiers describe what l
    `[tool.ruff]` config as everything else — real git-level enforcement alongside the Claude-session
    hooks) and `renovate.json` (automated dependency-update PRs, with the fast-moving AI framework deps
    held back from automerge) — plus the sub-gated `include_akira`/`include_dev_companion` toggles within
-   this tier. Working example agents: `rag_agent` (embedding-based retrieval, the shared backend the MCP
-   tool calls) always ships within this tier; `primary_chat_agent` picks which user-facing chat agent(s)
-   join it — `lg_agent` (LangGraph, BM25), `adk_agent` (Google ADK), `both` (default, today's behavior),
-   or `none` (build your own on top of `rag_agent` alone). `langgraph`/`langchain-core` stay installed
-   regardless of this choice — `rag_agent` and `akira` both depend on them; only the chosen chat agent's
+   this tier. Working example agents are minimal by default: `primary_chat_agent` picks the user-facing
+   chat agent — `lg_agent` (LangGraph, BM25 — the default for chat/agent/workflow/prototype shapes),
+   `adk_agent` (Google ADK), `both`, or `none` — and `rag_agent` (embedding-based retrieval behind
+   `/api/v1/retrieval`) ships default-on only for the `rag` shape (`include_rag_agent` opts any other
+   shape in, at genesis or later via `copier update`). `langgraph`/`langchain-core` stay installed
+   regardless of this choice — the chat agents and `akira` depend on them; only the chosen chat agent's
    own framework-specific deps (`langchain-mcp-adapters` for `lg_agent`, `google-adk`+`mcp` for
    `adk_agent`) actually toggle. The eval suite grades every backend independently (see `evals/README.md`
    in the generated project), so this choice never breaks eval coverage.
@@ -114,14 +117,15 @@ generated project to pull in template changes — see the
 | `primary_backend_language` | `python` | `python`/`typescript`/`both` — `typescript`/`both` scaffold a real Node/TS backend service at `ts_project_root` (package.json, tsconfig, eslint, Jest), not just frontend hooks |
 | `external_systems` | *(none)* | Multiselect: Slack/GitHub/Google Workspace/Calendar/Email/Database/Web — seeds integration + vector-store defaults |
 | `deployment_target` | `local` | `local`/`docker`/`cloud`/`serverless` — recorded in DESIGN.md's Key Decisions |
-| `agent_tools` | `[mcp]` + seeded | Agent-shaped projects only. Multiselect; `mcp` seeds `include_mcp_server`; recorded in DESIGN.md |
+| `agent_tools` | seeded from `external_systems` (GitHub/Database), else empty | Agent-shaped projects only. Multiselect; explicitly selecting `mcp` (a declared MCP host consumer) seeds `include_mcp_server`; recorded in DESIGN.md |
 | `agent_memory` | `conversation` | Agent-shaped projects only. `long_term` seeds `enable_postgres_checkpointer=true`; recorded in DESIGN.md |
 | `human_approval` | `sometimes` | Agent-shaped projects only. Recorded in DESIGN.md — constrains tools that write to external systems |
-| `primary_chat_agent` | derived from `project_type` | `lg_agent`/`adk_agent`/`both`/`none` — which chat agent(s) join the always-present `rag_agent`. Skipped for `mcp_server`/`eval_suite` projects |
+| `primary_chat_agent` | `lg_agent` for chat/agent/workflow/prototype shapes, else `none` | `lg_agent`/`adk_agent`/`both`/`none` — one working example by default; the other framework is a `copier update -d` away. Skipped for `mcp_server`/`eval_suite` projects |
+| `include_rag_agent` | `true` only for the `rag` shape | Prebuilt LangGraph retrieval backend behind `/api/v1/retrieval`. Skipped (computed) for `rag`/`mcp_server`/`eval_suite`; asked default-off elsewhere |
 | `vector_backend` | `duckdb` (`postgres` if Database selected) | Asked only for RAG projects or when Database is an external system. `opensearch` adds `opensearch-py`; `postgres` (pgvector — works with Supabase) adds `psycopg`/`pgvector` |
 | `ts_agent_framework` | `vercel_ai_sdk` for TS-only chat/agent projects, else `none` | Asked only for agent-shaped TS projects — stages a real streamText + tool() loop at `<ts_project_root>/src/agent/` |
 | `frontend_backend_topology` | `single` | Asked only with both a TS component and a Python backend. `split_service` = Next.js (Vercel) + FastAPI (Railway) sharing Supabase-JWT identity |
-| `include_mcp_server` | `true` when project is an MCP server or agent tools include MCP | Scaffolds `mcp_servers/<slug>/` |
+| `include_mcp_server` | `true` only when project is an MCP server, or MCP was explicitly selected in `agent_tools` | Scaffolds `mcp_servers/<slug>/` — a thin adapter over the REST boundary, off by default otherwise |
 | `mcp_server_language` | follows `primary_backend_language` | `python` (FastMCP) or `typescript` (official MCP TS SDK) — independent of the backend language, the default just follows it |
 | `optional_features` | `[akira, dev_companion]` + seeded | One multiselect replacing ten `include_*` prompts — see "Optional features" below |
 | `data_sensitivity` | `internal` (`restricted` for customer/public-facing) | `public`/`internal`/`restricted`/`secret` — drives a `CLAUDE.md` hard rule and (when `scaffold_full_project`) a Terraform resource tag |
@@ -160,8 +164,26 @@ isn't in the multiselect — it derives directly from Calendar in `external_syst
 | `python_version` / `aws_region` | `3.12` / `eu-central-1` | pyproject floor / Terraform default region |
 | `mcp_server_name` / `mcp_server_slug` | `<project_slug>` | MCP server naming |
 | `expensive_command_patterns` | *(blank)* | Regex for commands that should nudge `--dry-run`; blank disables the hook |
-| `include_agent_reference_library` | `true` | `.agents/skills/` (ADK + LangGraph reference library) + `/new-agent` |
+| `include_agent_reference_library` | `false` | `.agents/skills/` (ADK + LangGraph reference library) + `/new-agent` — opt in for offline/team-portability; canonical home stays this template |
 | `global_skills_source` | `vendored` | Maintainer knob — see `scripts/sync-global-skills.sh` |
+
+## Repository layout
+
+Only `template/` is rendered into target projects (`_subdirectory: template`); everything else is
+template-maintainer material.
+
+| Path | What it is |
+|---|---|
+| `copier.yaml` | The whole interview + derivation logic + `_tasks` post-processing. The comments in it are load-bearing — read them before changing any toggle. |
+| `template/CLAUDE.md.jinja`, `DESIGN.md.jinja`, `LIFECYCLE.md.jinja` | Rendered to the project root in every mode (including layering-only). LIFECYCLE.md is the phase/gate status contract maintained by `/gate-check` and read by DSSG's project-mgmt-ai. |
+| `template/.claude/` | Hooks, skills, agent defs, settings — the always-on Claude tooling tier. Ships in every mode. |
+| `template/.agents/` | Tool-agnostic ADK/LangGraph reference library (`include_agent_reference_library`). |
+| `template/mcp_servers/` | Python FastMCP server scaffold (`include_mcp_server`); swapped for the TS tree when `mcp_server_language=typescript`. |
+| `template/_scaffold/` | **Staging dir** for the full-project tier. Copier renders it verbatim, then `_tasks` prunes unselected features and `mv`s the survivors to the project root. Never collides with a pre-existing repo — layering-only mode discards it wholesale. |
+| `template/_mcp_ts/`, `template/_split_service_frontend_staging/` | Same staging convention for the TS MCP server and the split_service Next.js frontend; always `rm -rf`'d after their conditional `mv`. |
+| `scripts/` | Maintainer utilities (see `scripts/README.md`). |
+| `.claude/docs/` | This repo's own plan/research docs (local-only, git-ignored by policy). |
+| `.github/workflows/test-render.yml` | CI render matrix — leftover-Jinja + ruff checks per config. |
 
 ## Design notes
 

@@ -47,6 +47,10 @@ If no DESIGN.md exists, consider suggesting `/scope-poc` before continuing — e
 user hasn't yet defined actors, MVP scope, or key architectural decisions. `/project-genesis`
 works without it, but infrastructure choices made without a design are guesses.
 
+If the target directory already contains a `.copier-answers.yml`, this is a
+**re-entry**, not a first render — skip the interview except for what's changing
+and follow §Re-entry below.
+
 ### Step 1 — Ask, don't hand over a form
 
 Have a short real conversation (not a rigid checklist read verbatim). It mirrors
@@ -128,6 +132,14 @@ be `existing_repo`). Everything not covered keeps copier's own derived default
 — don't invent additional questions, and don't ask about anything in
 copier.yaml's "inferred, never asked" tier (`source_root`, `eval_root`,
 `python_version`, `aws_region`, ...) unless the user brings it up.
+
+**"I don't know" never blocks the render.** An unknown answer means: leave the
+variable unset (the seeded default fills it), park the question in DESIGN.md's
+Open Questions with a revisit trigger — or, for a Key Decision, record it as
+`Deferred(<trigger>)` with the default noted — and offer `/research` /
+`/parallel-research` to close it. Scaffold the base now; the capability lands
+later via re-entry (§Re-entry) when the trigger fires. Genesis never blocks on
+a deferred decision.
 
 ### Step 2 — Map to copier variables
 
@@ -227,15 +239,45 @@ if needed, `make setup` then the chat agent's `make <agent_slug>-up` (or
 `mcp_servers/<slug>` if `include_mcp_server`, and `/sanyi init` to define the
 project's change-contract now that its shape is set).
 
+## Re-entry — running genesis again
+
+The render is not a one-shot commitment. `.copier-answers.yml` in the generated
+project is the **scaffold state**: it records every answer, and changing an
+answer through copier is the only way components enter a repo after genesis —
+never hand-copy template files in.
+
+1. **Detect:** `.copier-answers.yml` present in the target → re-entry mode
+   (Step 0). Read it; the recorded answers are the baseline. Interview only
+   what's changing — usually a parked open question whose trigger fired
+   ("first external consumer appeared" → `include_mcp_server=true`).
+2. **Clean tree first:** `git -C <target> status` must be clean before
+   re-rendering — copier conflicts on top of uncommitted work are
+   unrecoverable. Hard-stop and ask the user to commit/stash otherwise.
+3. **Execute:** `copier update -d <changed>=<value>` when the project was
+   rendered from a tagged version; from a moving working tree,
+   `copier copy --overwrite --vcs-ref HEAD --defaults -d <changed>=<value> . <target>`
+   with the other answers carried from `.copier-answers.yml`. Conflict
+   walkthroughs are `/template-update`'s job — hand off there when the diff
+   touches user-edited files.
+4. **Close the loop:** mark the parked DESIGN.md question/decision `Resolved`,
+   and re-run `/gate-check` in the target if it tracks LIFECYCLE.md.
+
+Re-entry is idempotent gap-filling: unchanged answers re-render to identical
+files; only the flipped toggle's files appear.
+
+**Adding a single capability to an already-rendered project?** Run
+`/add-capability <x>` *in that project* instead of driving copier by hand — it's
+the capability-named front door over this same mechanism (clean-tree gate,
+`copier update -d`, close-the-loop → gate-check), with aliases `/add-rag`,
+`/add-eval-metric`, `/add-integration`. This §Re-entry path is for the
+template-author's cross-repo view; `/add-capability` is what ships into and runs
+inside the generated project.
+
 ## Notes
 
-- **Tell the user the add-later story in Step 5's report — always.** The render is
-  not a one-shot commitment: `.copier-answers.yml` in the generated project records
-  every answer, and any toggle can be flipped later by re-running copier against the
-  same directory with the changed answer (`copier copy --overwrite -d include_ml_labs=true ...`,
-  or `copier update` once the template is version-tagged). Users who don't know this
-  over-scaffold "just in case" — say it explicitly so they can scaffold the MVP and
-  add capabilities when they're actually needed.
+- **Tell the user the add-later story in Step 5's report — always.** Point them
+  at §Re-entry: scaffold the MVP now, flip toggles later when actually needed.
+  Users who don't know this over-scaffold "just in case" — say it explicitly.
 - **Legacy toggle → new axis mapping** (planning docs written against the old flat
   interview stay actionable — both forms are honored by `-d`):
 

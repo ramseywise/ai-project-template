@@ -30,6 +30,23 @@ Don't conflate them — many design sessions happen weeks before the scaffold is
 
 ---
 
+## Interview conventions
+
+**"I don't know" is a first-class answer.** Any question below can be answered
+*unknown* — park it, don't force a guess:
+
+- Record it in DESIGN.md's Open Questions with a concrete revisit trigger
+  ("resolve before sprint 1", "revisit when the first external consumer appears").
+- If it's a Key Decision, mark it `Deferred(<trigger>)` with the current default
+  choice recorded. A Deferred with a real trigger blocks nothing — not genesis,
+  not the G1 gate; a Deferred without one counts as Open (a blocker).
+- Offer the research handoff: `/research` (one deep question) or
+  `/parallel-research` (breadth-first) to close it, then re-run this skill.
+
+**Re-running is cheap and expected.** This skill is idempotent over DESIGN.md — a
+later run reads the existing file, ratifies what's resolved, and interviews only
+the gaps. Never start a fresh DESIGN.md when one exists.
+
 ## Steps
 
 ### Step 0 — Discover what's already decided
@@ -205,6 +222,10 @@ Summarize what you've learned back to the user in the DESIGN.md structure below.
 confirmation before writing. If anything feels like a guess rather than something they actually
 said, ask directly.
 
+Unknowns never block the write: park each one per §Interview conventions (Open
+Questions entry with trigger, or `Deferred(<trigger>)` Key Decision) and write the
+DESIGN.md anyway — a design with named gaps beats no design.
+
 Write the DESIGN.md to `--output` (default: `.claude/docs/DESIGN.md` if pre-scaffold,
 `DESIGN.md` in the project root if already inside a generated project).
 
@@ -286,10 +307,20 @@ Don't draw what doesn't exist yet. Containers and components come later, when yo
 
 | Decision | Status | Choice | Rationale |
 |----------|--------|--------|-----------|
-| Auth/identity | Resolved / Open | [choice] | [why] |
-| Data model ownership | Resolved / Open | [choice] | [why] |
-| AI approach (retrieval/gen/automation) | Resolved / Open | [choice] | [why] |
+| Auth/identity | Resolved / Open / Deferred(<trigger>) | [choice] | [why] |
+| Data model ownership | Resolved / Open / Deferred(<trigger>) | [choice] | [why] |
+| AI approach (retrieval/gen/automation) | Resolved / Open / Deferred(<trigger>) | [choice] | [why] |
 | [other] | | | |
+
+Status semantics: `Deferred(<trigger>)` records the default choice now and names
+the concrete event that reopens the decision. A Deferred without a real trigger
+counts as Open. Open items block the G1 gate; Deferred items don't.
+
+---
+
+## Open Questions
+
+- [question] — *revisit:* [trigger or date] — *close via:* [/research, /parallel-research, or a named person]
 
 ---
 
