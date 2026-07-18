@@ -2,6 +2,14 @@
 
 This directory holds the command-style workflows used in this repo.
 
+## The lifecycle
+
+This project moves **Discovery → Delivery → Deployment**, with a gate between
+each phase. The map — phases, gates, handoffs, and which skill drives each — is
+`RELEASE.md` at the repo root. Per-phase records: `DESIGN.md`, `DELIVERY.md`,
+`DEPLOYMENT.md`; machine-readable state in `LIFECYCLE.md` (written by
+`/gate-check` only). These are how you *walk* the project, not files to copy.
+
 ## Quick map
 
 | Skill | Use when | What it does | Hook automation? |
@@ -20,6 +28,7 @@ This directory holds the command-style workflows used in this repo.
 | `doc-to-linear-tickets` | You have a planning doc to turn into tickets | Parses a doc and creates structured Linear issues | No |
 | `rfc` | End of discovery — compile the approval cover-sheet | Writes RFC.md pointing at DESIGN.md + milestones + M1 tasks for a human go/no-go; never sets APPROVED itself | No |
 | `gate-check` | Phase handover — "are we ready to build/ship?" | Audits the Discovery/Delivery exit gates against real artifacts and updates LIFECYCLE.md (its sole writer) | No |
+| `deploy-check` | Launch pre-flight — "are we ready to deploy?" | Audits G2 (delivery → deployment) readiness against DEPLOYMENT.md + real artifacts; reports blockers. Does **not** write LIFECYCLE.md — hands off to `/gate-check` to record the verdict | No |
 | `add-capability` | A deferred component needs scaffolding post-genesis | Wraps `copier update -d include_<x>=true` (clean-tree gated) so rag/MCP/a second framework/an eval metric/an integration/split_service enters via copier, never hand-copy. Aliases: `/add-rag`, `/add-eval-metric`, `/add-integration` | No |
 | `github-projects` | Syncing status/iteration with GitHub Projects V2 | Provides GraphQL templates for common sync operations | No |
 | `quick-commit` | You want a branch + commit only | Creates a feature branch and commits safely | Partial |

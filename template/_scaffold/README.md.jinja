@@ -57,11 +57,13 @@ Try the TS agent (Vercel AI SDK) with `make ts-install && make ts-dev`, then
 {%- if primary_chat_agent in ["adk_agent", "both"] %}
 ├── {{ source_root }}/agents/{{ adk_agent_dir }}/  Chat agent (Google ADK), retrieval via the MCP tool
 {%- endif %}
-├── core/                                Corpus ingestion + preprocessing (feeds every backend's index)
+├── core/                                Data/ETL pipelines{% if has_corpus_pipeline %} (pipelines/corpus/ = markdown->JSONL->FTS, feeds retrieval){% endif %}
+{%- if has_corpus_pipeline %}
 ├── data/corpus/                         Example FAQ corpus (swap this out for your own)
+{%- endif %}
 ├── {{ eval_root }}/                     Eval suite ({{ eval_allowed_dirs }})
-{%- if include_ml_labs %}
-├── labs/                                Classical ML/stats toolkit (regression, timeseries, stats_testing, feature_engineering, model_comparison, clustering)
+{%- if include_ml %}
+├── ml/                                  Classical ML/stats toolkit (regression, timeseries, stats_testing, feature_engineering, model_comparison, clustering)
 {%- endif %}
 ├── nbks/                                Marimo notebooks — inspection, not production code
 ├── tests/                               unit / smoke / integration
@@ -86,13 +88,15 @@ reads `.agents/skills/framework-selection` (if you haven't already decided) and
 scaffolds a new agent next to the existing one(s) under `{{ source_root }}/agents/`.
 See `.claude/skills/new-agent/SKILL.md`.
 
+{% if has_corpus_pipeline -%}
 ## Replacing the example corpus
 
 `data/corpus/*.md` is a placeholder "Acme Coffee Machine" FAQ set so the example
 agent has something real to retrieve over. Delete it, drop your own markdown files
-in `data/corpus/`, and re-run `make corpus-ingest`. `core/ingestion.py` expects each
+in `data/corpus/`, and re-run `make corpus-ingest`. `core/pipelines/corpus/ingestion.py` expects each
 file to start with a single `# Title` line; everything else is body text.
 
+{% endif -%}
 ## Everyday commands
 
 See the `Makefile` for the full list (

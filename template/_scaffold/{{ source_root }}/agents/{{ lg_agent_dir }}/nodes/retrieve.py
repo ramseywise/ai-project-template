@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from core.index import search
+from core.pipelines.corpus.index import search
 
 from ..schema import Source
 from ..settings import settings

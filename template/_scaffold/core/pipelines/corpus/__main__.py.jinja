@@ -4,9 +4,9 @@ import argparse
 import os
 from pathlib import Path
 
-from core.index import build_index
-from core.ingestion import load_raw_articles
-from core.preprocessing import clean_and_dedupe, write_jsonl
+from core.pipelines.corpus.index import build_index
+from core.pipelines.corpus.ingestion import load_raw_articles
+from core.pipelines.corpus.preprocessing import clean_and_dedupe, write_jsonl
 
 CORPUS_DIR = Path("data/corpus")
 PROCESSED_PATH = Path("data/processed/articles_clean.jsonl")

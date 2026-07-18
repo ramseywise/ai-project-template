@@ -11,6 +11,8 @@ it runs in **phases** (see "The interview" below), and the tiers describe what l
    placeholder for project-specific hard rules — plus a data-classification hard rule driven by
    `data_sensitivity`), `LIFECYCLE.md` (Discovery → Delivery → Deployment phase/gate status,
    maintained by `/gate-check` — the status contract project-mgmt-ai reads),
+   `DEPLOYMENT.md` (the Phase-3 runbook — staged rollout, rollback criteria, monitoring;
+   pre-flighted by `/deploy-check`),
    `.claude/settings.json` (hook wiring: secrets scan, branch naming, code quality,
    test coverage, SDK-pattern checks, docs hygiene, memory-duplication guard, commit gates), and
    `.claude/hooks/*.sh` + `.claude/skills/` (21 workflow skills — research-review, plan-review,
@@ -20,24 +22,31 @@ it runs in **phases** (see "The interview" below), and the tiers describe what l
    onto an existing repo): `.agents/skills/` (`include_agent_reference_library`) — a tool-agnostic
    ADK/LangGraph reference library that `/new-agent` orchestrates — and `mcp_servers/<slug>/`
    (`include_mcp_server`) — a FastMCP server scaffold, ready to extend.
-3. **One all-or-nothing bundle** behind `scaffold_full_project`: `pyproject.toml`, `core/` ingestion,
+3. **One all-or-nothing bundle** behind `scaffold_full_project`: `pyproject.toml`, `core/` (the general
+   data/ETL home — `core/pipelines/corpus/` holds the markdown→JSONL→DuckDB-FTS corpus pipeline when a
+   retrieval example agent is present; see "Shape examples" below),
    `evals/`, `infrastructure/`, `tests/`, CI, `.pre-commit-config.yaml` (ruff-pre-commit, reads the same
    `[tool.ruff]` config as everything else — real git-level enforcement alongside the Claude-session
    hooks) and `renovate.json` (automated dependency-update PRs, with the fast-moving AI framework deps
    held back from automerge) — plus the sub-gated `include_akira`/`include_dev_companion` toggles within
-   this tier. Working example agents are minimal by default: `primary_chat_agent` picks the user-facing
-   chat agent — `lg_agent` (LangGraph, BM25 — the default for chat/agent/workflow/prototype shapes),
-   `adk_agent` (Google ADK), `both`, or `none` — and `rag_agent` (embedding-based retrieval behind
-   `/api/v1/retrieval`) ships default-on only for the `rag` shape (`include_rag_agent` opts any other
-   shape in, at genesis or later via `copier update`). `langgraph`/`langchain-core` stay installed
-   regardless of this choice — the chat agents and `akira` depend on them; only the chosen chat agent's
+   this tier. Working example agents are minimal by default and **derived from `project_type`**, not asked:
+   `primary_chat_agent` picks the user-facing chat agent — `lg_agent` (LangGraph, BM25 — the default for
+   chat/agent/workflow/prototype shapes), `adk_agent` (Google ADK), `both`, or `none` — and `rag_agent`
+   (embedding-based retrieval behind `/api/v1/retrieval`) ships default-on only for the `rag` shape. Both
+   are now `-d`-only capabilities: a second framework or `include_rag_agent=true` is a `copier update -d`
+   away (the `/add-capability` path), never a genesis question. `langgraph`/`langchain-core` stay installed
+   regardless — the chat agents and `akira` depend on them; only the chosen chat agent's
    own framework-specific deps (`langchain-mcp-adapters` for `lg_agent`, `google-adk`+`mcp` for
-   `adk_agent`) actually toggle. The eval suite grades every backend independently (see `evals/README.md`
-   in the generated project), so this choice never breaks eval coverage.
+   `adk_agent`) actually toggle. The retrieval golden-QA eval grades every backend independently (see
+   `evals/README.md` in the generated project) and ships alongside the corpus pipeline; a non-retrieval
+   shape (mcp_server/eval_suite/ai_backend/adk-only) gets an empty `core/` ETL home and keeps only the
+   interaction-eval suite.
 
 This repo's own `.github/workflows/test-render.yml` renders a representative config matrix (defaults,
-layering-only, each `primary_chat_agent` value) on every push/PR and checks for leftover Jinja + a clean
-`ruff check`/`format --check` — the automated version of this session's manual verification loop.
+layering-only, each `project_type`/`primary_chat_agent` value, and a `no-corpus-ai_backend` row that
+proves the empty-`core/` non-retrieval render's tests pass) on every push/PR and checks for leftover
+Jinja + a clean `ruff check`/`format --check` — the automated version of this session's manual
+verification loop.
 
 ## Quick start
 
@@ -48,8 +57,10 @@ layering-only, each `primary_chat_agent` value) on every push/PR and checks for 
    `nonprofit-success-ai` and `project-mgmt-ai` and applies shared platform context automatically.
 
 2. `/project-genesis` — infrastructure interview. Reads `DESIGN.md` if it exists (many questions
-   are already answered), asks about agent framework, vector backend, TypeScript, MCP, then runs
-   copier non-interactively.
+   are already answered), confirms the short scoping set (project type, users, language, external
+   systems, deployment, conventions), then runs copier non-interactively. Architecture (agent framework,
+   vector backend, TypeScript, MCP, integrations, eval metrics) is no longer asked — it's derived from
+   `project_type` and added later as capabilities via `copier update -d` (`/add-capability`).
 
 Running `/project-genesis` alone (skipping `/scope-poc`) is valid — the generated project includes a
 blank `DESIGN.md` stub as a reminder to fill in the design before sprint 1.
@@ -78,27 +89,43 @@ and the implementation choices either derive their defaults from that or aren't 
    `agent_memory` (none / conversation / long-term), `human_approval` (none / sometimes / always).
    These land in the generated `DESIGN.md`'s Key Decisions table and seed architecture defaults
    (MCP on when tools include MCP; postgres checkpointer on for long-term memory).
-3. **Phase 2 — Architecture** (each asked only when Phase 1 makes it relevant): `primary_chat_agent`
-   (skipped for MCP-server/eval-suite projects), `vector_backend` (asked only for RAG projects or when
-   Database is an external system — defaults to `postgres` in the latter case), `ts_agent_framework`
-   (TS projects; defaults to `vercel_ai_sdk` for TS-only chat/agent projects), `frontend_backend_topology`
-   (only when there's both a TS component and a Python backend), `include_mcp_server` +
-   `mcp_server_language` (language follows `primary_backend_language`).
-4. **Phase 3 — Optional features**: one `optional_features` multiselect (akira, dev companion,
-   promptfoo, ragas, web research, meeting intelligence, marketing clients, n8n webhook, composio,
-   ml labs) instead of ten yes/no prompts. Defaults are seeded from Phase 1 — e.g. Web → web research,
-   Slack/GitHub/Email → composio, workflow project → n8n webhook. Calendar isn't in the list: selecting
-   Calendar as an external system already scaffolds the Google Calendar client.
-5. **Phase 4 — Team conventions**: `data_sensitivity` (default follows `primary_users` —
+3. **Phase 4 — Team conventions**: `data_sensitivity` (default follows `primary_users` —
    customer/public-facing → `restricted`), `ticket_prefix`, `enable_macos_notifications`.
+
+That's the whole interview — 11 questions (14 for agent-shaped projects). **Architecture is no longer
+asked.** What used to be Phase 2 (chat-agent framework, vector backend, TS agent loop, frontend/backend
+topology, MCP server, MCP language) and Phase 3 (the optional-features and eval-metrics multiselects) is
+now **derived from `project_type` and `-d`-only** — `project_type` picks the one shape example, and each
+of those components is a mid-project capability you add later with `copier update -d include_<x>=…` (the
+`/add-capability` path). This shrinks genesis to scoping + conventions and moves lifecycle decisions to
+when they're actually made.
+
+### Shape examples — one per `project_type`
+
+The render ships exactly one shape example, chosen by `project_type` — no cross-shape leakage:
+
+| `project_type` | Shape example that lands |
+|---|---|
+| `chat_app` / `agent` / `prototype` | one LangGraph chat agent (`lg_agent`) + corpus pipeline + retrieval eval |
+| `workflow` | `lg_agent` + corpus + n8n webhook receiver |
+| `rag` | `rag_agent` (embedding retrieval) + corpus + retrieval eval + structure guard |
+| `mcp_server` | MCP server scaffold (`mcp_servers/<slug>/`), no chat agent |
+| `eval_suite` | eval machinery only, no chat agent |
+| `ai_backend` | FastAPI service only — no chat agent, empty `core/` ETL home, interaction evals only |
+| `existing_repo` | layering-only: `.claude/`/`.agents`/`mcp_servers`, nothing else |
+
+The corpus data pipeline (`core/pipelines/corpus/`, `data/corpus/`, the retrieval golden-QA eval, and
+`tests/unit/core/`) ships **only when a retrieval example agent is present** (`lg_agent` BM25 or
+`rag_agent`). Other shapes get `core/` as an empty ETL home; add corpus with
+`copier update -d include_rag_agent=true`.
 
 Everything else is **inferred, never asked**: `source_root` (`src`), `eval_root`/`eval_allowed_dirs`,
 `enable_structure_guard` (on only for eval-suite/RAG shapes), `python_version` (3.12), `aws_region`,
 `ts_source_root`/`ts_project_root`, `mcp_server_name`/`mcp_server_slug`, `scaffold_full_project`
-(false only for the layer-onto-existing-repo project type), `has_typescript`, and each `include_*`
-feature toggle (derived from the multiselect). Every inferred value remains overridable
-non-interactively — `-d source_root=lib`, `-d scaffold_full_project=false`, `-d include_ml_labs=true`
-all still work, which is how CI and `/project-genesis` drive the template.
+(false only for the layer-onto-existing-repo project type), `has_typescript`, `has_corpus_pipeline`, and
+the derived architecture + `include_*` toggles above. Every inferred/`-d`-only value remains overridable
+non-interactively — `-d source_root=lib`, `-d primary_chat_agent=both`, `-d include_mcp_server=true`,
+`-d include_ml=true` all still work, which is how CI and `/project-genesis` drive the template.
 
 ## Updating a project that already used this template
 
@@ -106,13 +133,21 @@ Copier tracks the answers it was given in `.copier-answers.yml`. Re-run `copier 
 generated project to pull in template changes — see the
 [Copier update docs](https://copier.readthedocs.io/en/stable/updating/).
 
+Template `_migrations` run automatically after each `copier update` to clean up structural moves that
+copier's file-level merge can't do on its own. The current migration handles the `core/*.py` →
+`core/pipelines/corpus/*.py` restructure: unmodified stale modules are removed automatically, but any
+`core/*.py` you had **hand-edited** is left in place with a `[migration] WARN` telling you to port your
+changes into `core/pipelines/corpus/` and repoint `from core.<module> import …` references. Migrations are
+idempotent — re-running `copier update` re-checks and only warns about files you haven't resolved yet.
+
 ## Options
 
-**Asked** (grouped by interview phase):
+**Asked** (the whole interview — Phase 1 scoping + Phase 4 conventions; agent-shaped projects also get
+the three Phase-1b questions):
 
 | Question | Default | Notes |
 |---|---|---|
-| `project_type` | `chat_app` | What you're building — drives which later questions appear and every derived default. `existing_repo` = layering-only mode |
+| `project_type` | `chat_app` | What you're building — drives the one shape example and every derived architecture default. `existing_repo` = layering-only mode |
 | `primary_users` | `internal` | `internal`/`customers`/`developers`/`public_api` — seeds `data_sensitivity` and DESIGN.md's actor table |
 | `primary_backend_language` | `python` | `python`/`typescript`/`both` — `typescript`/`both` scaffold a real Node/TS backend service at `ts_project_root` (package.json, tsconfig, eslint, Jest), not just frontend hooks |
 | `external_systems` | *(none)* | Multiselect: Slack/GitHub/Google Workspace/Calendar/Email/Database/Web — seeds integration + vector-store defaults |
@@ -120,19 +155,27 @@ generated project to pull in template changes — see the
 | `agent_tools` | seeded from `external_systems` (GitHub/Database), else empty | Agent-shaped projects only. Multiselect; explicitly selecting `mcp` (a declared MCP host consumer) seeds `include_mcp_server`; recorded in DESIGN.md |
 | `agent_memory` | `conversation` | Agent-shaped projects only. `long_term` seeds `enable_postgres_checkpointer=true`; recorded in DESIGN.md |
 | `human_approval` | `sometimes` | Agent-shaped projects only. Recorded in DESIGN.md — constrains tools that write to external systems |
-| `primary_chat_agent` | `lg_agent` for chat/agent/workflow/prototype shapes, else `none` | `lg_agent`/`adk_agent`/`both`/`none` — one working example by default; the other framework is a `copier update -d` away. Skipped for `mcp_server`/`eval_suite` projects |
-| `include_rag_agent` | `true` only for the `rag` shape | Prebuilt LangGraph retrieval backend behind `/api/v1/retrieval`. Skipped (computed) for `rag`/`mcp_server`/`eval_suite`; asked default-off elsewhere |
-| `vector_backend` | `duckdb` (`postgres` if Database selected) | Asked only for RAG projects or when Database is an external system. `opensearch` adds `opensearch-py`; `postgres` (pgvector — works with Supabase) adds `psycopg`/`pgvector` |
-| `ts_agent_framework` | `vercel_ai_sdk` for TS-only chat/agent projects, else `none` | Asked only for agent-shaped TS projects — stages a real streamText + tool() loop at `<ts_project_root>/src/agent/` |
-| `frontend_backend_topology` | `single` | Asked only with both a TS component and a Python backend. `split_service` = Next.js (Vercel) + FastAPI (Railway) sharing Supabase-JWT identity |
-| `include_mcp_server` | `true` only when project is an MCP server, or MCP was explicitly selected in `agent_tools` | Scaffolds `mcp_servers/<slug>/` — a thin adapter over the REST boundary, off by default otherwise |
-| `mcp_server_language` | follows `primary_backend_language` | `python` (FastMCP) or `typescript` (official MCP TS SDK) — independent of the backend language, the default just follows it |
-| `optional_features` | `[akira, dev_companion]` + seeded | One multiselect replacing ten `include_*` prompts — see "Optional features" below |
 | `data_sensitivity` | `internal` (`restricted` for customer/public-facing) | `public`/`internal`/`restricted`/`secret` — drives a `CLAUDE.md` hard rule and (when `scaffold_full_project`) a Terraform resource tag |
 | `ticket_prefix` | `LIN` | Drives branch-naming enforcement and the Linear-ticket skill |
 | `enable_macos_notifications` | `true` | Turn off on Linux/CI |
 
-**Optional features** (values of the `optional_features` multiselect; each maps to a derived
+**Derived architecture / `-d`-only** (A3: no longer asked at genesis — derived from `project_type`, the
+one shape example; each is a mid-project capability, added later with `copier update -d <name>=…` via
+`/add-capability`. Still overridable at genesis with `-d`):
+
+| Variable | Default | Notes |
+|---|---|---|
+| `primary_chat_agent` | `lg_agent` for chat/agent/workflow/prototype shapes, else `none` | `lg_agent`/`adk_agent`/`both`/`none` — one working example; a second framework is a `-d` / `copier update` away |
+| `include_rag_agent` | `true` only for the `rag` shape | Prebuilt LangGraph retrieval backend behind `/api/v1/retrieval`; flips on `has_corpus_pipeline` (corpus + retrieval eval) |
+| `vector_backend` | `duckdb` (`postgres` if Database selected) | `rag_agent`'s store. `opensearch` adds `opensearch-py`; `postgres` (pgvector — works with Supabase) adds `psycopg`/`pgvector` |
+| `ts_agent_framework` | `vercel_ai_sdk` for TS-only chat/agent projects, else `none` | Stages a real streamText + tool() loop at `<ts_project_root>/src/agent/` |
+| `frontend_backend_topology` | `single` | `split_service` = Next.js (Vercel) + FastAPI (Railway) sharing Supabase-JWT identity |
+| `include_mcp_server` | `true` only when project is an MCP server, or MCP was explicitly selected in `agent_tools` | Scaffolds `mcp_servers/<slug>/` — a thin adapter over the REST boundary |
+| `mcp_server_language` | follows `primary_backend_language` | `python` (FastMCP) or `typescript` (official MCP TS SDK) |
+| `optional_features` | `[akira, dev_companion]` + seeded | The optional-add-ons list — see "Optional features" below; add more with `-d optional_features=[…]` |
+| `eval_metrics` | `[escalation, friction]` for agent-shaped, else `[]` | Interaction-eval metrics; add with `-d eval_metrics=[…]` (`/add-eval-metric`) |
+
+**Optional features** (values of the `optional_features` variable; each maps to a derived
 `include_*` variable that `-d` can still override individually):
 
 | Value | Derived variable | What it scaffolds |
@@ -146,7 +189,7 @@ generated project to pull in template changes — see the
 | `marketing` | `include_marketing_integrations` | `integrations/{eventbrite,linkedin,canva}.py` — thin clients for publishing events, posting updates, generating assets |
 | `n8n_webhook` (seeded by `workflow`) | `include_n8n_webhook` | HMAC-verified inbound webhook receiver (`POST /webhooks/n8n`), auto-mounted on every present agent's FastAPI app |
 | `composio` (seeded by Slack/GitHub/Email/Workspace) | `include_composio` | `integrations/composio.py` — third-party app actions via Composio's unified tool API |
-| `ml_labs` | `include_ml_labs` | `labs/` — classical ML/stats toolkit (regression, time-series, A/B testing, feature engineering, model comparison, clustering) |
+| `ml` | `include_ml` | `ml/` — classical ML/stats toolkit (regression, time-series, A/B testing, feature engineering, model comparison, clustering) |
 
 `include_calendar_integration` (`integrations/google_calendar.py`, pre-obtained OAuth2 refresh token)
 isn't in the multiselect — it derives directly from Calendar in `external_systems`.
@@ -160,6 +203,7 @@ isn't in the multiselect — it derives directly from Calendar in `external_syst
 | `source_root` / `ts_source_root` / `ts_project_root` | `src` / `src` / `<project_slug>` | Directory layout |
 | `eval_root` / `eval_allowed_dirs` | `evals` / `graders metrics pipelines reports utils` | Eval-suite layout |
 | `enable_structure_guard` | on only for `eval_suite`/`rag` shapes | Canonical eval-suite directory enforcement |
+| `has_corpus_pipeline` | `lg_agent`/`both` present, or `include_rag_agent` | Ships `core/pipelines/corpus/` + `data/corpus/` + the retrieval golden-QA eval + `tests/unit/core/`; off = empty `core/` ETL home |
 | `enable_postgres_checkpointer` | `vector_backend=postgres` or `agent_memory=long_term` | Adds `langgraph-checkpoint-postgres`; runtime default stays `memory` either way |
 | `python_version` / `aws_region` | `3.12` / `eu-central-1` | pyproject floor / Terraform default region |
 | `mcp_server_name` / `mcp_server_slug` | `<project_slug>` | MCP server naming |
@@ -175,7 +219,7 @@ template-maintainer material.
 | Path | What it is |
 |---|---|
 | `copier.yaml` | The whole interview + derivation logic + `_tasks` post-processing. The comments in it are load-bearing — read them before changing any toggle. |
-| `template/CLAUDE.md.jinja`, `DESIGN.md.jinja`, `LIFECYCLE.md.jinja` | Rendered to the project root in every mode (including layering-only). LIFECYCLE.md is the phase/gate status contract maintained by `/gate-check` and read by DSSG's project-mgmt-ai. |
+| `template/CLAUDE.md.jinja`, `DESIGN.md.jinja`, `LIFECYCLE.md.jinja`, `DEPLOYMENT.md.jinja` | Rendered to the project root in every mode (including layering-only). LIFECYCLE.md is the phase/gate status contract maintained by `/gate-check` and read by DSSG's project-mgmt-ai; DEPLOYMENT.md is the Phase-3 runbook (staged rollout, rollback, monitoring), pre-flighted by `/deploy-check`. |
 | `template/.claude/` | Hooks, skills, agent defs, settings — the always-on Claude tooling tier. Ships in every mode. |
 | `template/.agents/` | Tool-agnostic ADK/LangGraph reference library (`include_agent_reference_library`). |
 | `template/mcp_servers/` | Python FastMCP server scaffold (`include_mcp_server`); swapped for the TS tree when `mcp_server_language=typescript`. |

@@ -36,6 +36,10 @@ contract; offer to create it from the template). Note the current `phase`.
 
 ### 2. Audit G2 (delivery exit) — when phase is delivery or later
 
+The G2 evidence lives in `DELIVERY.md` (the delivery record + handoff to
+deployment) and `DEPLOYMENT.md` (the runbook). Read both; each check below
+still verifies against the real artifact, not the doc's claim.
+
 | Check | How to verify |
 |---|---|
 | `eval_gate_green` | Run `make eval-gate`; it must pass against `evals/targets.yaml`. |
@@ -82,5 +86,5 @@ question ("G1 is green: move to delivery?").
 
 ---
 
-**Upstream:** `/scope-poc` (DESIGN.md), `/define-milestones`, `/sprint-kickoff`, `/plan-review`, `/rfc` (RFC.md)
-**Next:** on G1 green → `/execute-tasks`; on G2 green → deployment planning (DEPLOYMENT.md)
+**Upstream:** `/scope-poc` (DESIGN.md), `/define-milestones`, `/sprint-kickoff`, `/plan-review`, `/rfc` (RFC.md); for G2, `/deploy-check` (launch pre-flight — audits the same G2 criteria before this records them)
+**Next:** on G1 green → `/execute-tasks`; on G2 green → `DEPLOYMENT.md` staged rollout (run `/deploy-check` first to pre-flight readiness)

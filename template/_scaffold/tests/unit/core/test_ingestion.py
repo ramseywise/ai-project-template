@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from core.ingestion import load_raw_articles
+from core.pipelines.corpus.ingestion import load_raw_articles
 
 EXPECTED_ARTICLE_COUNT = 6
 # pytest runs from the project root (see pythonpath = [..., "."] in pyproject.toml),

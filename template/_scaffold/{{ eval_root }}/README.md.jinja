@@ -1,5 +1,5 @@
 # Evals
-{% if include_interaction_evals %}
+{% if has_corpus_pipeline and include_interaction_evals %}
 Two eval suites live here:
 
 1. **Retrieval golden-QA** (`pipelines/run.py`) — grades search quality per
@@ -7,7 +7,14 @@ Two eval suites live here:
 2. **Interaction evals** (`pipelines/grade.py`) — grades recorded assistant
    conversations on the metrics this project selected at generation time
    (see `graders/metrics_registry.py`). See "Interaction evals" at the end.
+{% elif include_interaction_evals %}
+This project ships the **interaction evals** suite (`pipelines/grade.py`) —
+grades recorded assistant conversations on the metrics selected at generation
+time (see `graders/metrics_registry.py`). See below. (No retrieval golden-QA
+suite: this shape has no corpus retrieval backend — add one with
+`/add-capability` → `include_rag_agent` to scaffold it.)
 {% endif %}
+{%- if has_corpus_pipeline %}
 Heuristic eval suite, run independently against every retrieval backend
 actually present in this project — see `pipelines/run.py`'s `BACKENDS` list
 ({% if include_rag_agent %}`rag_agent`'s embeddings{% endif %}{% if primary_chat_agent in ['lg_agent', 'both'] %}{% if include_rag_agent %}; {% endif %}`{{ lg_agent_dir }}`'s BM25 index{% endif %}).
@@ -47,7 +54,7 @@ should surface for that question.
 
 For each backend, for each row:
 
-1. The backend's own search function (`core.index.search` for the LangGraph chat agent's BM25
+1. The backend's own search function (`core.pipelines.corpus.index.search` for the LangGraph chat agent's BM25
    index, `agents.rag_agent.vectorstore.get_vector_index().similarity_search` for
    `rag_agent`'s embeddings — backend picked by `vector_backend`: duckdb/memory/
    opensearch) returns the top-k `SearchResult`s, wrapped into a common shape so
@@ -82,6 +89,7 @@ that backend's results file.
 
 Everything under `reports/output/` is generated, not committed — see the root
 `.gitignore`.
+{% endif -%}
 {% if include_interaction_evals %}
 ## Interaction evals
 
@@ -114,4 +122,10 @@ Supporting pipeline steps, each also runnable standalone:
   data-sensitivity answer, override with `--redact`/`--no-redact`
 - `pipelines/calibration.py` — how well the free heuristics track the judges;
   high kappa means heuristic-only CI runs are trustworthy proxies
-{% endif %}
+{% endif -%}
+{% if not has_corpus_pipeline and not include_interaction_evals %}
+No eval suites are scaffolded for this project shape. The eval spine
+(`graders/`, `metrics/`, `pipelines/`, `reports/`) is present as the place your
+project's own evals go. Add the retrieval golden-QA gate with `/add-capability`
+→ `include_rag_agent`, or interaction-eval metrics with `/add-eval-metric`.
+{% endif -%}

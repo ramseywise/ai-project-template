@@ -11,29 +11,92 @@ last-audit: pending — complete /sanyi init
 
 ## 不易 Buyi
 
-<!-- TODO (interview required — /sanyi init). Admission test: something is Buyi
-     only if violating it causes a security, legal, financial, or trust failure.
-     Every entry needs a deterministic code-layer implementation (a prompt-only
-     invariant is BY-4 debt) and must never be bypassable via config/env/flag.
+<!-- Seeded from the template's base-requirements invariants. These are STARTING
+     entries, not the finished contract:
+     /sanyi init walks them with you to confirm, sharpen the `paths`, and add the
+     project-specific invariants that no scaffold can infer (what the agent must
+     never do/say/promise, which data must never leave the boundary, which
+     irreversible actions need guards, what a misbehaving agent would cost).
 
-     Question bank:
-     - What must the agent never do, say, or promise?
-     - Which compliance constraints apply (data classification here: {{ data_sensitivity }})?
-     - Which escalation fallbacks must always fire?
-     - Which data must never leave the system boundary?
-     - Which actions are irreversible, and what guards them?
-     - What would a misbehaving agent concretely cost?
+     Admission test for any entry you add: it is Buyi only if violating it causes
+     a security, legal, financial, or trust failure. Every entry needs a
+     deterministic code-layer implementation (a prompt-only invariant is BY-4
+     debt) and must never be bypassable via config/env/flag. The seeded entries
+     below all carry `evidence: pending — /sanyi init` because the guarding test
+     is what makes an invariant real; wiring it is the first init task. -->
 
-     Candidates from your scaffold answers (confirm, don't rubber-stamp):
+### Service boundary
+
+<!-- REST-first is the template's service standard: every long-running
+     component exposes FastAPI + /health + versioned /api/v1/*. The invariant is
+     the boundary itself — an endpoint outside /api/v1/* or business logic reached
+     without passing the app factory bypasses the one surface that is tested,
+     observable, and (in split_service) authenticated. MCP is an adapter OVER this,
+     never a second boundary with its own logic. -->
+
+- paths: {{ source_root }}/**/app.py, {{ source_root }}/**/api/v1/**
+- contract: Every externally reachable component is served through the FastAPI
+  app factory behind versioned `/api/v1/*` with a `/health` probe; no business
+  logic is exposed outside this boundary and no alternate transport (MCP,
+  sidecar) carries logic of its own. Not bypassable via config or route
+  registration outside the versioned prefix.
+- evidence: pending — /sanyi init
 {%- if frontend_backend_topology == 'split_service' %}
-     - Supabase-JWT auth middleware ({{ source_root }}/middleware/auth.py) — every
-       API request authenticated; not bypassable.
+
+### Request authentication
+
+<!-- split_service ships Supabase-JWT middleware; every API request is
+     authenticated. An unauthenticated path to a protected endpoint is a
+     security failure, so this is a hard invariant, not a tunable. -->
+
+- paths: {{ source_root }}/middleware/auth.py
+- contract: Every request to a protected `/api/v1/*` endpoint is authenticated
+  by the auth middleware; authentication must not be bypassable via config, env
+  var, or flag. Requires a deterministic code-layer implementation.
+- evidence: pending — /sanyi init
 {%- endif %}
-     - data_sensitivity = {{ data_sensitivity }}{% if data_sensitivity in ['restricted', 'secret'] %} — restricted/secret data needs a
-       named boundary invariant with a code-layer guard{% endif %}
-     - "make eval-gate must pass before release" — the threshold VALUES are
-       Bianyi (targets.yaml); "the gate must run" is the Buyi part once you
-       wire it into CI. -->
+
+### Data-boundary governance
+
+<!-- data_sensitivity drives a CLAUDE.md hard rule (and a Terraform tag when
+     scaffold_full_project). The invariant is that {{ data_sensitivity }} data
+     stays inside its declared boundary — a leak is a legal/trust failure.
+     restricted/secret needs a code-layer guard, not just the doc rule. -->
+
+- paths: CLAUDE.md, {{ source_root }}/**
+- contract: {{ data_sensitivity }}-classified data must not leave the system
+  boundary or be logged/emitted outside its declared sink.{% if data_sensitivity in ['restricted', 'secret'] %} At the
+  {{ data_sensitivity }} level this requires a deterministic code-layer guard, not
+  only the CLAUDE.md hard rule.{% endif %} Not relaxable via config or env.
+- evidence: pending — /sanyi init
+{%- if is_agent_shaped and human_approval in ['sometimes', 'always'] %}
+
+### Human-approval guard
+
+<!-- human_approval = {{ human_approval }} — irreversible or external writes require
+     a human confirmation. Silently making an irreversible action autonomous is a
+     financial/trust failure, so the confirmation gate is Buyi (the LIST of which
+     actions require it is a DESIGN.md record, the "a gate must fire" part is the
+     invariant). -->
+
+- paths: {{ source_root }}/**
+- contract: {% if human_approval == 'always' %}Every agent action{% else %}Every irreversible or external-system write{% endif %} passes through a human-approval
+  gate before executing; the gate must not be bypassable via config, env var, or
+  flag. Requires a deterministic code-layer implementation.
+- evidence: pending — /sanyi init
+{%- endif %}
+
+### Eval gate runs before release
+
+<!-- The threshold VALUES are Bianyi (targets.yaml); "the gate must run before
+     release" is the Buyi part. Shipping past a red or absent gate is the failure
+     this forbids. Wire `make eval-gate` into CI to make it real. -->
+
+- paths: {{ eval_root }}/targets.yaml, Makefile
+- contract: `make eval-gate` must run and pass before any release; the gate may
+  not be skipped or disabled via config or flag. (Threshold values are Bianyi —
+  see 变易 below.) Requires the gate wired into CI.
+- evidence: pending — /sanyi init
 
 ## 简易 Jianyi
 

@@ -1,13 +1,16 @@
 # nbks/ — analysis notebooks
 
 Exploratory analyses kept as plain `.py` scripts in the percent/py:percent
-style (git-diffable, runnable headless via `make nbks-corpus`, openable as
+style (git-diffable{% if has_corpus_pipeline %}, runnable headless via `make nbks-corpus`{% endif %}, openable as
 notebooks in VS Code/Jupytext).
-
+{% if has_corpus_pipeline %}
 - `corpus_analysis.py` — corpus statistics for the ingested article set
   (sizes, categories, token distributions) to sanity-check ingestion before
   trusting retrieval quality numbers.
-
+{% else %}
+No notebooks ship for this project shape yet — drop new analyses here as `.py`
+scripts.
+{% endif %}
 Convention: notebooks are read-only consumers of `core/` and the data dirs —
 no pipeline logic lives here. Promote anything reusable into a real module
 with tests.

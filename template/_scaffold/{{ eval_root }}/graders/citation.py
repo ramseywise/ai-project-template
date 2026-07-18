@@ -3,7 +3,7 @@
 Two independent checks, both cheap enough to run on every commit:
 
 - ``grade_retrieval``: did the article that actually answers the question show
-  up (and at what rank) in the top-k results returned by ``core.index.search``?
+  up (and at what rank) in the top-k results returned by ``core.pipelines.corpus.index.search``?
 - ``grade_answer_overlap``: does the generated answer share enough vocabulary
   with the golden ``expected_answer`` to plausibly be addressing the same
   question? This is a coarse proxy for answer quality that needs no API key —
@@ -16,7 +16,7 @@ import re
 
 from pydantic import BaseModel
 
-from core.models import SearchResult
+from core.pipelines.corpus.models import SearchResult
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 
@@ -82,7 +82,7 @@ def grade_retrieval(query: str, expected_id: str, results: list[SearchResult]) -
     """Check whether ``expected_id`` appears in ``results`` and at what rank.
 
     ``results`` is assumed to already be ordered best-match-first (as returned
-    by ``core.index.search``), so rank is simply its 1-indexed position.
+    by ``core.pipelines.corpus.index.search``), so rank is simply its 1-indexed position.
     """
     top_k_ids = [result.id for result in results]
     rank: int | None = None

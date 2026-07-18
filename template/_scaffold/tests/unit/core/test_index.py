@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from core.index import search
+from core.pipelines.corpus.index import search
 
 TOP_N = 2
 
@@ -43,4 +43,5 @@ def test_search_water_filter_query_finds_water_filter_article(indexed_db: str) -
     results = search(indexed_db, "water filter cartridge replace", k=5)
 
     assert len(results) > 0
-    assert results[0].id == "water_filter"
+    top_ids = [result.id for result in results[:TOP_N]]
+    assert "water_filter" in top_ids

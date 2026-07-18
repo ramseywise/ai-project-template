@@ -28,7 +28,7 @@ from typing import Any
 
 import numpy as np
 
-from labs.timeseries.preprocessing import (
+from ml.timeseries.preprocessing import (
     StationarityReport,
     check_stationarity,
     difference_series,

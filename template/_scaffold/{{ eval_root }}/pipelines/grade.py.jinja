@@ -63,6 +63,22 @@ def _load_targets() -> dict[str, float]:
     return {key: float(value) for key, value in raw.items()}
 
 
+def _warn_no_targets_activated() -> None:
+    """Loud banner when --warn-empty runs but no targets.yaml metric is active.
+
+    An empty targets.yaml makes --gate pass trivially — enforcement that reads
+    as a no-op. In CI we want that vacuous pass to be *visible*, so the gate
+    step can't green-wash a fresh scaffold. Prints one WARNING line and returns;
+    the build still proceeds (warn-but-pass — see the plan's Phase 4b contract).
+    """
+    print(
+        "WARNING: eval gate is NOT enforcing — no targets activated in "
+        "targets.yaml. Uncomment real thresholds (see DESIGN.md's Evaluation "
+        "section) to make --gate bite. Proceeding without enforcement.",
+        file=sys.stderr,
+    )
+
+
 def run_grading(
     input_path: Path,
     use_judges: bool,
@@ -70,6 +86,7 @@ def run_grading(
     sample_n: int | None,
     seed: int,
     gate: bool,
+    warn_empty: bool = False,
 ) -> InteractionReport:
     records = _load_interactions(input_path)
     if sample_n is not None:
@@ -122,7 +139,10 @@ def run_grading(
     )
 
     _print_summary(report)
-    failures = _check_targets(report, _load_targets())
+    targets = _load_targets()
+    if warn_empty and not targets:
+        _warn_no_targets_activated()
+    failures = _check_targets(report, targets)
     print(f"\nWrote graded rows to {GRADED_PATH}")
     if gate and failures:
         print("eval gate FAILED:", file=sys.stderr)
@@ -213,6 +233,12 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Exit non-zero if any activated targets.yaml metric falls below its target.",
     )
+    run_parser.add_argument(
+        "--warn-empty",
+        action="store_true",
+        help="Print a loud WARNING (but still pass) when targets.yaml has no "
+        "activated metric, so a vacuous --gate can't green-wash in CI.",
+    )
 
     subparsers.add_parser("report", help="Render the latest graded results as HTML.")
 
@@ -225,6 +251,7 @@ def main(argv: list[str] | None = None) -> None:
             sample_n=args.sample,
             seed=args.seed,
             gate=args.gate,
+            warn_empty=args.warn_empty,
         )
     elif args.command == "report":
         run_report()

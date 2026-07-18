@@ -3,7 +3,7 @@ analysis (mutual information, correlation, permutation importance) for tabular
 time-series ML (gradient boosting, etc.).
 
 Adapted from a real production forecasting pipeline — rewritten from polars to
-pandas (more standard for a general-purpose labs toolkit) and, for the
+pandas (more standard for a general-purpose ml toolkit) and, for the
 lag/rolling/EWM builders, from the original's manual per-series Python loops to
 vectorized `groupby().shift()`/`.rolling()`/`.ewm()` calls — same feature
 semantics, meaningfully faster on real data. Dropped `add_company_level_features`

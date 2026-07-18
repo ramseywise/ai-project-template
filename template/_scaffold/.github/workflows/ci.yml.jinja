@@ -27,3 +27,32 @@ jobs:
       - uses: astral-sh/setup-uv@v3
       - run: uv sync --group dev
       - run: uv run pytest tests/unit -q
+{%- if has_corpus_pipeline or include_interaction_evals %}
+
+  # Informational eval report on every PR — surfaces the numbers so reviewers
+  # see retrieval/interaction quality trend, but NEVER fails on a threshold miss
+  # (no --gate here). Enforcement lives in cd.yml's build-canary gate. Runs on
+  # the free heuristic layer only (no ANTHROPIC_API_KEY needed) — same graceful
+  # degradation as the harness itself.
+  eval-report:
+    needs: [test]
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_API_KEY: "test-key-not-real"
+      LANGSMITH_TRACING: "false"
+      VECTORDB_PATH: ":memory:"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync --group dev
+{%- if has_corpus_pipeline %}
+      # The retrieval grade reads the corpus index — build it first.
+      - run: make corpus-ingest
+      - name: Retrieval eval (informational)
+        run: PYTHONPATH={{ source_root }}:. uv run python -m {{ eval_root }}.pipelines.run heuristic
+{%- endif %}
+{%- if include_interaction_evals %}
+      - name: Interaction eval (informational)
+        run: PYTHONPATH={{ source_root }}:. uv run python -m {{ eval_root }}.pipelines.grade run --no-judges
+{%- endif %}
+{%- endif %}

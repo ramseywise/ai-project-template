@@ -22,6 +22,8 @@ jobs:
             args: "-d project_type=mcp_server"
           - name: project_type-eval_suite
             args: "-d project_type=eval_suite"
+          - name: project_type-ai_backend
+            args: "-d project_type=ai_backend"
           - name: primary_chat_agent-lg_agent
             args: "-d primary_chat_agent=lg_agent"
           - name: primary_chat_agent-adk_agent
@@ -52,14 +54,22 @@ jobs:
           - name: project_type-rag
             args: "-d project_type=rag"
             tier: test-py
+          # A2: a non-retrieval shape — no lg_agent BM25, no rag_agent, so
+          # has_corpus_pipeline is false: core/ is an empty ETL home, the corpus
+          # subpackage + retrieval golden-QA eval + tests/unit/core are dropped,
+          # and only the interaction-eval suite (ai_backend is agent-shaped)
+          # remains. Proves the gutted-corpus render's pytest passes.
+          - name: no-corpus-ai_backend
+            args: "-d project_type=ai_backend"
+            tier: test-py
           - name: ts-backend
             args: "-d primary_backend_language=typescript"
             tier: test-ts
           - name: split-service
             args: "-d primary_backend_language=both -d frontend_backend_topology=split_service"
             tier: test-split
-          - name: ml-labs
-            args: "-d include_ml_labs=true"
+          - name: ml
+            args: "-d include_ml=true"
             tier: test-py
           - name: mcp-ts
             args: "-d mcp_server_language=typescript"
@@ -80,6 +90,20 @@ jobs:
           - name: agent-slug
             args: "-d agent_slug=helpdesk"
             tier: test-py
+          # Eval-in-CI gate (Phase 4b): an agentic+docker profile must render
+          # BOTH the informational ci.yml eval-report job AND the hard cd.yml
+          # build-canary gate (before docker/login). assert_gate=present drives
+          # the assertion step below.
+          - name: eval-gate-agentic
+            args: "-d primary_chat_agent=lg_agent -d deployment_target=docker -d eval_metrics=[escalation,friction]"
+            assert_gate: present
+          # The mirror: a fire-and-forget shape (no eval harness, no cd.yml) must
+          # render NEITHER the eval-report job NOR any gate step. Proves the
+          # has_corpus_pipeline / include_interaction_evals guards keep
+          # non-agentic scaffolds byte-untaxed.
+          - name: eval-gate-absent
+            args: "-d project_type=eval_suite -d primary_chat_agent=none"
+            assert_gate: absent
     steps:
       - uses: actions/checkout@v4
 
@@ -121,6 +145,31 @@ jobs:
             exit 1
           fi
 
+      # Phase 4b eval-in-CI gate — assert the conditionals don't silently rot.
+      # present: agentic+docker profile renders the informational ci.yml
+      # eval-report job AND the hard cd.yml build-canary gate (before docker
+      # login). absent: fire-and-forget profile renders neither and has no cd.yml.
+      - name: Assert eval gate rendered (${{ matrix.assert_gate }})
+        if: matrix.assert_gate == 'present'
+        run: |
+          CI=out/.github/workflows/ci.yml
+          CD=out/.github/workflows/cd.yml
+          grep -q 'eval-report' "$CI" || { echo "FAIL: ci.yml missing eval-report job"; exit 1; }
+          test -f "$CD" || { echo "FAIL: cd.yml did not render for agentic+docker"; exit 1; }
+          grep -q -- '--gate' "$CD" || { echo "FAIL: cd.yml build-canary missing hard --gate step"; exit 1; }
+          grep -q -- '--warn-empty' "$CD" || { echo "FAIL: cd.yml gate missing --warn-empty"; exit 1; }
+          # The gate must run BEFORE the image build/push (docker/login).
+          awk '/eval gate/{g=NR} /docker\/login-action/{d=NR} END{exit !(g>0 && g<d)}' "$CD" \
+            || { echo "FAIL: eval gate is not before docker/login in cd.yml"; exit 1; }
+          echo "OK: eval gate present in ci.yml (report) + cd.yml (hard, pre-build)"
+      - name: Assert eval gate absent (${{ matrix.assert_gate }})
+        if: matrix.assert_gate == 'absent'
+        run: |
+          CI=out/.github/workflows/ci.yml
+          grep -q 'eval-report' "$CI" && { echo "FAIL: eval-report leaked into a fire-and-forget ci.yml"; exit 1; }
+          test ! -f out/.github/workflows/cd.yml || { echo "FAIL: cd.yml rendered for a fire-and-forget profile"; exit 1; }
+          echo "OK: no eval gate for the fire-and-forget profile (ci.yml untaxed, no cd.yml)"
+
       # Delegates to the render's own `make lint-check` (LINT_PATHS) rather than
       # repo-wide ruff — .claude/ ships vendored reference scripts (mcp-builder)
       # that are deliberately outside the project's lint boundary.
@@ -158,6 +207,13 @@ jobs:
             -d include_rag_agent=true "$GITHUB_WORKSPACE" .
           test -d src/agents/rag_agent \
             || { echo "add-capability re-entry did not land rag_agent"; exit 1; }
+          # rag_agent implies has_corpus_pipeline → the corpus subpackage + its
+          # retrieval eval must land on re-entry too (covers the no-corpus shape
+          # gaining a retrieval backend, and stays true for shapes that had it).
+          test -d core/pipelines/corpus \
+            || { echo "re-entry did not land core/pipelines/corpus"; exit 1; }
+          test -f evals/pipelines/run.py \
+            || { echo "re-entry did not land the retrieval golden-QA eval"; exit 1; }
           test ! -e _scaffold \
             || { echo "staging dir survived re-render (mv/cp task not idempotent)"; exit 1; }
           uv run pytest tests/unit -q

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from labs.stats_testing.ab_test import (
+from ml.stats_testing.ab_test import (
     bootstrap_cliffs_delta,
     cliffs_delta,
     cliffs_delta_strength,

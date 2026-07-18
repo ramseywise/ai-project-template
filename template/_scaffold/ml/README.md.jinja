@@ -1,14 +1,14 @@
-# Labs
+# ML
 
 A classical ML/stats toolkit — distinct from `{{ eval_root }}/`, which grades
-*agent* output quality against a golden set. `labs/` is for building and
+*agent* output quality against a golden set. `ml/` is for building and
 comparing *predictive* models: a different job, a different audience (data
 scientists doing discovery-to-delivery work, not agent evaluation).
 
 ## Layout
 
 ```
-labs/
+ml/
 ├── regression/           Logistic regression + RFE feature selection,
 │                         coefficient-significance tables and plots
 ├── timeseries/            ARIMA/SARIMA forecasting with explicit assumption
@@ -25,7 +25,7 @@ labs/
 ```
 
 Each module is self-contained — import only what you need
-(`from labs.model_comparison.compare import compare_classifiers`). None of
+(`from ml.model_comparison.compare import compare_classifiers`). None of
 these modules import from each other or from `{{ source_root }}/agents/`.
 
 ## Discovery-to-delivery workflow
@@ -62,4 +62,4 @@ module matches the question you're actually asking.
 These modules are tested against real (if synthetic) data: `sklearn`'s bundled
 `breast_cancer` dataset for classification examples, `sklearn.datasets.make_blobs`
 for clustering, and numpy-generated trending/seasonal series for time-series —
-see `tests/unit/labs/` for worked examples of every module.
+see `tests/unit/ml/` for worked examples of every module.

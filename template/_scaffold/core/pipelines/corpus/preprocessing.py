@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-from core.models import Article
+from core.pipelines.corpus.models import Article
 
 _MIN_LENGTH = 20
 

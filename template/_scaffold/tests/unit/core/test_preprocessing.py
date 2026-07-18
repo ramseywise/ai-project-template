@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from core.models import Article
-from core.preprocessing import clean_and_dedupe, write_jsonl
+from core.pipelines.corpus.models import Article
+from core.pipelines.corpus.preprocessing import clean_and_dedupe, write_jsonl
 
 
 def _article(**overrides: object) -> Article:

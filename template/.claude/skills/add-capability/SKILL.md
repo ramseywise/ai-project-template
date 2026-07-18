@@ -52,7 +52,7 @@ capabilities — the base and the genesis shape example are already on disk.
 | Vector-backend upgrade | `vector_backend=postgres` (or `opensearch`) | pgvector/OpenSearch deps + config; runtime default unchanged |
 | Interaction eval metric | add `<name>` to `eval_metrics` | heuristic grader + LLM judge + report section |
 | Integration | add `<name>` to `optional_features` | the integration's client(s) / receiver |
-| ML/stats labs | add `ml_labs` to `optional_features` | classical ML/stats toolkit |
+| ML/stats | add `ml` to `optional_features` | classical ML/stats toolkit |
 | Split frontend/backend | `frontend_backend_topology=split_service` | Next.js frontend + JWT-auth FastAPI backend |
 
 Multiselect variables (`agent_tools`, `eval_metrics`, `optional_features`) are

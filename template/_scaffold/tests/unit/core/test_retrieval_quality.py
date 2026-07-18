@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from core.index import search
+from core.pipelines.corpus.index import search
 
 # pytest runs from the project root — see the comment in test_ingestion.py.
 GOLDEN_QA_PATH = Path("data/corpus/golden_qa.jsonl")

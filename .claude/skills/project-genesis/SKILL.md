@@ -115,9 +115,9 @@ defaults are right):**
    is in `external_systems`).
 9. **Optional add-ons** → `optional_features` (multiselect: `akira` +
    `dev_companion` default on; `promptfoo`/`ragas`/`web_research`/
-   `meeting_intelligence`/`marketing`/`n8n_webhook`/`composio`/`ml_labs`).
+   `meeting_intelligence`/`marketing`/`n8n_webhook`/`composio`/`ml`).
    Mention only the ones the design implies — e.g. classical ML/stats work
-   (baselines, forecasting, A/B) → add `ml_labs`.
+   (baselines, forecasting, A/B) → add `ml`.
 10. **Which interaction metrics matter?** → `eval_metrics` (multiselect:
     `escalation`/`friction`/`intent`/`language` — each ships a heuristic
     grader + LLM judge + report section; agent-shaped projects seed
@@ -285,7 +285,7 @@ inside the generated project.
   |---|---|
   | `include_calendar_integration=true` | `calendar` in `external_systems` |
   | `include_meeting_intelligence=true` | `meeting_intelligence` in `optional_features` |
-  | `include_ml_labs=true` | `ml_labs` in `optional_features` |
+  | `include_ml=true` | `ml` in `optional_features` |
   | `include_promptfoo/ragas/web_research/composio/n8n_webhook` | same name in `optional_features` |
   | `scaffold_full_project=false` | `project_type=existing_repo` |
 

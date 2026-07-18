@@ -43,6 +43,14 @@ Not yet checked — run `/gate-check` once discovery artifacts exist.
 - Phases are re-entrant: going back to discovery to resolve a deferred
   decision is normal; `/gate-check` re-audits rather than assuming
   monotonic progress.
+- Each phase has a human record alongside this machine state: `DESIGN.md`
+  (discovery), `DELIVERY.md` (delivery — what was built, eval evidence, the
+  handoff to deployment), `DEPLOYMENT.md` (deployment runbook). `RELEASE.md` is
+  the overview that ties the three together.
+- Once G2 is green and `phase` is `deployment`, the runbook is `DEPLOYMENT.md`
+  (staged rollout, rollback criteria, monitoring). `/deploy-check` is the
+  launch pre-flight that audits G2 readiness; it reports blockers but never
+  writes this file — `/gate-check` records the verdict.
 - Layered onto an existing repo? Some G1 checks (evals, CI) may not apply —
   `/gate-check` marks inapplicable checks `true` with a note in the summary
   rather than blocking the gate on artifacts the project never adopted.

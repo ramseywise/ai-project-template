@@ -75,6 +75,12 @@ If conflicts arise (`.rej` files or merge markers):
 3. Propose a resolution
 4. Apply the resolution (edit the file, remove `.rej`)
 
+**Watch the update output for `[migration]` lines.** The template's `_migrations` clean up
+structural moves copier's file-level merge can't (e.g. `core/*.py` → `core/pipelines/corpus/*.py`).
+A `[migration] removed stale …` line is informational. A `[migration] WARN …` line means a file you
+hand-edited was left in place: surface it to the user, and offer to port the local edits into the new
+location and repoint the imports the warning names.
+
 ### Step 5: Verify
 
 After update completes:

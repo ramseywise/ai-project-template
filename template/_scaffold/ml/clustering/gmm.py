@@ -6,7 +6,7 @@ query is also plausibly in", not just "same nearest centroid").
 Adapted from a real production recommendation system's clustering module —
 genericized (dropped hardcoded "audio feature"/Spotify-specific column lists in
 favor of constructor-supplied continuous/categorical feature lists, same
-pattern as `labs.model_comparison.compare.TabularPreprocessor`).
+pattern as `ml.model_comparison.compare.TabularPreprocessor`).
 
 Usage:
     gmm, scaler = fit_gmm(corpus_df, continuous_features=[...], categorical_features={...})

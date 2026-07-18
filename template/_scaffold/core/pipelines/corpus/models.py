@@ -15,4 +15,5 @@ class SearchResult(BaseModel):
     id: str
     title: str
     text: str
+    category: str
     score: float

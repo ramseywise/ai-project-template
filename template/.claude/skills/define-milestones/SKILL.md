@@ -8,6 +8,14 @@ description: >
   "what are the phases", "milestone plan for X", "what ships first in X", "release planning".
 ---
 
+## Target repo
+
+Same convention as the phase protocols (research/plan/execute/code-review): a
+`repo:<name-or-path>` token in `$ARGUMENTS` targets another workspace repo (bare name
+resolves to `~/workspace/<name>`); all repo-relative paths and git/test commands resolve
+against it, and artifacts land in the TARGET repo. No token → the cwd's repo; in a
+meta/workspace-root session, ask rather than defaulting.
+
 # define-milestones
 
 Break one initiative into milestones. A milestone is a checkpoint *inside* an initiative — a

@@ -48,7 +48,7 @@ def _():
     from collections import Counter
     from pathlib import Path
 
-    from core.ingestion import load_raw_articles
+    from core.pipelines.corpus.ingestion import load_raw_articles
 
     return Counter, Path, json, load_raw_articles
 

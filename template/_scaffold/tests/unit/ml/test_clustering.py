@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from sklearn.datasets import make_blobs
 
-from labs.clustering.gmm import (
+from ml.clustering.gmm import (
     build_cluster_features,
     filter_by_cluster_overlap,
     fit_gmm,

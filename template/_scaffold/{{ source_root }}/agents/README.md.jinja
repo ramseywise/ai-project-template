@@ -8,7 +8,7 @@ reading `.env`, and Makefile lifecycle targets (`make <name>-up` /
 {% if primary_chat_agent in ["lg_agent", "both"] -%}
 - `{{ lg_agent_dir }}/` — the user-facing chat agent (LangGraph): graph +
   nodes (`retrieve` → `generate` → `guardrail`), checkpointer-backed
-  conversation state, BM25 retrieval over the `core/` index, MCP tool wiring
+  conversation state, BM25 retrieval over the `core/pipelines/corpus/` index, MCP tool wiring
   via `clients/mcp.py`.
 {% endif -%}
 {% if primary_chat_agent in ["adk_agent", "both"] -%}

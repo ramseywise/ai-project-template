@@ -27,7 +27,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from core.models import SearchResult
+from core.pipelines.corpus.models import SearchResult
 from evals.graders.citation import grade_answer_overlap, grade_retrieval
 from evals.graders.custom import all_graders
 {%- if include_ragas_grader %}
@@ -108,6 +108,22 @@ def _load_targets() -> dict[str, float]:
     return {key: float(value) for key, value in raw.items()}
 
 
+def _warn_no_targets_activated() -> None:
+    """Loud banner when --warn-empty runs but no targets.yaml metric is active.
+
+    An empty targets.yaml makes --gate pass trivially — enforcement that reads
+    as a no-op. In CI we want that vacuous pass to be *visible*, so the gate
+    step can't green-wash a fresh scaffold. Prints one WARNING line and returns;
+    the build still proceeds (warn-but-pass — see the plan's Phase 4b contract).
+    """
+    print(
+        "WARNING: eval gate is NOT enforcing — no targets activated in "
+        "targets.yaml. Uncomment real thresholds (see DESIGN.md's Evaluation "
+        "section) to make --gate bite. Proceeding without enforcement.",
+        file=sys.stderr,
+    )
+
+
 def _check_targets(report: HeuristicReport, targets: dict[str, float]) -> list[str]:
     """Compare report metrics against targets.yaml; return failure descriptions.
 
@@ -133,7 +149,7 @@ def _check_targets(report: HeuristicReport, targets: dict[str, float]) -> list[s
 {% if primary_chat_agent in ["lg_agent", "both"] -%}
 def _search_lg_agent(question: str) -> list[SearchResult]:
     from agents.{{ lg_agent_dir }}.settings import settings
-    from core.index import search
+    from core.pipelines.corpus.index import search
 
     if settings.vectordb_path != ":memory:" and not Path(settings.vectordb_path).exists():
         raise SystemExit(
@@ -316,9 +332,9 @@ def run_heuristic(backend: str) -> tuple[HeuristicReport, list[str]]:
                 top_k_ids=retrieval_grade.top_k_ids,
                 answer_overlap_ratio=answer_overlap_ratio,
 {%- if include_ragas_grader %}
-                ragas_faithfulness=ragas_scores["faithfulness"] if ragas_scores else None,
-                ragas_answer_relevancy=ragas_scores["answer_relevancy"] if ragas_scores else None,
-                ragas_context_precision=ragas_scores["context_precision"] if ragas_scores else None,
+                ragas_faithfulness=ragas_scores.get("faithfulness") if ragas_scores else None,
+                ragas_answer_relevancy=ragas_scores.get("answer_relevancy") if ragas_scores else None,
+                ragas_context_precision=ragas_scores.get("context_precision") if ragas_scores else None,
 {%- endif %}
             )
         )
@@ -372,7 +388,9 @@ def run_heuristic(backend: str) -> tuple[HeuristicReport, list[str]]:
     return report, failures
 
 
-def run_all_heuristic(gate: bool = False) -> None:
+def run_all_heuristic(gate: bool = False, warn_empty: bool = False) -> None:
+    if warn_empty and not _load_targets():
+        _warn_no_targets_activated()
     all_failures: list[str] = []
     for backend in BACKENDS:
         print(f"=== {backend} ===")
@@ -510,6 +528,12 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Exit non-zero if any targets.yaml metric falls below its target.",
     )
+    heuristic_parser.add_argument(
+        "--warn-empty",
+        action="store_true",
+        help="Print a loud WARNING (but still pass) when targets.yaml has no "
+        "activated metric, so a vacuous --gate can't green-wash in CI.",
+    )
     subparsers.add_parser(
         "render", help="Render the latest heuristic results as HTML, for every backend present."
     )
@@ -525,7 +549,7 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(1)
 
     if args.command == "heuristic":
-        run_all_heuristic(gate=args.gate)
+        run_all_heuristic(gate=args.gate, warn_empty=args.warn_empty)
     elif args.command == "render":
         run_all_render()
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from core.models import Article
+from core.pipelines.corpus.models import Article
 
 _TITLE_RE = re.compile(r"^#\s+(.+)$", re.MULTILINE)
 
