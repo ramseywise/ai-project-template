@@ -125,12 +125,18 @@ jobs:
         with:
           node-version: "22"
 
+      # The destination MUST be absolute. copier runs _tasks with cwd already set
+      # to the destination, and the tasks build their paths from
+      # _copier_conf.dst_path — which is the dst exactly as passed here. A
+      # relative "out/" therefore resolves as out/out/ inside the tasks: the rm
+      # cleanups become silent no-ops and the staging mv fails outright
+      # ("out/ is not a directory"), breaking every matrix row.
       - name: Render (${{ matrix.name }})
         run: |
           copier copy --vcs-ref HEAD --trust --defaults \
             -d "project_name_input=Render Test" \
             ${{ matrix.args }} \
-            . out/
+            . "$GITHUB_WORKSPACE/out"
 
       # .agents/ is vendored reference material that mentions copier variables in
       # prose (e.g. framework-selection's SKILL.md) — excluded here for the same
@@ -215,8 +221,8 @@ jobs:
           git init -q && git add -A
           git -c user.email=ci@ci -c user.name=ci commit -qm "genesis render"
           copier copy --overwrite --vcs-ref HEAD --trust --defaults \
-            -d include_rag_agent=true "$GITHUB_WORKSPACE" .
-          test -d src/agents/rag_agent \
+            -d include_rag_agent=true "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/out"
+          test -d backend/src/agents/rag_agent \
             || { echo "add-capability re-entry did not land rag_agent"; exit 1; }
           # rag_agent implies has_corpus_pipeline → the corpus subpackage + its
           # retrieval eval must land on re-entry too (covers the no-corpus shape
