@@ -116,7 +116,7 @@ jobs:
 
       # No enable-cache: the template root has no uv.lock (it only exists after
       # render), so cache keying on **/uv.lock fails hard with "No file matched".
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
 
       # Renders have no package-lock.json, so npm caching (which keys on a
       # lockfile) is deliberately not enabled here.

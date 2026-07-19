@@ -45,7 +45,7 @@ jobs:
     continue-on-error: ${{ !inputs.lint-blocking }}
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
           python-version: ${{ inputs.python-version }}
@@ -64,7 +64,7 @@ jobs:
       VECTORDB_PATH: ":memory:"
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
           python-version: ${{ inputs.python-version }}
