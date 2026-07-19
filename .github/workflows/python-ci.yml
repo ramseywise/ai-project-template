@@ -44,7 +44,7 @@ jobs:
     # branch rule must name the blocking jobs only.
     continue-on-error: ${{ !inputs.lint-blocking }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -63,7 +63,7 @@ jobs:
       LANGSMITH_TRACING: "false"
       VECTORDB_PATH: ":memory:"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
