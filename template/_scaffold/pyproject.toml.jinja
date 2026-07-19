@@ -103,8 +103,10 @@ ignore = ["E501", "RUF001", "RUF002", "RUF003", "N803", "N806"]
 # middleware/ only exists in split_service renders — pin it first-party so the
 # agents' try/except import blocks sort identically whether or not it's present
 # (ruff otherwise classifies it by directory existence, flipping I001 per config).
+# agents/ lives under {{ source_root }}/, not the project root, so ruff's src-based
+# resolution misses it and sorts it as third-party — same failure mode, same fix.
 [tool.ruff.lint.isort]
-known-first-party = ["middleware"]
+known-first-party = ["agents", "middleware"]
 
 [tool.pyright]
 include = ["{{ source_root }}", "core", "{{ eval_root }}", "tests"{% if include_ml %}, "ml"{% endif %}]

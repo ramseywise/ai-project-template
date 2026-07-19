@@ -105,22 +105,22 @@ jobs:
             args: "-d project_type=eval_suite -d primary_chat_agent=none"
             assert_gate: absent
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
       - name: Install copier
         run: pip install copier
 
-      - uses: astral-sh/setup-uv@v3
-        with:
-          enable-cache: true
+      # No enable-cache: the template root has no uv.lock (it only exists after
+      # render), so cache keying on **/uv.lock fails hard with "No file matched".
+      - uses: astral-sh/setup-uv@v5
 
       # Renders have no package-lock.json, so npm caching (which keys on a
       # lockfile) is deliberately not enabled here.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         if: contains(matrix.tier || '', 'ts') || matrix.tier == 'test-split'
         with:
           node-version: "22"
@@ -138,9 +138,20 @@ jobs:
       # {{prompt}}/{{question}} are promptfoo's own runtime template syntax, not
       # unrendered copier Jinja — filtered by pattern (not by excluding the whole
       # file, which also carries real copier substitutions worth checking).
+      # GitHub Actions expression syntax (github.actor, secrets.*, steps.*.outputs.*)
+      # in the rendered cd.yml/ci.yml is a dollar sign followed by '{{' — same
+      # rationale as promptfoo above. The pattern requires the leading '$', so a
+      # line carrying real unrendered '{{ copier_var }}' still trips the check.
+      # The Actions pattern is carried in ACTIONS_EXPR rather than written inline:
+      # the literal sequence in a run: block would make Actions parse THIS file as
+      # an unclosed expression, and escaping it through both YAML and shell quoting
+      # silently collapses ('\$' is not a YAML escape, so the var stops expanding
+      # and the filter matches nothing). A plain env value needs no escaping.
       - name: Check for leftover Jinja
+        env:
+          ACTIONS_EXPR: '[$]{{'
         run: |
-          if grep -rn '{{' out/ --exclude-dir='.agents' --include='*.py' --include='*.md' --include='*.toml' --include='*.yaml' --include='*.yml' | grep -v 'font-family\|border-collapse\|padding: 0.4rem\|background: #f2f2f2\|margin-bottom\|font-weight: bold\|{{prompt}}\|{{question}}'; then
+          if grep -rn '{{' out/ --exclude-dir='.agents' --include='*.py' --include='*.md' --include='*.toml' --include='*.yaml' --include='*.yml' | grep -v "font-family\|border-collapse\|padding: 0.4rem\|background: #f2f2f2\|margin-bottom\|font-weight: bold\|{{prompt}}\|{{question}}\|$ACTIONS_EXPR"; then
             echo "Leftover unrendered Jinja found"
             exit 1
           fi
