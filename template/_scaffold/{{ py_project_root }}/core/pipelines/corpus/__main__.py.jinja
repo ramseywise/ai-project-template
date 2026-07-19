@@ -8,7 +8,7 @@ from core.pipelines.corpus.index import build_index
 from core.pipelines.corpus.ingestion import load_raw_articles
 from core.pipelines.corpus.preprocessing import clean_and_dedupe, write_jsonl
 
-CORPUS_DIR = Path("data/corpus")
+CORPUS_DIR = Path("data/raw_corpus")
 PROCESSED_PATH = Path("data/processed/articles_clean.jsonl")
 
 

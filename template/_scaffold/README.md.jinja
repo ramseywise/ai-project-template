@@ -7,7 +7,7 @@
 Scaffolded by `ai-project-template` — working example agent(s) over the same
 tiny FAQ corpus:
 {%- if include_rag_agent %}
-`{{ source_root }}/agents/rag_agent` (embedding-based semantic retrieval,
+`{{ py_project_root }}/{{ ai_source_root }}/agents/rag_agent` (embedding-based semantic retrieval,
 standalone service — the shared retrieval backend the MCP tool calls)
 {%- endif %}
 {%- if primary_chat_agent in ["lg_agent", "both"] %}{% if include_rag_agent %},{% endif %} `{{ lg_agent_dir }}` (LangGraph, BM25 retrieval){% endif %}
@@ -27,7 +27,7 @@ for the ADK/LangGraph framework reference library.
 ```bash
 ./project_init.sh                          # uv sync, .env from example, git init if needed
 {%- if include_rag_agent %}
-make rag-corpus-ingest                      # build rag_agent's embedding index from data/corpus/
+make rag-corpus-ingest                      # build rag_agent's embedding index from data/raw_corpus/
 make rag-up && make rag-wait && make rag-chat   # start + smoke test rag_agent
 {%- endif %}
 ```
@@ -49,17 +49,17 @@ Try the TS agent (Vercel AI SDK) with `make ts-install && make ts-dev`, then
 ```
 {{ project_slug }}/
 {%- if primary_chat_agent in ["lg_agent", "both"] %}
-├── {{ source_root }}/agents/{{ lg_agent_dir }}/   Chat agent (LangGraph): guardrail -> retrieve -> generate (BM25)
+├── {{ py_project_root }}/{{ ai_source_root }}/agents/{{ lg_agent_dir }}/   Chat agent (LangGraph): guardrail -> retrieve -> generate (BM25)
 {%- endif %}
 {%- if include_rag_agent %}
-├── {{ source_root }}/agents/rag_agent/  Working example: embedding-based retrieval, standalone service
+├── {{ py_project_root }}/{{ ai_source_root }}/agents/rag_agent/  Working example: embedding-based retrieval, standalone service
 {%- endif %}
 {%- if primary_chat_agent in ["adk_agent", "both"] %}
-├── {{ source_root }}/agents/{{ adk_agent_dir }}/  Chat agent (Google ADK), retrieval via the MCP tool
+├── {{ py_project_root }}/{{ ai_source_root }}/agents/{{ adk_agent_dir }}/  Chat agent (Google ADK), retrieval via the MCP tool
 {%- endif %}
 ├── core/                                Data/ETL pipelines{% if has_corpus_pipeline %} (pipelines/corpus/ = markdown->JSONL->FTS, feeds retrieval){% endif %}
 {%- if has_corpus_pipeline %}
-├── data/corpus/                         Example FAQ corpus (swap this out for your own)
+├── data/raw_corpus/                         Example FAQ corpus (swap this out for your own)
 {%- endif %}
 ├── {{ eval_root }}/                     Eval suite ({{ eval_allowed_dirs }})
 {%- if include_ml %}
@@ -85,15 +85,15 @@ The example agent is a starting point, not the point. Once you understand it:
 ```
 
 reads `.agents/skills/framework-selection` (if you haven't already decided) and
-scaffolds a new agent next to the existing one(s) under `{{ source_root }}/agents/`.
+scaffolds a new agent next to the existing one(s) under `{{ py_project_root }}/{{ ai_source_root }}/agents/`.
 See `.claude/skills/new-agent/SKILL.md`.
 
 {% if has_corpus_pipeline -%}
 ## Replacing the example corpus
 
-`data/corpus/*.md` is a placeholder "Acme Coffee Machine" FAQ set so the example
+`data/raw_corpus/*.md` is a placeholder "Acme Coffee Machine" FAQ set so the example
 agent has something real to retrieve over. Delete it, drop your own markdown files
-in `data/corpus/`, and re-run `make corpus-ingest`. `core/pipelines/corpus/ingestion.py` expects each
+in `data/raw_corpus/`, and re-run `make corpus-ingest`. `core/pipelines/corpus/ingestion.py` expects each
 file to start with a single `# Title` line; everything else is body text.
 
 {% endif -%}
@@ -148,7 +148,7 @@ API-key check before exposing one outside a private network.
 
 **This project calling n8n back** (inbound webhook, the reverse direction): a
 generic `POST /webhooks/n8n` route is mounted on every present agent's FastAPI
-app (`{{ source_root }}/integrations/n8n_webhook.py`) — HMAC-SHA256-verified via
+app (`{{ py_project_root }}/{{ ai_source_root }}/integrations/n8n_webhook.py`) — HMAC-SHA256-verified via
 an `X-Webhook-Signature` header computed over the raw request body with
 `N8N_WEBHOOK_SECRET`. Payload shape: `{"event": "...", "data": {...}}`. Add your
 own handlers to `EVENT_HANDLERS` in that file; unrecognized events are accepted
@@ -156,7 +156,7 @@ own handlers to `EVENT_HANDLERS` in that file; unrecognized events are accepted
 {%- endif %}
 {%- if include_calendar_integration %}
 
-**Google Calendar** (`{{ source_root }}/integrations/google_calendar.py`):
+**Google Calendar** (`{{ py_project_root }}/{{ ai_source_root }}/integrations/google_calendar.py`):
 `GoogleCalendarClient` — list/create events, find open slots. Needs a
 pre-obtained OAuth2 refresh token (`GOOGLE_CALENDAR_REFRESH_TOKEN` +
 `GOOGLE_CALENDAR_CLIENT_ID`/`_SECRET`) — see the module's docstring for the
@@ -164,14 +164,14 @@ one-time consent-flow setup this template deliberately doesn't automate.
 {%- endif %}
 {%- if include_marketing_integrations %}
 
-**Marketing** (`{{ source_root }}/integrations/{eventbrite,linkedin,canva}.py`):
+**Marketing** (`{{ py_project_root }}/{{ ai_source_root }}/integrations/{eventbrite,linkedin,canva}.py`):
 thin clients for publishing an Eventbrite event, posting a LinkedIn update, and
 generating a Canva asset from a brand template — each needs its own API
 token/credential (see each module for the exact env var names).
 {%- endif %}
 {%- if include_meeting_intelligence %}
 
-**Meeting intelligence** (`{{ source_root }}/integrations/meeting_intelligence.py`):
+**Meeting intelligence** (`{{ py_project_root }}/{{ ai_source_root }}/integrations/meeting_intelligence.py`):
 `extract_action_items(transcript)` turns a raw transcript (from a
 Granola/Fireflies webhook, or pasted manually) into structured action
 items/decisions/owners/deadlines via one LLM call. This module doesn't fetch
@@ -199,14 +199,14 @@ instead of) the Python eval suite.
 {%- endif %}
 {%- if include_composio %}
 
-**Composio** (`{{ source_root }}/integrations/composio.py`):
+**Composio** (`{{ py_project_root }}/{{ ai_source_root }}/integrations/composio.py`):
 `get_tools()`/`execute_tool()` — discover and execute third-party app actions
 (Gmail, Slack, GitHub, hundreds more) via Composio's unified API. Connect an
 account once via Composio's own dashboard/CLI first.
 {%- endif %}
 {%- if include_web_research %}
 
-**Web research** (`{{ source_root }}/integrations/web_research.py`):
+**Web research** (`{{ py_project_root }}/{{ ai_source_root }}/integrations/web_research.py`):
 `research(query)` runs GPT-Researcher end-to-end and returns a markdown
 report. Needs GPT-Researcher's own LLM + search-provider env vars (e.g.
 `OPENAI_API_KEY` + `TAVILY_API_KEY`), not this project's settings. **Known
@@ -227,18 +227,18 @@ See `.agents/skills/framework-selection/SKILL.md` for when to reach for
 this vs. ADK/LangGraph. Answer-only smoke eval (NOT retrieval grading — the
 TS agent has no search step, unlike the Python backends): `make ts-dev`
 in one terminal, `make ts-agent-eval` in another — scores token overlap
-against `data/corpus/golden_qa.jsonl` the same way `citation.py`'s
+against `data/raw_corpus/golden_qa.jsonl` the same way `citation.py`'s
 `grade_answer_overlap` does for the Python backends, writes
 `evals/reports/output/heuristic_results_ts_agent.json`.
 {%- endif %}
 {%- if frontend_backend_topology == "split_service" %}
 
-**split_service** (`{{ ts_project_root }}/` + `{{ source_root }}/middleware/`):
+**split_service** (`{{ ts_project_root }}/` + `{{ py_project_root }}/{{ ai_source_root }}/middleware/`):
 two independently-deployed services sharing identity via Supabase Auth JWT —
 FOIA-Fluent's production shape (`dssg/projects/FOIA-Fluent`), not a single
 process. `{{ ts_project_root }}/src/middleware.ts` is the Next.js Edge
 route gate (session check, redirects unauthenticated requests to `/login`);
-`{{ source_root }}/middleware/auth.py`'s `get_current_user_id` FastAPI
+`{{ py_project_root }}/{{ ai_source_root }}/middleware/auth.py`'s `get_current_user_id` FastAPI
 dependency verifies the same JWT server-side (HS256 or RS256/JWKS,
 auto-detected) and is mounted on every present agent's FastAPI app.
 Local dev needs no live Supabase project — `get_current_user_id` returns a

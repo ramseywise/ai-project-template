@@ -6,7 +6,7 @@ Subcommands, wired up by the project Makefile:
     python -m evals.pipelines.run render      # == `make eval-render`
 
 Grades retrieval quality against the golden QA set in
-``data/corpus/golden_qa.jsonl`` for each retrieval backend actually present in
+``data/raw_corpus/golden_qa.jsonl`` for each retrieval backend actually present in
 this project — rag_agent's embedding-based retrieval (default-on shared
 MCP-backing infra) and the LangGraph chat agent's BM25 retrieval, whichever
 are scaffolded. Each backend gets its own results/report file and
@@ -35,7 +35,7 @@ from evals.graders.ragas_grader import grade_with_ragas
 {%- endif %}
 from evals.metrics.retrieval import hit_rate, mean_reciprocal_rank
 
-GOLDEN_QA_PATH = Path("data/corpus/golden_qa.jsonl")
+GOLDEN_QA_PATH = Path("data/raw_corpus/golden_qa.jsonl")
 REPORTS_OUTPUT_DIR = Path(__file__).resolve().parent.parent / "reports" / "output"
 TARGETS_PATH = Path(__file__).resolve().parent.parent / "targets.yaml"
 

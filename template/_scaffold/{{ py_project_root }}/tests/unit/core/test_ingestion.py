@@ -7,7 +7,7 @@ from core.pipelines.corpus.ingestion import load_raw_articles
 EXPECTED_ARTICLE_COUNT = 6
 # pytest runs from the project root (see pythonpath = [..., "."] in pyproject.toml),
 # so this mirrors how `make corpus-ingest` locates the corpus in a real project.
-CORPUS_DIR = Path("data/corpus")
+CORPUS_DIR = Path("data/raw_corpus")
 
 
 def test_load_raw_articles_finds_all_corpus_files() -> None:

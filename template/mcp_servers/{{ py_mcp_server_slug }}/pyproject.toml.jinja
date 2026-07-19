@@ -10,10 +10,10 @@ dependencies = [
 ]
 
 [project.scripts]
-{{ mcp_server_slug }} = "app.server:main"
+{{ mcp_server_slug }} = "src.server:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["app"]
+packages = ["src"]
 
 [build-system]
 requires = ["hatchling"]

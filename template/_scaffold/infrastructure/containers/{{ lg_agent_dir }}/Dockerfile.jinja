@@ -1,5 +1,5 @@
 # Dockerfile for the {{ lg_agent_dir }} chat-agent service
-# ({{ source_root }}/agents/{{ lg_agent_dir }}).
+# ({{ py_project_root }}/{{ ai_source_root }}/agents/{{ lg_agent_dir }}).
 #
 # Build context is the project root (see docker-compose.yml `build.context: ../../..`)
 # because the app needs src/, core/, pyproject.toml, and uv.lock together.
@@ -21,15 +21,15 @@ COPY pyproject.toml uv.lock* ./
 # --frozen: fail instead of silently re-resolving if uv.lock is missing/out of date.
 RUN uv sync --no-dev --frozen
 
-# Now copy the actual source. `core/` and `{{ source_root }}/` are the only two top-level trees
+# Now copy the actual source. `core/` and `{{ py_project_root }}/{{ ai_source_root }}/` are the only two top-level trees
 # the running app imports from (see pyproject.toml [tool.uv] package = false
 # comment — "agents" and "core" are made importable via PYTHONPATH, not a build).
-COPY {{ source_root }}/ ./{{ source_root }}/
+COPY {{ py_project_root }}/{{ ai_source_root }}/ ./{{ py_project_root }}/{{ ai_source_root }}/
 COPY core/ ./core/
 
-# Mirrors the Makefile's `PYTHONPATH={{ source_root }}:. uv run ...` convention:
-# "{{ source_root }}" makes `agents.{{ lg_agent_dir }}` importable, "." (== /app) makes `core` importable.
-ENV PYTHONPATH=/app/{{ source_root }}:/app
+# Mirrors the Makefile's `PYTHONPATH={{ py_project_root }}/{{ ai_source_root }}:. uv run ...` convention:
+# "{{ py_project_root }}/{{ ai_source_root }}" makes `agents.{{ lg_agent_dir }}` importable, "." (== /app) makes `core` importable.
+ENV PYTHONPATH=/app/{{ py_project_root }}/{{ ai_source_root }}:/app
 
 ARG LG_PORT=8010
 ENV LG_PORT=${LG_PORT}

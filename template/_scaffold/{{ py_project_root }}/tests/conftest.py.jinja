@@ -10,7 +10,7 @@ from core.pipelines.corpus.preprocessing import clean_and_dedupe, write_jsonl
 
 # pytest runs from the project root (pythonpath includes "." in pyproject.toml),
 # so this is the same relative path `make corpus-ingest` uses in a real project.
-CORPUS_DIR = Path("data/corpus")
+CORPUS_DIR = Path("data/raw_corpus")
 
 
 @pytest.fixture

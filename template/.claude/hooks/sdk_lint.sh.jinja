@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# PostToolUse hook for Write|Edit — enforces AI SDK best practices in {{ source_root }}/
+# PostToolUse hook for Write|Edit — enforces AI SDK best practices in {{ py_project_root }}/{{ ai_source_root }}/
 # Covers: Anthropic SDK, Google Gemini SDK
 
 path=$(echo "$CLAUDE_TOOL_INPUT" | jq -r '.file_path // empty')
 [ -z "$path" ] && exit 0
-echo "$path" | grep -qE '/{{ source_root }}/.*\.py$' || exit 0
+echo "$path" | grep -qE '/{{ py_project_root }}/{{ ai_source_root }}/.*\.py$' || exit 0
 
 issues=""
 
@@ -29,7 +29,7 @@ if ! echo "$path" | grep -qE 'config\.py$|settings\.py$|/tests/'; then
 fi
 
 # --- B3: No bare observability client instantiation ---
-# Only a factory file named observability.py (anywhere in {{ source_root }}/) may
+# Only a factory file named observability.py (anywhere in {{ py_project_root }}/{{ ai_source_root }}/) may
 # instantiate a tracing provider client — keeps the provider swappable in one place.
 if ! echo "$path" | grep -qE '(^|/)observability\.py$'; then
   line=$(grep -nE 'langfuse\.Langfuse\(|Langfuse\(|langsmith\.Client\(' "$path" 2>/dev/null | grep -v '# noqa' | head -1 || true)

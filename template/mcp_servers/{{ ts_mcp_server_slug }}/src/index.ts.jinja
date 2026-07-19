@@ -34,7 +34,7 @@ server.registerTool(
     description:
       "Search the project's knowledge base for relevant articles. Calls the retrieval backend's " +
       "/api/v1/retrieval endpoint (retrieval only, no answer synthesis) — see " +
-      "the /api/v1/retrieval contract{% if include_rag_agent %} in {{ source_root }}/agents/rag_agent/main.py. Requires rag_agent " +
+      "the /api/v1/retrieval contract{% if include_rag_agent %} in {{ py_project_root }}/{{ ai_source_root }}/agents/rag_agent/main.py. Requires rag_agent " +
       "running (`make rag-up`){% else %} — point RAG_AGENT_URL at your custom RAG service{% endif %}; RAG_AGENT_URL overrides the default http://localhost:8011.",
     inputSchema: SearchArticlesInputSchema.shape,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },

@@ -6,7 +6,7 @@ from pathlib import Path
 from core.pipelines.corpus.index import search
 
 # pytest runs from the project root — see the comment in test_ingestion.py.
-GOLDEN_QA_PATH = Path("data/corpus/golden_qa.jsonl")
+GOLDEN_QA_PATH = Path("data/raw_corpus/golden_qa.jsonl")
 TOP_K = 3
 # BM25 is a real (imperfect) retriever, not an exact-match oracle — some golden
 # questions phrase things quite differently from the source article text, so we

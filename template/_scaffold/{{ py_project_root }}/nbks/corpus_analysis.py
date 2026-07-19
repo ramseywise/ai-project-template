@@ -55,7 +55,7 @@ def _():
 
 @app.cell
 def _(Path, load_raw_articles):
-    articles = load_raw_articles(Path("data/corpus"))
+    articles = load_raw_articles(Path("data/raw_corpus"))
     return (articles,)
 
 
@@ -81,7 +81,7 @@ def _(articles, mo):
 
 @app.cell
 def _(Path, json):
-    golden_qa_path = Path("data/corpus/golden_qa.jsonl")
+    golden_qa_path = Path("data/raw_corpus/golden_qa.jsonl")
     golden_qa = [
         json.loads(line)
         for line in golden_qa_path.read_text(encoding="utf-8").splitlines()

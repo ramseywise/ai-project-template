@@ -27,11 +27,11 @@
 {%- endif %}
         docker-up docker-down
 
-# {{ source_root }}/ holds "agents" (imported bare, e.g. `agents.{{ lg_agent_dir }}`); "core"
+# {{ py_project_root }}/{{ ai_source_root }}/ holds "agents" (imported bare, e.g. `agents.{{ lg_agent_dir }}`); "core"
 # and "{{ eval_root }}" live at the project root — both need to be on PYTHONPATH
 # for anything invoked outside of pytest (which reads pythonpath from pyproject.toml).
-PY := PYTHONPATH={{ source_root }}:. uv run python
-UVICORN := PYTHONPATH={{ source_root }}:. uv run uvicorn
+PY := PYTHONPATH={{ py_project_root }}/{{ ai_source_root }}:{% if include_ml %}{{ py_project_root }}:{% endif %}. uv run python
+UVICORN := PYTHONPATH={{ py_project_root }}/{{ ai_source_root }}:. uv run uvicorn
 
 setup:
 	./project_init.sh
@@ -46,7 +46,7 @@ corpus-preprocess:
 corpus-ingest: corpus-preprocess
 	$(PY) -m core.pipelines.corpus ingest
 
-# --- Chat agent ({{ source_root }}/agents/{{ lg_agent_dir }}, LangGraph) ---
+# --- Chat agent ({{ py_project_root }}/{{ ai_source_root }}/agents/{{ lg_agent_dir }}, LangGraph) ---
 {{ lg }}-up:
 	$(UVICORN) agents.{{ lg_agent_dir }}.main:app --port $${LG_PORT:-8010} --reload &
 
@@ -67,7 +67,7 @@ corpus-ingest: corpus-preprocess
 
 {% endif -%}
 {% if include_rag_agent -%}
-# --- Example agent ({{ source_root }}/agents/rag_agent) — same corpus, embedding-based retrieval ---
+# --- Example agent ({{ py_project_root }}/{{ ai_source_root }}/agents/rag_agent) — same corpus, embedding-based retrieval ---
 rag-corpus-ingest: corpus-preprocess
 	$(PY) -m core.pipelines.corpus rag-ingest
 
@@ -91,7 +91,7 @@ rag-chat:
 
 {% endif -%}
 {% if primary_chat_agent in ["adk_agent", "both"] -%}
-# --- Chat agent ({{ source_root }}/agents/{{ adk_agent_dir }}, Google ADK) — MCP via McpToolset ---
+# --- Chat agent ({{ py_project_root }}/{{ ai_source_root }}/agents/{{ adk_agent_dir }}, Google ADK) — MCP via McpToolset ---
 {{ adk }}-up:
 	$(UVICORN) agents.{{ adk_agent_dir }}.gateway.main:app --port $${ADK_PORT:-8000} --reload &
 
@@ -157,7 +157,7 @@ promptfoo-eval:
 {% if has_corpus_pipeline -%}
 # --- Notebooks (nbks/, Marimo) ---
 nbks-corpus:
-	PYTHONPATH={{ source_root }}:. uv run marimo run nbks/corpus_analysis.py
+	PYTHONPATH={{ py_project_root }}/{{ ai_source_root }}:. uv run marimo run nbks/corpus_analysis.py
 
 {% endif -%}
 # --- Tests ---
@@ -174,7 +174,7 @@ test-integration:
 # Scoped to this project's own source, not the whole repo root — .claude/.agents/
 # ship vendored reference material (e.g. mcp-builder's example scripts) that
 # isn't held to this project's lint config and was never meant to be.
-LINT_PATHS := {{ source_root }} core {{ eval_root }} tests{% if include_ml %} ml{% endif %}
+LINT_PATHS := {{ py_project_root }}/{{ ai_source_root }} core {{ eval_root }} tests{% if include_ml %} {{ py_project_root }}/{{ ml_source_root }}{% endif %}
 
 lint:
 	uv run ruff check $(LINT_PATHS) --fix
@@ -212,7 +212,7 @@ ts-dev:
 # step) — see agent/eval/run.ts's docstring. Requires the server already
 # running (`make ts-dev` in another terminal) and ANTHROPIC_API_KEY set.
 ts-agent-eval:
-	cd {{ ts_project_root }} && GOLDEN_QA_PATH=$(CURDIR)/data/corpus/golden_qa.jsonl npm run eval
+	cd {{ ts_project_root }} && GOLDEN_QA_PATH=$(CURDIR)/data/raw_corpus/golden_qa.jsonl npm run eval
 
 {% endif -%}
 {% endif -%}

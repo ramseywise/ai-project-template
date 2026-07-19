@@ -17,7 +17,7 @@ __pycache__/
 .env.local
 .env.*.local
 
-# Data artifacts (runtime outputs — the committed example corpus lives in data/corpus/)
+# Data artifacts (runtime outputs — the committed example corpus lives in data/raw_corpus/)
 data/processed/
 data/stores/
 data/datasets/

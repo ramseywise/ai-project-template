@@ -34,7 +34,7 @@ If you're extending this skill, add capability reference material there, not her
 - If `--framework` is missing, don't guess — go to Step 2.
 - If `--output` is missing, let the framework-specific scaffold skill pick its own
   default (ADK: `agent-starter-pack`'s project-directory convention; LangGraph:
-  typically `{source_root}/agents/{name}` — confirm the source directory name from
+  typically `{py_project_root}/{ai_source_root}/agents/{name}` — confirm the source directory name from
   the project layout if it isn't obvious).
 
 ### Step 2 — Decide the framework (if not given)

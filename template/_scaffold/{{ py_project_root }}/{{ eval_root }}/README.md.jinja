@@ -3,7 +3,7 @@
 Two eval suites live here:
 
 1. **Retrieval golden-QA** (`pipelines/run.py`) — grades search quality per
-   backend against `data/corpus/golden_qa.jsonl`. Documented below.
+   backend against `data/raw_corpus/golden_qa.jsonl`. Documented below.
 2. **Interaction evals** (`pipelines/grade.py`) — grades recorded assistant
    conversations on the metrics this project selected at generation time
    (see `graders/metrics_registry.py`). See "Interaction evals" at the end.
@@ -38,7 +38,7 @@ evals/
 
 ## The golden QA set
 
-`data/corpus/golden_qa.jsonl` has 10 rows, each shaped like:
+`data/raw_corpus/golden_qa.jsonl` has 10 rows, each shaped like:
 
 ```json
 {"id": "qa_001", "question": "How often should I descale the machine?",
@@ -47,7 +47,7 @@ evals/
 ```
 
 `source_article` is the article `id` (the corpus filename stem, e.g.
-`descaling` for `data/corpus/descaling.md`) that a well-behaved retriever
+`descaling` for `data/raw_corpus/descaling.md`) that a well-behaved retriever
 should surface for that question.
 
 ## How grading works

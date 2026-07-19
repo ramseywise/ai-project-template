@@ -71,9 +71,15 @@ jobs:
           - name: ml
             args: "-d include_ml=true"
             tier: test-py
+          # include_mcp_server is derived (when: false) and defaults OFF for
+          # chat_app, so it must be forced here — without it this row rendered
+          # no mcp_servers/ at all and the test-mcp-ts step had no working dir.
           - name: mcp-ts
-            args: "-d mcp_server_language=typescript"
+            args: "-d include_mcp_server=true -d mcp_server_language=typescript"
             tier: test-mcp-ts
+          - name: mcp-py
+            args: "-d include_mcp_server=true -d mcp_server_language=python"
+            tier: test-mcp-py
           - name: vector-memory
             args: "-d vector_backend=memory"
             tier: test-py
@@ -255,7 +261,19 @@ jobs:
 
       - name: TS MCP server — install/build
         if: matrix.tier == 'test-mcp-ts'
-        working-directory: out/mcp_servers/render-test
         run: |
+          ! ls -d out/mcp_servers/*__unchosen* 2>/dev/null
+          cd out/mcp_servers/render-test
           npm install
           npm run build
+
+      # Guards the __unchosen_* prune: the chosen language must survive at the
+      # real slug and the other must be gone. A naive alias where both slugs
+      # resolved to mcp_server_slug deleted BOTH trees, leaving only README.md.
+      - name: Python MCP server — assert tree + sync
+        if: matrix.tier == 'test-mcp-py'
+        run: |
+          test -f out/mcp_servers/render-test/src/server.py
+          test -f out/mcp_servers/render-test/pyproject.toml
+          ! ls -d out/mcp_servers/*__unchosen* 2>/dev/null
+          cd out/mcp_servers/render-test && uv sync
