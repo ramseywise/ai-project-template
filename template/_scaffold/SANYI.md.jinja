@@ -11,8 +11,8 @@ last-audit: pending — complete /sanyi init
 
 ## 不易 Buyi
 
-<!-- Seeded from the template's base-requirements invariants. These are STARTING
-     entries, not the finished contract:
+<!-- Seeded from the template's base-requirements invariants (template core redesign,
+     Part 2). These are STARTING entries, not the finished contract:
      /sanyi init walks them with you to confirm, sharpen the `paths`, and add the
      project-specific invariants that no scaffold can infer (what the agent must
      never do/say/promise, which data must never leave the boundary, which
@@ -24,6 +24,51 @@ last-audit: pending — complete /sanyi init
      debt) and must never be bypassable via config/env/flag. The seeded entries
      below all carry `evidence: pending — /sanyi init` because the guarding test
      is what makes an invariant real; wiring it is the first init task. -->
+
+### Toolchain
+
+<!-- uv + ruff + pytest + pyright are the enforced toolchain: one [tool.ruff]
+     block drives session hooks, pre-commit, and CI from the same config.
+     Bypassing any leg (running tests outside uv, skipping ruff in CI) breaks
+     the three-way enforcement guarantee and is a trust failure for reviewers
+     who rely on it. -->
+
+- paths: pyproject.toml, .pre-commit-config.yaml, Makefile
+- contract: uv, ruff, pytest, and pyright are the only sanctioned toolchain.
+  All three enforcement legs (session hooks + pre-commit + CI) run the same
+  ruff config from `[tool.ruff]` in pyproject.toml; no leg may be silently
+  disabled or bypassed via config or flag.
+- evidence: pending — /sanyi init
+
+### Project layout
+
+<!-- src/ package + tests/{unit,smoke,integration} + configs/{dev,prod}.yaml
+     is the enforced layout: Makefile's LINT_PATHS and the structure guard hook
+     both assume it. Deviating silently breaks lint scoping and the structure
+     guard without a build error. -->
+
+- paths: pyproject.toml, Makefile, .claude/hooks/structure_guard.sh
+- contract: Source lives under `{{ py_project_root }}/{{ ai_source_root }}/`;
+  tests under `tests/{unit,smoke,integration}/`; environment config under
+  `configs/{dev,prod}.yaml`. LINT_PATHS in the Makefile must match the actual
+  source layout; the structure guard hook enforces the invariant on every
+  session. Not relaxable without updating both.
+- evidence: pending — /sanyi init
+
+### Config via pydantic-settings
+
+<!-- Every agent's settings.py inherits from pydantic-settings BaseSettings with
+     .env loading. A literal credential or tunable in business logic (not in
+     settings.py and not env-overridable) is a BY-4 debt item and a security
+     exposure — env vars are the one surface that CI, local dev, and production
+     all share without code changes. -->
+
+- paths: {{ py_project_root }}/{{ ai_source_root }}/**/settings.py, .env.example
+- contract: All credentials, model names, and tunables are declared in a
+  pydantic-settings `Settings` class, loaded from env/.env, and never hardcoded
+  in business logic. `.env.example` is the published contract for required vars.
+  Not bypassable via a literal in any non-settings module.
+- evidence: pending — /sanyi init
 
 ### Service boundary
 
