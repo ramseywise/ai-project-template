@@ -64,11 +64,13 @@ def add_ewm_features(
     value_col: str = "value",
     series_col: str = "series_id",
     date_col: str = "date",
-    spans: list[int] = [7, 14, 30],
+    spans: list[int] | None = None,
 ) -> pd.DataFrame:
     """Exponentially weighted mean per series, per span — more responsive to
     recent changes than a simple rolling mean, useful for catching trend
     shifts early."""
+    if spans is None:
+        spans = [7, 14, 30]
     df = df.sort_values([series_col, date_col])
     grouped = df.groupby(series_col)[value_col]
     for span in spans:
@@ -147,7 +149,7 @@ class FeatureImportanceResult:
         return self.ranked[:k]
 
     def as_dataframe(self) -> pd.DataFrame:
-        names, scores = zip(*self.ranked) if self.ranked else ([], [])
+        names, scores = zip(*self.ranked, strict=False) if self.ranked else ([], [])
         return pd.DataFrame({"feature": list(names), "importance": list(scores)})
 
 
@@ -167,7 +169,7 @@ def mutual_information_importance(
         # the bundled type stub only declares "auto" | array-like — stub gap,
         # not a real type error.
         scores = mutual_info_regression(x, y, discrete_features=discrete_features, random_state=42)  # type: ignore[arg-type]
-        importance = dict(zip(feature_names, scores.tolist()))
+        importance = dict(zip(feature_names, scores.tolist(), strict=False))
         ranked = sorted(importance.items(), key=lambda item: item[1], reverse=True)
         return FeatureImportanceResult("mutual_information", importance, ranked)
     except ImportError:

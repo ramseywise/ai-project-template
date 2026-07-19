@@ -83,10 +83,12 @@ def check_arima_assumptions(
 
     ljung_passed = ljung_pval = arch_pval = hetero_passed = jb_passed = jb_pval = None
 
+    # N811 below: statsmodels' ARIMA is a class, not a constant — aliased to
+    # avoid colliding with this module's own ARIMA.
     try:
         from scipy.stats import jarque_bera
         from statsmodels.stats.diagnostic import acorr_ljungbox, het_arch
-        from statsmodels.tsa.arima.model import ARIMA as StatsARIMA
+        from statsmodels.tsa.arima.model import ARIMA as StatsARIMA  # noqa: N811
 
         d = stat.recommended_d
         work = difference_series(values, d) if d > 0 else values
@@ -316,7 +318,8 @@ class ARIMAForecaster:
 
     def _fit_manual(self, values: np.ndarray, exog: np.ndarray | None) -> Any:
         try:
-            from statsmodels.tsa.arima.model import ARIMA as StatsARIMA
+            # N811: see the note in _fit_auto — class alias, not a constant.
+            from statsmodels.tsa.arima.model import ARIMA as StatsARIMA  # noqa: N811
 
             p, d, q = self.order
             model = StatsARIMA(values, order=(p, d, q), exog=exog).fit()

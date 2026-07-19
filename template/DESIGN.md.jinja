@@ -54,13 +54,29 @@ manual process), and what must the AI beat, by how much, to justify itself? -->
 
 ## Key Decisions
 
+The rows between the markers below are generated from `design.yaml` and rewritten
+in place on every `copier update`. To change one of those decisions, edit
+`design.yaml` — edits made inside the markers are overwritten. Rows outside the
+markers, and every other section of this file, are yours.
+
+<!-- BEGIN design-table (generated from design.yaml — do not edit by hand) -->
+| Decision | Status | Choice | Rationale |
+|----------|--------|--------|-----------|
+| AI approach | Resolved | {{ project_type }} | Set at scaffold time — revisit if the shape changes |
+| Python backend | Resolved | {{ ('yes — ' ~ primary_chat_agent if primary_chat_agent != 'none' else 'yes — no agent loop') if primary_backend_language in ['python', 'both'] else 'no' }} | From `design.yaml` `backends.python` |
+| TypeScript backend | Resolved | {{ ('yes — ' ~ ts_agent_framework if ts_agent_framework and ts_agent_framework != 'none' else 'yes — no agent loop') if primary_backend_language in ['typescript', 'both'] else 'no' }} | From `design.yaml` `backends.typescript` |
+| Frontend | Resolved | {{ 'nextjs (' ~ frontend_backend_topology ~ ')' if include_frontend else 'none' }} | From `design.yaml` `web` |
+| Retrieval | Resolved | {{ (rag_impl ~ ' / ' ~ vector_backend) if include_rag_agent else 'none' }} | From `design.yaml` `rag` |
+| Cloud | Resolved | {{ cloud }} | From `design.yaml` `cloud` |
+| Deployment target | Resolved | {{ deployment_target }} | From `design.yaml` `deployment_target` |
+| Data sensitivity | Resolved | {{ data_sensitivity }} | From `design.yaml` `data_sensitivity` |
+| Interaction evals | Resolved | {{ [('escalation' if include_metric_escalation else none), ('friction' if include_metric_friction else none), ('intent' if include_metric_intent else none), ('language' if include_metric_language else none)] | select | join(', ') or 'none' }} | From `design.yaml` `evals.interaction` |
+<!-- END design-table -->
+
 | Decision | Status | Choice | Rationale |
 |----------|--------|--------|-----------|
 | Auth / identity | <!-- Resolved / Open / Deferred(<trigger>) --> | | |
 | Data model ownership | <!-- Resolved / Open / Deferred(<trigger>) --> | | |
-| AI approach | Resolved | {{ project_type }} | Set at scaffold time — revisit if the shape changes |
-| Data sensitivity | Resolved | {{ data_sensitivity }} | Set at scaffold time |
-| Deployment target | Resolved | {{ deployment_target }} | Set at scaffold time |
 | Multi-tenancy | <!-- Resolved / Open / Deferred(<trigger>) --> | | |
 | Service surface | Deferred(first external consumer identified) | REST `/api/v1/*` is the boundary | MCP is a logic-free adapter over REST — add one when an MCP host actually consumes this project; revisit at that trigger |
 {%- if is_agent_shaped %}

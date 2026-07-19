@@ -296,9 +296,12 @@ human_approval:
 # Inferred directory layout — computed here (before Phase 2) because later
 # question help-strings interpolate it; copier renders each question with only
 # the answers collected so far. Never asked; override with -d source_root=….
+# Re-parented under backend/ (step 2b′): the Python backend tree is
+# backend/src/, while the staging layout under _scaffold/ stays flat — the
+# destination merge (below) creates the nested path via mkdir -p.
 source_root:
   type: str
-  default: src
+  default: backend/src
   when: false
 
 # ─── Phase 2 — Architecture (A3: derived from Phase 1, -d-only, never asked) ─
@@ -532,6 +535,16 @@ ts_project_root:
   default: "{{ project_slug }}"
   when: false
 
+# Where the TS backend service LANDS (step 2b′) — distinct from ts_project_root,
+# which is its staging dir under _scaffold/ and is unchanged. A typescript-only
+# backend renders to backend/, matching the Python layout. Under `both`, Python
+# already owns backend/, so TS keeps its project-named root rather than colliding
+# — the uniformity rule's one explicit exception.
+ts_backend_dest:
+  type: str
+  default: "{{ ts_project_root if primary_backend_language == 'both' else 'backend' }}"
+  when: false
+
 # Orthogonal to primary_chat_agent — a TS project may or may not want an agent
 # loop at all (some TS backends are plain API services). vercel_ai_sdk stages
 # a real agent/ tree (streamText + tool() loop, Anthropic provider) at
@@ -702,6 +715,43 @@ optional_features:
   # -d optional_features=[…] or the /add-integration path. Still overridable.
   when: false
 
+# Does this project produce model interactions worth grading? The interaction
+# evals (escalation/friction/intent/language) grade a *conversational turn* —
+# they need a chat agent to have produced one. `is_agent_shaped` is the wrong
+# gate for that: it keys off project_type, which is the project's SHAPE, not
+# whether a chat agent was actually scaffolded. The two diverge in both
+# directions, and step 7 exists because both divergences shipped:
+#   - primary_chat_agent=none on an agent-shaped type (chat_app etc.) rendered
+#     escalation+friction graders, a metrics_registry importing them, and
+#     targets.yaml keys — all grading an agent the project does not contain.
+#   - an ml-shaped project (project_type=prototype + ml) is not agent-shaped,
+#     so it correctly got none; that half was already right and must stay right.
+# Keyed on primary_chat_agent for the same reason has_corpus_pipeline is: the
+# concrete capability, not the shape label. `both` counts (two agents, still
+# gradeable turns); `none` does not.
+#
+# adk_agent counts even though the shipped judges were written against the
+# LangGraph example — the graders read EvalInteraction (framework-agnostic
+# recorded turns), not a framework object, so an ADK project grades its own
+# interactions through the same registry.
+has_gradeable_interactions:
+  type: bool
+  default: >-
+    {{ (scaffold_full_project and _external_data.design.backends.python.enabled
+    and _external_data.design.backends.python.framework in ['langgraph', 'adk'])
+    if (_external_data.design is defined and _external_data.design and
+    _external_data.design.stages is defined and
+    _external_data.design.stages.discovery == 'complete') else
+    (scaffold_full_project and is_agent_shaped
+    and primary_chat_agent in ['lg_agent', 'adk_agent', 'both']) }}
+  # Mirrors has_corpus_pipeline's two-branch shape (Q5): design.yaml once
+  # discovery is complete, else the A3-derived answer expression. `and
+  # is_agent_shaped` is kept in the else branch so a NON-agent shape that
+  # nonetheless carries a chat-agent answer (primary_chat_agent defaults to
+  # lg_agent for `prototype`, which is not agent-shaped) does not acquire
+  # interaction evals — that half of the coupling was already correct.
+  when: false
+
 eval_metrics:
   type: str
   multiselect: true
@@ -710,17 +760,19 @@ eval_metrics:
     matched heuristic grader + LLM judge + aggregation + report section, wired
     through graders/metrics_registry.py, with sampling/redaction/calibration
     pipelines alongside. Retrieval isn't listed: its golden-QA eval ships with
-    every full scaffold regardless. Agent-shaped projects pre-select
-    escalation + friction.
+    every full scaffold regardless. Projects with a prebuilt chat agent
+    pre-select escalation + friction.
   choices:
     "escalation — did the assistant hand off to a human when it should?": escalation
     "friction — hedging/vagueness/UX friction in responses": friction
     "intent — routing/intent classification correctness": intent
     "language — response language matches the user's": language
-  default: "[{% if is_agent_shaped %}'escalation', 'friction'{% endif %}]"
+  default: "[{% if has_gradeable_interactions %}'escalation', 'friction'{% endif %}]"
   # A3 (F4): interaction-eval metrics are added as they become relevant, not at
-  # genesis — agent-shaped projects seed escalation + friction; add others later
-  # with -d eval_metrics=[…] (/add-eval-metric). Still overridable.
+  # genesis — projects with a chat agent seed escalation + friction; add others
+  # later with -d eval_metrics=[…] (/add-eval-metric). Still overridable.
+  # Step 7: the seed gate moved from is_agent_shaped to
+  # has_gradeable_interactions — see that variable's comment.
   when: false
 
 # Derived feature toggles — the _tasks block and templates consume these
@@ -790,23 +842,61 @@ include_ml:
   # optional_features expression, kept verbatim.
   when: false
 
+# LLM tracing provider for backend/src/observability/ (step 3′). Agentic-only:
+# an ml-only project has no LLM calls to trace, so the subtree is removed in
+# _tasks when is_agent_shaped is false and this collapses to 'none'.
+# The factory file MUST stay named observability.py — .claude/hooks/sdk_lint.sh
+# (B3) exempts only that filename from the bare-client-instantiation check, so
+# renaming it makes the scaffold flag itself.
+observability_provider:
+  type: str
+  choices:
+    langfuse: langfuse
+    langsmith: langsmith
+    none: none
+  default: "{{ 'langfuse' if is_agent_shaped else 'none' }}"
+  # A3 invariant: derived, never asked — drive it with
+  # -d observability_provider=langsmith.
+  when: false
+
+# Guard layers for backend/src/security/ (step 4′). Agentic-only: the three
+# layers wrap an LLM turn (untrusted input → prompt → model output), so an
+# ml-only project has nothing to guard and the subtree is removed in _tasks.
+# Independent of observability_provider — guards don't trace. The output filter
+# runs BEFORE observability/tracing.py's redact() so a value the model leaked
+# never reaches the tracing backend (CLAUDE.md.jinja, DESIGN.md.jinja).
+include_security_guards:
+  type: bool
+  default: "{{ is_agent_shaped }}"
+  # A3 invariant: derived, never asked — drive it with
+  # -d include_security_guards=false.
+  when: false
+
 include_calendar_integration:
   type: bool
   default: "{{ 'calendar' in external_systems }}"
   when: false
 
 # Derived per-metric toggles from the eval_metrics multiselect — same pattern
-# as the optional_features derivations above. Gated on scaffold_full_project
-# for the same reason as include_akira: layering-only mode must not compute a
-# truthy default off the (skipped) multiselect's seeded default.
+# as the optional_features derivations above.
+#
+# Gated on has_gradeable_interactions (step 7), which is strictly stronger than
+# the scaffold_full_project conjunct these carried before: it still keeps
+# layering-only mode from computing a truthy default off the (skipped)
+# multiselect's seeded default, AND it makes the gate hold against an EXPLICIT
+# override. That second half is the point — `-d eval_metrics=[intent]` on a
+# primary_chat_agent=none project would otherwise scaffold an intent grader,
+# a registry importing it, and a targets.yaml key, all grading an agent that
+# was never rendered. The metric list stays user-selectable; whether ANY
+# interaction metric is coherent for the project is not a list question.
 include_metric_escalation:
   type: bool
   default: >-
-    {{ (scaffold_full_project and 'escalation' in _external_data.design.evals.interaction)
+    {{ (has_gradeable_interactions and 'escalation' in _external_data.design.evals.interaction)
     if (_external_data.design is defined and _external_data.design and
     _external_data.design.stages is defined and
     _external_data.design.stages.discovery == 'complete') else
-    (scaffold_full_project and 'escalation' in eval_metrics) }}
+    (has_gradeable_interactions and 'escalation' in eval_metrics) }}
   # Q5 row 10: repoints include_metric_escalation's OWN default directly,
   # bypassing the eval_metrics multiselect. Stage-gated on discovery; else the
   # existing A3-derived 'escalation' in eval_metrics expression, kept verbatim.
@@ -815,31 +905,31 @@ include_metric_escalation:
 include_metric_friction:
   type: bool
   default: >-
-    {{ (scaffold_full_project and 'friction' in _external_data.design.evals.interaction)
+    {{ (has_gradeable_interactions and 'friction' in _external_data.design.evals.interaction)
     if (_external_data.design is defined and _external_data.design and
     _external_data.design.stages is defined and
     _external_data.design.stages.discovery == 'complete') else
-    (scaffold_full_project and 'friction' in eval_metrics) }}
+    (has_gradeable_interactions and 'friction' in eval_metrics) }}
   when: false
 
 include_metric_intent:
   type: bool
   default: >-
-    {{ (scaffold_full_project and 'intent' in _external_data.design.evals.interaction)
+    {{ (has_gradeable_interactions and 'intent' in _external_data.design.evals.interaction)
     if (_external_data.design is defined and _external_data.design and
     _external_data.design.stages is defined and
     _external_data.design.stages.discovery == 'complete') else
-    (scaffold_full_project and 'intent' in eval_metrics) }}
+    (has_gradeable_interactions and 'intent' in eval_metrics) }}
   when: false
 
 include_metric_language:
   type: bool
   default: >-
-    {{ (scaffold_full_project and 'language' in _external_data.design.evals.interaction)
+    {{ (has_gradeable_interactions and 'language' in _external_data.design.evals.interaction)
     if (_external_data.design is defined and _external_data.design and
     _external_data.design.stages is defined and
     _external_data.design.stages.discovery == 'complete') else
-    (scaffold_full_project and 'language' in eval_metrics) }}
+    (has_gradeable_interactions and 'language' in eval_metrics) }}
   when: false
 
 # Any interaction metric selected → ship the shared machinery (models,
@@ -1055,6 +1145,18 @@ _tasks:
   # contract for whatever compatible retrieval service the project points at.
   - "{{ 'true' if (not scaffold_full_project) or include_rag_agent else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/agents/rag_agent' }}"
   - "{{ 'true' if enable_structure_guard else 'rm -f ' ~ _copier_conf.dst_path ~ '/.claude/hooks/structure_guard.sh' }}"
+  # observability/ (step 3′) is agentic-only — an ml-only or non-agent project
+  # has no LLM calls to trace. Removed from staging (not the final path), same
+  # reasoning as the rag_agent/ml cleanups. It otherwise rides the source_root
+  # merge below like agents/integrations/middleware, so there is no separate
+  # merge task for it.
+  - "{{ 'true' if (not scaffold_full_project) or (is_agent_shaped and observability_provider != 'none') else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/observability' }}"
+  # security/ (step 4′) is agentic-only for the same reason as observability/ —
+  # the three guard layers wrap an LLM turn, so an ml-only or non-agent project
+  # has nothing to guard. Independent of observability_provider (guards don't
+  # trace). Removed from staging (not the final path); like observability/ it
+  # rides the source_root merge below, so there is no separate merge task.
+  - "{{ 'true' if (not scaffold_full_project) or include_security_guards else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/security' }}"
   # ml/ (classical ML/stats toolkit) is staged under _scaffold/ like the
   # other optional full-project-tier content — removed from staging (not the
   # final path) if not requested, same reasoning as the akira/lg_agent cleanup above.
@@ -1144,8 +1246,6 @@ _tasks:
     ~ _copier_conf.dst_path ~ '/_scaffold/data/. ' ~ _copier_conf.dst_path ~ '/data/'
     ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/core && cp -R '
     ~ _copier_conf.dst_path ~ '/_scaffold/core/. ' ~ _copier_conf.dst_path ~ '/core/'
-    ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/' ~ source_root ~ ' && cp -R '
-    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/. ' ~ _copier_conf.dst_path ~ '/' ~ source_root ~ '/'
     ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/' ~ eval_root ~ ' && cp -R '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ eval_root ~ '/. ' ~ _copier_conf.dst_path ~ '/' ~ eval_root ~ '/'
     ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/nbks && cp -R '
@@ -1155,11 +1255,18 @@ _tasks:
     ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/infrastructure && cp -R '
     ~ _copier_conf.dst_path ~ '/_scaffold/infrastructure/. ' ~ _copier_conf.dst_path ~ '/infrastructure/'
     ) if scaffold_full_project else 'true' }}
+  # Separate merge (not part of the block above) — the Python backend tree only
+  # belongs in a project whose backend is Python. Pre-2b′ this rode along in the
+  # unconditional block, so a typescript-only project still got a Python src/
+  # tree beside its TS root; re-parenting both to backend/ turned that latent
+  # bug into a visible collision. Gated here to mirror the TS merge's own
+  # primary_backend_language condition.
+  - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/' ~ source_root ~ ' && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ source_root ~ '/. ' ~ _copier_conf.dst_path ~ '/' ~ source_root ~ '/') if (scaffold_full_project and primary_backend_language in ['python', 'both']) else 'true' }}"
   # Separate merge (not part of the block above) — the ml/ cleanup task above
   # rm -rf's the whole _scaffold/ml directory when include_ml is false,
   # so it may not exist at all; folding it in would make the copy fail on a
   # missing source path.
-  - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/ml && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/ml/. ' ~ _copier_conf.dst_path ~ '/ml/') if (scaffold_full_project and include_ml) else 'true' }}"
+  - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/' ~ source_root ~ '/ml && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/ml/. ' ~ _copier_conf.dst_path ~ '/' ~ source_root ~ '/ml/') if (scaffold_full_project and include_ml and primary_backend_language in ['python', 'both']) else 'true' }}"
   # Same reasoning — railway.toml is rm -f'd above when split_service isn't chosen.
   # (bare file → mv, overwrites fine on re-render)
   - "{{ ('mv ' ~ _copier_conf.dst_path ~ '/_scaffold/railway.toml ' ~ _copier_conf.dst_path ~ '/') if (scaffold_full_project and frontend_backend_topology == 'split_service') else 'true' }}"
@@ -1174,7 +1281,11 @@ _tasks:
   # split_service's TS side is frontend-only (Next.js, not the Express backend
   # service), so it's excluded here — moved from its own staging dir instead,
   # by the task below.
-  - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/' ~ ts_project_root ~ ' && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ ts_project_root ~ '/. ' ~ _copier_conf.dst_path ~ '/' ~ ts_project_root ~ '/') if (scaffold_full_project and has_typescript and ts_project_root != '' and primary_backend_language in ['typescript', 'both'] and frontend_backend_topology != 'split_service') else 'true' }}"
+  # Destination (step 2b′): a typescript-only backend lands at backend/, matching
+  # the Python case. Under `both` it keeps its project-named root — Python already
+  # owns backend/, and the two would otherwise collide (the uniformity rule's one
+  # explicit exception). Staging path is unchanged either way.
+  - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/' ~ ts_backend_dest ~ ' && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ ts_project_root ~ '/. ' ~ _copier_conf.dst_path ~ '/' ~ ts_backend_dest ~ '/') if (scaffold_full_project and has_typescript and ts_project_root != '' and primary_backend_language in ['typescript', 'both'] and frontend_backend_topology != 'split_service') else 'true' }}"
   - "rm -rf {{ _copier_conf.dst_path }}/_scaffold"
   # split_service: swap in the Next.js frontend from its own staging dir (same
   # convention as the MCP TS-server swap below) and stage the Python auth
@@ -1230,4 +1341,25 @@ _migrations:
         rm -f "$old" && echo "[migration] removed stale $old (moved to $corpus/$f).";
       fi;
     done
+    '
+  # DESIGN.md Key Decisions table ← design.yaml (Q7). The table between the
+  # design-table markers is a VIEW of design.yaml; the prose around it is
+  # human-owned. copier's 3-way merge is the wrong tool here — it would
+  # conflict on every prose edit — so instead this rewrites ONLY the bytes
+  # between the two markers, leaving all other bytes untouched. The script
+  # itself is defensive: missing design.yaml/DESIGN.md, absent or reordered
+  # markers, unparseable yaml, or a discovery stage that isn't `complete` all
+  # warn and no-op rather than touching the file. Idempotent — re-running with
+  # an unchanged design.yaml rewrites identical bytes. Guarded on python3
+  # being available; without it the table simply stays as-is.
+  - >-
+    sh -c '
+    [ -f design.yaml ] || exit 0;
+    [ -f DESIGN.md ] || exit 0;
+    [ -f .claude/scripts/render_design_table.py ] || exit 0;
+    command -v python3 >/dev/null 2>&1 || {
+      echo "[migration] WARN: python3 not found — DESIGN.md decisions table not regenerated from design.yaml.";
+      exit 0;
+    };
+    python3 .claude/scripts/render_design_table.py .
     '

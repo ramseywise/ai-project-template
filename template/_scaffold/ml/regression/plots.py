@@ -74,7 +74,7 @@ def model_comparison_table(models: list, labels: list[str]) -> pd.DataFrame:
     """One row per model: pseudo R-squared, log-likelihood, AIC, and the
     selected feature set — useful for comparing RFE runs across subgroups/folds."""
     rows = []
-    for model, label in zip(models, labels):
+    for model, label in zip(models, labels, strict=False):
         rows.append(
             {
                 "label": label,
@@ -96,7 +96,7 @@ def plot_feature_importance_grid(models: list, titles: list[str]) -> Figure:
     fig, axs = plt.subplots(nrows, ncols, figsize=(5 * ncols, 4 * nrows), squeeze=False)
     axs_flat = axs.flatten()
 
-    for i, (model, title) in enumerate(zip(models, titles)):
+    for i, (model, title) in enumerate(zip(models, titles, strict=False)):
         coef = model.params[1:]
         p_values = model.pvalues[1:]
         features = model.model.exog_names[1:]
@@ -107,7 +107,7 @@ def plot_feature_importance_grid(models: list, titles: list[str]) -> Figure:
         sorted_p = [p_values[idx] for idx in order]
         colors = ["red" if c > 0 else "green" for c in sorted_coef]
         alphas = [1.0 if p < 0.05 else 0.3 for p in sorted_p]
-        rgba_colors = [mcolors.to_rgba(c, a) for c, a in zip(colors, alphas)]
+        rgba_colors = [mcolors.to_rgba(c, a) for c, a in zip(colors, alphas, strict=False)]
 
         ax = axs_flat[i]
         ax.barh(range(len(sorted_features)), sorted_coef, color=rgba_colors)

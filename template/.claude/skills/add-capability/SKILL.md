@@ -124,7 +124,8 @@ add that touches user-edited files is exactly its Step 3/4 job.
 Render-clean is not enough — exercise it (the roadmap's own lesson: A1 required
 the full runtime loop, not a render check):
 
-- New files for the capability are present, no leftover `{{ }}` Jinja.
+- New files for the capability are present, with no leftover unrendered Jinja
+  (double-brace placeholders that copier should have substituted).
 - `make setup` / `uv sync` if the capability pulled new deps.
 - `make test` passes; if the capability ships an eval, `make eval-heuristic`
   (or its metric-specific target) runs.
