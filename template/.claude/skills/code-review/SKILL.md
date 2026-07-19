@@ -69,8 +69,10 @@ dedupe, drop findings the linter already caught in step 2, rank most-important-f
 - Machine-consumed docs (`.claude/`, CLAUDE.md, SANYI.md): if changed code contradicts
   them (renamed commands, moved paths, dead references), FLAG at level 1; PROPOSE a
   diff in the report at level ≥2.
-- Human-consumed docs (README, DESIGN.md, wiki): FLAG staleness only — never edit
-  (doc-writer boundary, `~/.claude/rules/docs.md`).
+- Human-consumed docs (README, DESIGN.md, wiki): at level ≥2, run the `/docs-check`
+  protocol (diff mode — scoped to changed dirs). Flag staleness only — never edit
+  (doc-writer boundary, `~/.claude/rules/docs.md`). At level 1, skip structural check
+  but still flag obviously broken references caught by the `docs_hygiene` hook.
 
 ### 6. Report
 If the repo has a plan doc with `Status: IN PROGRESS` whose scope covers this diff,

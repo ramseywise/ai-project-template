@@ -96,6 +96,7 @@ project_slug:
   help: Is this project slug ok? (used for folder/package naming)
   placeholder: my-project
   default: "{{ project_name.lower().replace(' ', '-') }}"
+  when: false
 
 project_description:
   type: str
@@ -170,6 +171,7 @@ primary_backend_language:
   # enabled in design.yaml once discovery is complete — the question stays
   # askable/​overridable either way (this only changes its seed, same as
   # every other Layer-A default). Else = the original literal 'python' default.
+  when: false
 
 # Derived from primary_backend_language. Override with -d has_typescript=true
 # for a frontend-only TS project layered onto an existing repo (adds the TS
@@ -224,6 +226,7 @@ deployment_target:
   # Q5 row 9 (stage-gated on discovery): direct copy of design.deployment_target
   # once discovery is complete; else the original literal 'local' default. Stays
   # askable — this only changes the seed shown/used, same as primary_backend_language.
+  when: false
 
 # Q5 row 8 (new flag): which cloud, drives the RAG-per-cloud matrix (Q4:
 # bedrock_kb needs aws, vertex_rag needs gcp) and terraform provider selection
@@ -264,7 +267,7 @@ agent_tools:
     "MCP (expose/consume tools)": mcp
     "Custom (project-specific)": custom
   default: "{{ (['github'] if 'github' in external_systems else []) + (['database'] if 'database' in external_systems else []) }}"
-  when: "{{ is_agent_shaped }}"
+  when: false
 
 agent_memory:
   type: str
@@ -278,7 +281,7 @@ agent_memory:
     "Conversation history": conversation
     "Long-term / cross-session": long_term
   default: conversation
-  when: "{{ is_agent_shaped }}"
+  when: false
 
 human_approval:
   type: str
@@ -662,6 +665,13 @@ include_frontend:
     _external_data.design.stages.discovery == 'complete') else false }}
   when: false
 
+# mcp_servers/ lives at template root, NOT inside _scaffold/ — deliberately. It
+# is available in layering-only mode (project_type=existing_repo), same class as
+# .claude/ and .agents/: something addable to an existing repo that does not
+# require a full scaffold. Moving it into _scaffold/ would make layering mode
+# render an empty directory (everything inside _scaffold/ is discarded in that
+# mode). The `include_mcp_server` task below prunes the whole mcp_servers/ dir
+# when the toggle is off — correct in both modes.
 # Independent of scaffold_full_project — available in layering-only mode too.
 include_mcp_server:
   type: bool
@@ -1022,16 +1032,28 @@ data_sensitivity:
   # discovery is complete (governance decision seeded during Discovery per the
   # design.yaml schema); else the original literal primary_users-derived
   # expression. Stays askable.
+  when: false
 
 ticket_prefix:
   type: str
   help: Ticket prefix used for branch naming and linked-issue conventions (e.g. LIN, JIRA, GH)
   default: LIN
+  when: false
 
 enable_macos_notifications:
   type: bool
   help: Use macOS notifications (osascript) for Stop/long-test hooks? (turn off on Linux/CI)
-  default: true
+  default: "{{ _copier_conf.os == 'macos' }}"
+  when: false
+
+agent_config_profile:
+  type: str
+  help: "Agent harness posture: guarded (full hooks+permissions), independent (full hooks, relaxed permissions), vanilla (no .claude or .agents)"
+  choices:
+    guarded: guarded
+    independent: independent
+    vanilla: vanilla
+  default: guarded
 
 # ─── Inferred repo configuration (never asked — override with -d) ─────────
 # (py_project_root/ai_source_root live above Phase 2 — later help-strings
@@ -1095,37 +1117,51 @@ global_skills_source:
 
 _tasks:
   - "chmod +x {{ _copier_conf.dst_path }}/.claude/hooks/*.sh 2>/dev/null || true"
+  # vanilla profile: no agent harness at all — remove .claude and .agents wholesale.
+  # guarded/independent: keep everything; permissions differ in settings.json only.
+  - "{{ 'true' if agent_config_profile != 'vanilla' else 'rm -rf ' ~ _copier_conf.dst_path ~ '/.claude ' ~ _copier_conf.dst_path ~ '/.agents' }}"
   - "{{ 'true' if include_mcp_server else 'rm -rf ' ~ _copier_conf.dst_path ~ '/mcp_servers' }}"
-  - "{{ 'true' if include_agent_reference_library else 'rm -rf ' ~ _copier_conf.dst_path ~ '/.agents ' ~ _copier_conf.dst_path ~ '/.claude/skills/new-agent' }}"
+  # agent_creator.md is the subagent new-agent dispatches to — it is useless
+  # without the skill and the .agents/ reference library, so it goes with them.
+  - "{{ 'true' if include_agent_reference_library else 'rm -rf ' ~ _copier_conf.dst_path ~ '/.agents ' ~ _copier_conf.dst_path ~ '/.claude/skills/new-agent ' ~ _copier_conf.dst_path ~ '/.claude/agents/agent_creator.md' }}"
+  # The names below MUST match SKILLS[] in scripts/sync-global-skills.sh — that
+  # array decides what gets vendored in, this list decides what gets removed when
+  # global_skills_source=none. They drifted apart once (2026-07-19: all 13 names
+  # here were pre-rename, so 15 renamed skills escaped cleanup and shipped even
+  # with the knob off). new-agent is synced by that script but removed by the
+  # include_agent_reference_library task above, so it is deliberately absent here.
   - >-
     {{ 'true' if global_skills_source == 'vendored' else 'rm -rf ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/quick-commit ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/quick-pr ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/review-pr ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/execute-tasks ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/scope-initiative ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/design-sprint ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/doc-to-linear-tickets ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/plan-review ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/research-review ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/execute-plan ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/git-commit ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/git-pr ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/code-pr ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/code-refactor ' ~
     _copier_conf.dst_path ~ '/.claude/skills/code-review ' ~
     _copier_conf.dst_path ~ '/.claude/skills/code-debug ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/compact-session ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/define-milestones ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/workflow-research ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/workflow-plan ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/workflow-execute ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/workflow-review ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/workflow-insights ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/workflow-retro ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/design-sprint ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/design-initiative ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/design-milestones ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/design-prototype ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/akira ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/docs-check ' ~
     _copier_conf.dst_path ~ '/.claude/skills/github-projects ' ~
     _copier_conf.dst_path ~ '/.claude/skills/mcp-builder ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/plan-refactor ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/prototype ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/skill-creator' }}
+    _copier_conf.dst_path ~ '/.claude/skills/skill-creator ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/sanyi' }}
   # akira is .claude-only (vendored skill + akira-scan agent definition) — no
   # product source. Guarded on include_* alone (not `(not scaffold_full_project)
   # or ...`): these skills/docs live under .claude/, which layering-only mode
   # DOES ship, so the removal must fire there too when the toggles are off —
   # unlike the _scaffold/ cleanups below, which layering mode discards
   # wholesale anyway.
-  - "{{ 'true' if include_akira else 'rm -rf ' ~ _copier_conf.dst_path ~ '/.claude/skills/akira ' ~ _copier_conf.dst_path ~ '/.claude/agents/akira-scan.md' }}"
-  - "{{ 'true' if include_dev_companion else 'rm -rf ' ~ _copier_conf.dst_path ~ '/.claude/skills/dream ' ~ _copier_conf.dst_path ~ '/.claude/skills/grow-companion ' ~ _copier_conf.dst_path ~ '/.claude/docs/companion' }}"
+  - "{{ 'true' if include_akira else 'rm -rf ' ~ _copier_conf.dst_path ~ '/.claude/skills/akira ' ~ _copier_conf.dst_path ~ '/.claude/agents/akira-scan.md ' ~ _copier_conf.dst_path ~ '/.claude/agents/akira-wander.md' }}"
+  - "{{ 'true' if include_dev_companion else 'rm -rf ' ~ _copier_conf.dst_path ~ '/.claude/docs/companion' }}"
   # integrations/ sub-modules are independently removable — a blanket rm -rf tied
   # to one toggle would also delete modules gated by the OTHER toggles below.
   # Same staging-path caveat as akira/dream above — integrations/ is staged

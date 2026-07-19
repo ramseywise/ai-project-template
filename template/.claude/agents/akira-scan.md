@@ -18,6 +18,41 @@ problems only — style is the linter's job.
    missing tenant/user scoping on queries
 3. **Complexity / dead code** — unreachable branches, unused symbols (check callers via
    Grep before claiming), functions doing 3+ jobs, copy-paste divergence
+4. **Naming / layering** — role-based layer violations per `~/.claude/rules/naming.md`:
+   RAG index/embedding code under `core/` (belongs in `source/`), ETL under `source/`,
+   executable code under `data/`, or two same-named modules doing the same job
+   (`naming-collision`). Only flag files in your batch; cite the rule. A bare name overlap
+   that is role-justified (e.g. `data/corpus/` artifacts vs `core/pipelines/corpus/` ETL)
+   is NOT a finding. Advisory severity: `[Non-blocking]`, or `[Nit]` for a confusing but
+   role-justified overlap.
+5. **Config / secrets hygiene** — hardcoded tunables (chunk sizes, thresholds, model
+   names), inline endpoints, magic numbers, or env-specific values that belong in
+   `configs/` or env. A hardcoded secret/credential is always `[Blocking]`; other
+   hardcoded tunables are `[Non-blocking]` — cross-ref SANYI BN-1 (变易 outside its layer).
+6. **Error / resource handling** — swallowed exceptions (bare `except`, `except: pass`),
+   network calls with no timeout/retry, unclosed resources (no context manager /
+   `.close()`). Cite the language lens for specifics. `[Blocking]` when it swallows a
+   failure on a critical path; else `[Non-blocking]`.
+
+### Path-gated categories (only when a batch file matches the path)
+
+7. **Data-correctness (pipelines)** — for `core/pipelines/**`, `*.sql`, and embedded
+   query strings, apply `~/.claude/refs/sql.md` (SELECT * in ETL, missing WHERE on
+   update/delete, implicit cross joins, non-idempotent INSERT without ON CONFLICT,
+   tz-naive timestamps, string-concat SQL). Also flag silent dtype coercion, no schema
+   validation at ingest, and non-idempotent writes. Severity per the ref (`[Blocking]`
+   for silent corruption / data-doubling; else `[Non-blocking]`).
+8. **Prompt / LLM smells** — for agent code (`agents/**`, `*_agent/**`, files importing
+   an LLM/agent framework): prompt strings hardcoded inline instead of in `prompts/`
+   (SANYI BN-1), model output fed downstream without validation, missing structured-output
+   schema or output bound. `[Non-blocking]`; cite the framework ref (`adk-vercel`/`langgraph`).
+9. **Test-shape** — for test files: no assertions, mocks stubbed so the assertion is
+   tautological, error paths never exercised. `[Nit]`/`[Non-blocking]`.
+
+Language lenses (cite by path, don't restate): `~/.claude/refs/python.md`,
+`~/.claude/refs/typescript.md`, `~/.claude/refs/sql.md`. Read the relevant lens for a
+file's language before reporting a language-specific finding; the smell list lives in the
+ref, not here.
 
 ## Rules
 

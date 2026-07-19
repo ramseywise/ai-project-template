@@ -53,7 +53,7 @@ TS process.
 - You need a graph with arbitrary branching/loops/parallel workers
 - You need LLM providers other than Gemini
 
-**Skills to invoke next:** `.agents/skills/adk-scaffold/SKILL.md`, then `.agents/skills/adk-dev-guide/SKILL.md`
+**References to read next:** `.agents/skills/adk-scaffold/SKILL.md`, then `.agents/skills/adk-dev-guide/SKILL.md`
 
 ### LangGraph
 
@@ -68,7 +68,8 @@ TS process.
 - A simple single-agent assistant would do — the extra graph-authoring effort isn't worth it
 - There's no need for anything beyond what ADK's built-in agent/sub-agent hierarchy gives you for free
 
-**Skills to invoke next:** `.agents/skills/langgraph-scaffold/SKILL.md`, then `.agents/skills/langgraph-fundamentals/SKILL.md`; also `.agents/skills/langgraph-persistence/SKILL.md` and `.agents/skills/langgraph-human-in-the-loop/SKILL.md` as needed.
+**References to read next:** `.agents/skills/langgraph-scaffold/SKILL.md`, then `.agents/skills/langgraph-fundamentals/SKILL.md`;
+also `.agents/skills/langgraph-persistence/SKILL.md` and `.agents/skills/langgraph-human-in-the-loop/SKILL.md` as needed.
 
 ### Vercel AI SDK
 
@@ -86,11 +87,11 @@ TS process.
 - The project's agent logic is already Python and there's no reason to also run a
   TS runtime just for this.
 
-**Requires:** `has_typescript: true` and `ts_agent_framework: vercel_ai_sdk` in
-copier.yaml — stages a real `agent/` tree (settings, Anthropic provider factory,
-tool registry, `streamText` loop, framework-agnostic HTTP handler) at
-`{{ ts_project_root }}/{{ ts_source_root }}/agent/`. See
-`.claude/docs/plans/vercel-native-ts-agent-scaffold.md` for the full design.
+**Requires (scaffolded projects only):** `has_typescript: true` and
+`ts_agent_framework: vercel_ai_sdk` in copier.yaml — stages a real `agent/` tree
+(settings, Anthropic provider factory, tool registry, `streamText` loop,
+framework-agnostic HTTP handler) at
+`{{ ts_project_root }}/{{ ts_source_root }}/agent/`.
 
 ---
 

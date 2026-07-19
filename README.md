@@ -15,8 +15,7 @@ it runs in **phases** (see "The interview" below), and the tiers describe what l
    pre-flighted by `/deploy-check`),
    `.claude/settings.json` (hook wiring: secrets scan, branch naming, code quality,
    test coverage, SDK-pattern checks, docs hygiene, memory-duplication guard, commit gates), and
-   `.claude/hooks/*.sh` + `.claude/skills/` (21 workflow skills — research-review, plan-review,
-   execute-plan, code-review, quick-pr, mcp-builder, new-agent, etc. — see `.claude/skills/README.md` in
+   `.claude/hooks/*.sh` + `.claude/skills/` (26 workflow skills — see `.claude/skills/README.md` in
    the generated project for the full map).
 2. **Independent toggles** (available even with `scaffold_full_project=false`, i.e. layering-only mode
    onto an existing repo): `.agents/skills/` (`include_agent_reference_library`) — a tool-agnostic
@@ -220,12 +219,12 @@ template-maintainer material.
 | Path | What it is |
 |---|---|
 | `copier.yaml` | The whole interview + derivation logic + `_tasks` post-processing. The comments in it are load-bearing — read them before changing any toggle. |
-| `template/CLAUDE.md.jinja`, `DESIGN.md.jinja`, `LIFECYCLE.md.jinja`, `DEPLOYMENT.md.jinja` | Rendered to the project root in every mode (including layering-only). LIFECYCLE.md is the phase/gate status contract maintained by `/gate-check` and read by DSSG's project-mgmt-ai; DEPLOYMENT.md is the Phase-3 runbook (staged rollout, rollback, monitoring), pre-flighted by `/deploy-check`. |
+| `template/CLAUDE.md.jinja`, `DESIGN.md.jinja`, `LIFECYCLE.md.jinja`, `DEPLOYMENT.md.jinja`, `DELIVERY.md.jinja`, `RELEASE.md.jinja`, `design.yaml.jinja` | Rendered to the project root in every mode (including layering-only). LIFECYCLE.md is the phase/gate status contract maintained by `/gate-check` and read by DSSG's project-mgmt-ai; DEPLOYMENT.md is the Phase-3 runbook (staged rollout, rollback, monitoring), pre-flighted by `/deploy-check`; DELIVERY.md and RELEASE.md cover delivery process and release notes. |
 | `template/.claude/` | Hooks, skills, agent defs, settings — the always-on Claude tooling tier. Ships in every mode. |
 | `template/.agents/` | Tool-agnostic ADK/LangGraph reference library (`include_agent_reference_library`). |
 | `template/mcp_servers/` | Python FastMCP server scaffold (`include_mcp_server`); swapped for the TS tree when `mcp_server_language=typescript`. |
 | `template/_scaffold/` | **Staging dir** for the full-project tier. Copier renders it verbatim, then `_tasks` prunes unselected features and `mv`s the survivors to the project root. Never collides with a pre-existing repo — layering-only mode discards it wholesale. |
-| `template/_mcp_ts/` | Same staging convention for the TS MCP server; always `rm -rf`'d after its conditional `mv`. (`_split_service_frontend_staging/` was removed 2026-07-19 — it was referenced by three tasks but never existed on disk. The single `_scaffold/frontend/` tree serves both topologies.) |
+| `template/_scaffold/configs/` | Environment config files (dev.yaml, prod.yaml) — rendered into project root by `_tasks`. |
 | `scripts/` | Maintainer utilities (see `scripts/README.md`). |
 | `.claude/docs/` | This repo's own plan/research docs (local-only, git-ignored by policy). |
 | `.github/workflows/test-render.yml` | CI render matrix — leftover-Jinja + ruff checks per config. |

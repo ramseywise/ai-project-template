@@ -1,4 +1,4 @@
-.PHONY: new_project new_project_dev run_copier check_tools preview_defaults
+.PHONY: new_project new_project_dev run_copier check_tools preview_defaults project
 
 input_dir := .
 
@@ -21,6 +21,18 @@ run_copier:
 	mkdir -p "$$output_dir"; \
 	output_dir=$$(cd "$$output_dir" && pwd); \
 	copier copy $(VCS_REF) $(input_dir) "$$output_dir" --trust -d "project_name_input=$$project_name"
+
+## Render a project from a genesis answers file produced by /project-genesis.
+## Usage: make project ANSWERS=/tmp/genesis-answers.yml output_dir=~/workspace/my-project
+##        make project ANSWERS=/tmp/genesis-answers.yml output_dir=~/workspace/my-project OVERWRITE=1
+project: check_tools
+	@answers=$${ANSWERS:-}; \
+	if [ -z "$$answers" ]; then echo "ANSWERS is required — e.g. make project ANSWERS=/tmp/genesis-answers.yml output_dir=..."; exit 1; fi; \
+	output_dir=$${output_dir:-$$(read -p "output_dir (target project path): " r && echo $$r)}; \
+	mkdir -p "$$output_dir"; \
+	output_dir=$$(cd "$$output_dir" && pwd); \
+	overwrite_flag=$$([ -n "$${OVERWRITE}" ] && echo "--overwrite" || echo ""); \
+	copier copy --vcs-ref HEAD --trust --defaults $$overwrite_flag --data-file "$$answers" $(input_dir) "$$output_dir"
 
 ## Preview resolved copier defaults without rendering any files.
 ## Usage: make preview_defaults project_type=rag external_systems="[slack,github]"

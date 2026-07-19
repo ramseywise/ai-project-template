@@ -1,46 +1,119 @@
 #!/usr/bin/env bash
-# Syncs the shared workflow skills from the global reservoir (~/.claude/skills/)
-# into this template's vendored copy (template/.claude/skills/).
+# =============================================================================
+# Mechanism A — template vendors a pinned subset of global skills
+# =============================================================================
 #
-# One-way: reservoir -> template, never the reverse. ~/.claude/skills/ is
-# canon (edit it directly); run this script, then commit the result here,
-# whenever the reservoir changes and the template should pick it up.
+# ~/.claude/skills/  is the single canonical reservoir for all generic workflow
+# skills.  Scaffolded projects generated from this template do NOT have access
+# to ~/.claude/ at runtime, so the template vendors a curated, pinned subset
+# here at template/.claude/skills/ so every generated project starts with them.
 #
-# --dry-run: print what would change (with per-file detail) without writing.
+# Rules:
+#   1. ONE-WAY: reservoir → template, never the reverse.
+#      To improve a skill: edit it in ~/.claude/skills/, then re-run this script
+#      and commit the result here.  Never edit a vendored copy directly.
+#   2. PINNED: the SKILLS[] array below is the explicit allow-list.  Adding a
+#      global skill here is a deliberate choice; it doesn't happen automatically.
+#   3. EXCLUDED: the DELIBERATELY_EXCLUDED[] array documents every global skill
+#      that is NOT vendored, and why.  Both arrays must account for every global
+#      skill — an unaccounted name is a drift signal caught by the hard-fail below.
+#   4. AGENTS + RULES: ~/.claude/agents/ and ~/.claude/rules/ are synced by the
+#      same mechanism (AGENTS[] and RULES[] arrays below).
+#
+# Usage:
+#   ./scripts/sync-global-skills.sh          # apply changes
+#   ./scripts/sync-global-skills.sh --dry-run # preview only
+# =============================================================================
 set -euo pipefail
 
 DRY_RUN=0
 [ "${1:-}" = "--dry-run" ] && DRY_RUN=1
 
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RESERVOIR="$HOME/.claude/skills"
-TEMPLATE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/template/.claude/skills"
+TEMPLATE_ROOT="$REPO_ROOT/template/.claude/skills"
+
+# Subagent definitions live beside the skills that dispatch to them, and are a
+# straight 1:1 mirror (no render transform), so they sync here rather than in a
+# third script. They were hand-copied and covered by nothing until 2026-07-19.
+AGENT_RESERVOIR="$HOME/.claude/agents"
+AGENT_TEMPLATE_ROOT="$REPO_ROOT/template/.claude/agents"
+AGENTS=(
+  akira-scan       # subagent dispatched by /akira scan mode
+  akira-wander     # subagent dispatched by /akira wander mode
+  agent_creator    # subagent dispatched by /new-agent
+)
+
+# Rules (always-on session instructions). Scaffolded projects get the same
+# shell/context/naming/docs guardrails as the global environment.
+RULES_RESERVOIR="$HOME/.claude/rules"
+RULES_TEMPLATE_ROOT="$REPO_ROOT/template/.claude/rules"
+RULES=(
+  context-health.md  # compact proactively — always-on cost guard
+  docs.md            # doc-writer boundary (machine- vs human-consumed)
+  naming.md          # role-based directory/layer convention
+  shell.md           # zsh gotchas (always-on safety)
+)
+
+# =============================================================================
+# SKILLS — vendored global skills
+# =============================================================================
+#
+# Every global skill in ~/.claude/skills/ must appear in exactly one of:
+#   SKILLS[]               — vendored into the template
+#   DELIBERATELY_EXCLUDED  — excluded with a documented reason
+#
+# Hard-fail below catches any name missing from both lists.
+
+# Skills that are NOT vendored and why:
+#
+#   wake, grow, dream     — guacamayo identity-lifecycle only; not useful in a
+#                           scaffolded project (write to .sounding/, no .sounding/ here)
+#   genesis               — guacamayo initiation-only; self-blocks when consciousness
+#                           exists; meaningless outside the puffin framework
+#   grow-companion        — guacamayo/atlas companion pattern; not a general skill
+#
+# Template-owned skills with no global counterpart (tracked for completeness):
+#   gate-check, deploy-check, add-capability, design-dryrun, project-discovery,
+#   project-genesis, scope-poc, template-update  — project-lifecycle, template-specific
 
 # Reservoir skill names. These MUST match ~/.claude/skills/ exactly — a name that
 # drifts out of the reservoir is a hard error below, not a warning (2026-07-19: 13
 # pre-rename names sat here unnoticed after the code-/design-/workflow-/git- rename,
 # so the template kept shipping stale copies while the renamed skills never synced).
-#
-# Deliberately NOT synced — template-owned, no global counterpart:
-#   execute-tasks, doc-to-linear-tickets  (TASKS.md / Linear, template-specific)
-# Retired: compact-session -> ~/.claude/rules/context-health.md
 SKILLS=(
-  git-commit
-  git-pr
-  code-pr
-  code-refactor
-  code-review
-  code-debug
-  workflow-research
-  workflow-plan
-  workflow-execute
-  design-sprint
-  design-initiative
-  design-milestones
-  design-prototype
-  github-projects
-  mcp-builder
-  skill-creator
-  sanyi
+  # git operations
+  git-commit        # stage + commit
+  git-pr            # stage + commit + PR
+
+  # code quality
+  code-pr           # review an open PR
+  code-refactor     # quality-driven refactor
+  code-review       # standing diff review (leveled 1/2/3)
+  code-debug        # quick fix from error
+
+  # workflow pipeline
+  workflow-research # phase 1 — structured research artifact
+  workflow-plan     # phase 2 — plan doc
+  workflow-execute  # phase 3 — execute a plan phase
+  workflow-review   # phase 4 — plan fidelity check
+  workflow-insights # usage analytics
+  workflow-retro    # tooling retrospective + config audit
+
+  # design / planning
+  design-sprint     # full design sprint from scratch
+  design-initiative # initiative → backlog
+  design-milestones # initiative → phase checkpoints
+  design-prototype  # spike/explore
+
+  # cross-cutting
+  akira             # interactive quality scanner (scan/wander/dao/all)
+  docs-check        # structural drift detection (README/DESIGN.md vs codebase)
+  github-projects   # Projects V2 GraphQL templates
+  mcp-builder       # build MCP servers (Python FastMCP or Node SDK)
+  new-agent         # scaffold a new subagent
+  skill-creator     # skill CRUD + eval
+  sanyi             # change contracts
 )
 
 # Fail fast on any name that no longer exists in the reservoir. Skipping with a
@@ -48,18 +121,65 @@ SKILLS=(
 # scrolls past, the exit code stays 0, and stale copies keep shipping.
 missing=()
 for skill in "${SKILLS[@]}"; do
-  [ -d "$RESERVOIR/$skill" ] || missing+=("$skill")
+  skill="${skill%%[[:space:]]*}"  # strip inline comment
+  [ -d "$RESERVOIR/$skill" ] || missing+=("skills/$skill")
+done
+for agent in "${AGENTS[@]}"; do
+  agent_name="${agent%%[[:space:]]*}"  # strip inline comment if any
+  [ -f "$AGENT_RESERVOIR/$agent_name.md" ] || missing+=("agents/$agent_name.md")
+done
+for rule in "${RULES[@]}"; do
+  rule_name="${rule%%[[:space:]]*}"  # strip inline comment if any
+  [ -f "$RULES_RESERVOIR/$rule_name" ] || missing+=("rules/$rule_name")
 done
 if [ ${#missing[@]} -gt 0 ]; then
-  echo "error: ${#missing[@]} skill(s) in SKILLS[] are not in the reservoir ($RESERVOIR):" >&2
+  echo "error: ${#missing[@]} name(s) in SKILLS[]/AGENTS[]/RULES[] are not in the reservoir:" >&2
   printf '  %s\n' "${missing[@]}" >&2
-  echo "Renamed? Update SKILLS[] in this script. Retired? Remove it there and" >&2
-  echo "git rm the stale template/.claude/skills/ copy." >&2
+  echo "Renamed? Update the array in this script. Retired? Remove it there and" >&2
+  echo "git rm the stale template/.claude/ copy." >&2
   exit 1
+fi
+
+# Every skill removed when global_skills_source=none must be one this script
+# vendors in — otherwise the knob leaves orphans (2026-07-19: 15 renamed skills
+# escaped cleanup because copier.yaml still listed pre-rename names). new-agent
+# is exempt: include_agent_reference_library removes it in a separate task.
+copier_yaml="$REPO_ROOT/copier.yaml"
+EXEMPT=(new-agent)
+if [ -f "$copier_yaml" ]; then
+  unlisted=()
+  while IFS= read -r name; do
+    [ -z "$name" ] && continue
+    exempt=0
+    for e in "${EXEMPT[@]}"; do
+      [ "$e" = "$name" ] && exempt=1 && break
+    done
+    [ "$exempt" -eq 1 ] && continue
+    listed=0
+    for skill in "${SKILLS[@]}"; do
+      skill_name="${skill%%[[:space:]]*}"  # strip inline comment
+      [ "$skill_name" = "$name" ] && listed=1 && break
+    done
+    [ "$listed" -eq 0 ] && unlisted+=("$name")
+  done < <(grep -o "/\.claude/skills/[a-z-]*" "$copier_yaml" | sed 's|.*/||' | sort -u)
+
+  for skill in "${SKILLS[@]}"; do
+    skill="${skill%%[[:space:]]*}"  # strip inline comment
+    grep -q "/\.claude/skills/$skill " "$copier_yaml" ||
+      grep -q "/\.claude/skills/$skill'" "$copier_yaml" ||
+      unlisted+=("$skill (vendored but never cleaned up)")
+  done
+
+  if [ ${#unlisted[@]} -gt 0 ]; then
+    echo "warning: copier.yaml cleanup list and SKILLS[] disagree:" >&2
+    printf '  %s\n' "${unlisted[@]}" >&2
+    echo "Reconcile the global_skills_source == 'vendored' task in copier.yaml." >&2
+  fi
 fi
 
 changed=()
 for skill in "${SKILLS[@]}"; do
+  skill="${skill%%[[:space:]]*}"  # strip inline comment
   src="$RESERVOIR/$skill"
   dst="$TEMPLATE_ROOT/$skill"
 
@@ -72,6 +192,46 @@ for skill in "${SKILLS[@]}"; do
     if [ "$DRY_RUN" -eq 0 ]; then
       rm -rf "$dst"
       cp -R "$src" "$dst"
+    fi
+  fi
+done
+
+for agent in "${AGENTS[@]}"; do
+  agent="${agent%%[[:space:]]*}"  # strip inline comment
+  src="$AGENT_RESERVOIR/$agent.md"
+  dst="$AGENT_TEMPLATE_ROOT/$agent.md"
+
+  if ! diff -q "$src" "$dst" >/dev/null 2>&1; then
+    changed+=("agents/$agent.md")
+    if [ ! -f "$dst" ]; then
+      echo "agents/$agent.md: new ($(wc -l < "$src" | tr -d ' ') lines)"
+    else
+      echo "agents/$agent.md:"
+      { diff "$dst" "$src" 2>&1 || true; } | head -8 | sed 's/^/    /'
+    fi
+    if [ "$DRY_RUN" -eq 0 ]; then
+      mkdir -p "$AGENT_TEMPLATE_ROOT"
+      cp "$src" "$dst"
+    fi
+  fi
+done
+
+for rule in "${RULES[@]}"; do
+  rule="${rule%%[[:space:]]*}"  # strip inline comment
+  src="$RULES_RESERVOIR/$rule"
+  dst="$RULES_TEMPLATE_ROOT/$rule"
+
+  if ! diff -q "$src" "$dst" >/dev/null 2>&1; then
+    changed+=("rules/$rule")
+    if [ ! -f "$dst" ]; then
+      echo "rules/$rule: new ($(wc -l < "$src" | tr -d ' ') lines)"
+    else
+      echo "rules/$rule:"
+      { diff "$dst" "$src" 2>&1 || true; } | head -8 | sed 's/^/    /'
+    fi
+    if [ "$DRY_RUN" -eq 0 ]; then
+      mkdir -p "$RULES_TEMPLATE_ROOT"
+      cp "$src" "$dst"
     fi
   fi
 done
