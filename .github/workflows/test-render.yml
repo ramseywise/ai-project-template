@@ -120,7 +120,7 @@ jobs:
 
       # Renders have no package-lock.json, so npm caching (which keys on a
       # lockfile) is deliberately not enabled here.
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         if: contains(matrix.tier || '', 'ts') || matrix.tier == 'test-split'
         with:
           node-version: "22"
