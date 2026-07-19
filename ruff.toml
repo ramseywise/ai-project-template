@@ -1,0 +1,20 @@
+# Lint settings for THIS repo's own template sources (template/_scaffold/**.py).
+#
+# Not rendered into scaffolded projects: copier renders from `_subdirectory:
+# template`, so this root file is outside its scope. Rendered projects get their
+# settings from template/_scaffold/pyproject.toml.jinja instead.
+#
+# It exists because ruff resolves settings from the config nearest each file, and
+# the nearest one here is a Jinja *template* (pyproject.toml.jinja) that ruff
+# cannot parse. With no resolvable config, ruff silently falls back to its
+# built-in defaults — line-length 88, E+F rules — and reports template sources as
+# violations when they are correct under the settings the rendered project (and
+# its CI) actually uses. Keep these values in sync with the [tool.ruff] block in
+# pyproject.toml.jinja.
+line-length = 100
+target-version = "py312"
+
+[lint]
+select = ["E", "W", "F", "I", "N", "UP", "B", "C4", "SIM", "RUF"]
+# RUF001-003: typographic unicode in prose; N803/N806: ML naming (X, y, X_train)
+ignore = ["E501", "RUF001", "RUF002", "RUF003", "N803", "N806"]

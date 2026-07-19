@@ -27,7 +27,9 @@ def build_index(jsonl_path: Path, db_path: str) -> None:
             skipped += 1
             log.warning("skipping malformed JSONL line %d in %s: %s", lineno, jsonl_path, exc)
     if skipped:
-        log.warning("skipped %d malformed line(s) while building index from %s", skipped, jsonl_path)
+        log.warning(
+            "skipped %d malformed line(s) while building index from %s", skipped, jsonl_path
+        )
 
     with duckdb.connect(db_path) as con:
         con.execute("INSTALL fts")

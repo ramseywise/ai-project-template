@@ -6,27 +6,15 @@ on:
   pull_request:
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - run: uv sync --group dev
-      # Scoped to this project's own source — see Makefile's LINT_PATHS comment.
-      - run: uv run ruff check {{ source_root }} core {{ eval_root }} tests
-      - run: uv run ruff format --check {{ source_root }} core {{ eval_root }} tests
-
-  test:
-    runs-on: ubuntu-latest
-    env:
-      ANTHROPIC_API_KEY: "test-key-not-real"
-      LANGSMITH_TRACING: "false"
-      VECTORDB_PATH: ":memory:"
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - run: uv sync --group dev
-      - run: uv run pytest tests/unit -q
+  # Lint + test come from the shared reusable workflow in ai-project-template,
+  # so rendered projects and the standalone production repos stay on one
+  # definition. Lint paths are scoped to this project's own source — see the
+  # Makefile's LINT_PATHS comment.
+  ci:
+    uses: ramseywise/ai-project-template/.github/workflows/python-ci.yml@main
+    with:
+      lint-paths: "{{ source_root }} core {{ eval_root }} tests"
+      test-command: "uv run pytest tests/unit -q"
 {%- if has_corpus_pipeline or include_interaction_evals %}
 
   # Informational eval report on every PR — surfaces the numbers so reviewers
@@ -35,15 +23,17 @@ jobs:
   # the free heuristic layer only (no ANTHROPIC_API_KEY needed) — same graceful
   # degradation as the harness itself.
   eval-report:
-    needs: [test]
+    # `test` moved into the reusable workflow; the caller job `ci` is what
+    # this can depend on now.
+    needs: [ci]
     runs-on: ubuntu-latest
     env:
       ANTHROPIC_API_KEY: "test-key-not-real"
       LANGSMITH_TRACING: "false"
       VECTORDB_PATH: ":memory:"
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v5
       - run: uv sync --group dev
 {%- if has_corpus_pipeline %}
       # The retrieval grade reads the corpus index — build it first.
