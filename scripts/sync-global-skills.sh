@@ -15,38 +15,53 @@ DRY_RUN=0
 RESERVOIR="$HOME/.claude/skills"
 TEMPLATE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/template/.claude/skills"
 
+# Reservoir skill names. These MUST match ~/.claude/skills/ exactly — a name that
+# drifts out of the reservoir is a hard error below, not a warning (2026-07-19: 13
+# pre-rename names sat here unnoticed after the code-/design-/workflow-/git- rename,
+# so the template kept shipping stale copies while the renamed skills never synced).
+#
+# Deliberately NOT synced — template-owned, no global counterpart:
+#   execute-tasks, doc-to-linear-tickets  (TASKS.md / Linear, template-specific)
+# Retired: compact-session -> ~/.claude/rules/context-health.md
 SKILLS=(
-  quick-commit
-  quick-pr
-  review-pr
-  execute-tasks
-  scope-initiative
-  design-sprint
-  doc-to-linear-tickets
-  plan-review
-  research-review
-  execute-plan
+  git-commit
+  git-pr
+  code-pr
+  code-refactor
   code-review
   code-debug
-  compact-session
-  define-milestones
+  workflow-research
+  workflow-plan
+  workflow-execute
+  design-sprint
+  design-initiative
+  design-milestones
+  design-prototype
   github-projects
   mcp-builder
-  plan-refactor
-  prototype
   skill-creator
   sanyi
 )
+
+# Fail fast on any name that no longer exists in the reservoir. Skipping with a
+# warning lets a renamed skill rot in the template indefinitely — the warning
+# scrolls past, the exit code stays 0, and stale copies keep shipping.
+missing=()
+for skill in "${SKILLS[@]}"; do
+  [ -d "$RESERVOIR/$skill" ] || missing+=("$skill")
+done
+if [ ${#missing[@]} -gt 0 ]; then
+  echo "error: ${#missing[@]} skill(s) in SKILLS[] are not in the reservoir ($RESERVOIR):" >&2
+  printf '  %s\n' "${missing[@]}" >&2
+  echo "Renamed? Update SKILLS[] in this script. Retired? Remove it there and" >&2
+  echo "git rm the stale template/.claude/skills/ copy." >&2
+  exit 1
+fi
 
 changed=()
 for skill in "${SKILLS[@]}"; do
   src="$RESERVOIR/$skill"
   dst="$TEMPLATE_ROOT/$skill"
-
-  if [ ! -d "$src" ]; then
-    echo "warning: $skill missing from reservoir ($src) — skipping" >&2
-    continue
-  fi
 
   if ! diff -rq "$src" "$dst" >/dev/null 2>&1; then
     changed+=("$skill")

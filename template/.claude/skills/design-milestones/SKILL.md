@@ -1,5 +1,5 @@
 ---
-name: define-milestones
+name: design-milestones
 description: >
   Define the milestones inside a named initiative — the phase-level goalposts that break an
   initiative into verifiable checkpoints before task planning. Follows Linear's hierarchy:

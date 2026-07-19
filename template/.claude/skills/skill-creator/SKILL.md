@@ -56,7 +56,17 @@ Start by understanding the user's intent. The current conversation might already
 1. What should this skill enable Claude to do?
 2. When should this skill trigger? (what user phrases/contexts)
 3. What's the expected output format?
-4. Should we set up test cases to verify the skill works? Skills with objectively verifiable outputs (file transforms, data extraction, code generation, fixed workflow steps) benefit from test cases. Skills with subjective outputs (writing style, art) often don't need them. Suggest the appropriate default based on the skill type, but let the user decide.
+4. What eval depth does this skill warrant? Two tiers, and most skills only need the first:
+   - **Triggering eval (default for every skill)** — does the description fire on the right
+     prompts and stay quiet on near-misses? Cheapest, highest-ROI check, and mis-triggering
+     is the failure you actually hit. See "Description Optimization" below; it generates the
+     trigger eval set.
+   - **Behavioral eval (on-demand, judgment-shaped skills only)** — fixtures + graded
+     assertions + variance, the full loop in "Running and evaluating test cases." Worth it
+     for skills whose *output quality* is the risk and is subjective-but-assessable (audits,
+     reviews, plans, synthesis). Procedural skills with deterministic outputs (commit
+     messages, ticket sync, fixed workflow steps) get little from this — don't frontload it
+     onto them. Suggest the tier that fits the skill type; let the user opt up.
 
 ### Interview and Research
 
@@ -112,6 +122,16 @@ cloud-deploy/
     └── azure.md
 ```
 Claude reads only the relevant reference file.
+
+**Bundle vs. shared refs** — decide by scope, not convenience:
+- Reference specific to *invoking this skill correctly* → bundle it in `references/`. It
+  versions with the skill, can't drift from it, and travels when the skill moves.
+- Reference about a *stack or tool many skills touch* (Python idioms, ADK/Vercel-SDK
+  patterns, logging conventions) → do NOT copy it in. It lives once in `~/.claude/refs/`
+  and is pulled in on demand via the repo's `Refs:` line. Copying a stack ref into a
+  skill is how copies go stale — the same failure mode as duplicating a global skill.
+
+When in doubt: "would another skill want this exact file?" Yes → shared ref. No → bundle.
 
 #### Principle of Lack of Surprise
 

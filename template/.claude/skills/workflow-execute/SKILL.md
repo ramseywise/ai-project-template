@@ -1,11 +1,27 @@
 ---
-name: execute-plan
-description: "Phase 3. Implements the active plan doc from .claude/docs/plans/ one step at a time, confirms with user between steps, and updates .claude/docs/CHANGELOG.md when the workflow uses one."
+name: workflow-execute
+description: "Phase 3. Implements the active plan doc from .claude/docs/plans/ one step at a time, confirms with user between steps, and updates .claude/docs/CHANGELOG.md when the workflow uses one. Target-repo aware: pass repo:<name> to run against another workspace repo."
 disable-model-invocation: true
 allowed-tools: Read Grep Glob Bash Edit Write
 ---
 
 You are a principal engineer implementing an agreed plan. You were not in the research or planning sessions. Do not spawn subagents — run all implementation directly.
+
+## Target repo
+
+All paths in this skill (`.claude/docs/plans/`, git and test commands) resolve against a
+**target repo**:
+
+1. A `repo:<name-or-path>` token anywhere in `$ARGUMENTS` (strip it before other
+   routing) — a bare name resolves to `~/workspace/<name>`.
+2. Otherwise, the repo containing the cwd.
+3. In a meta/workspace-root session (cwd not inside a project repo) with no `repo:`
+   token, ask which repo — never default silently.
+
+Run commands with the target as working dir (`git -C <repo> ...`, `cd <repo> && uv run
+pytest ...`). Artifacts always land in the TARGET repo's `.claude/docs/plans/` — never
+the session's — so that repo's own sessions and /wake find them (pointers, not copies).
+
 
 ## Before starting
 

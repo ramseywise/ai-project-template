@@ -1,5 +1,5 @@
 ---
-name: prototype
+name: design-prototype
 description: Prototyping and exploration mode for quickly validating ideas, APIs, or technical approaches. Use when the user wants to prototype, explore, spike, or try something out before committing to a production implementation. Not for production code.
 ---
 

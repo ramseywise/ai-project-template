@@ -1,5 +1,5 @@
 ---
-name: quick-pr
+name: git-pr
 description: "All-in-one: stage, commit, push, open PR, resolve merge conflicts, and merge — single command end to end."
 disable-model-invocation: true
 allowed-tools: Read Grep Glob Bash Write

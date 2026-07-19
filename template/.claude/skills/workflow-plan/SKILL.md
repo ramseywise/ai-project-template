@@ -1,6 +1,6 @@
 ---
-name: plan-review
-description: "Phase 2. Review, iterate, and refine implementation plans. Reads the ## Research section of the active doc in .claude/docs/plans/ and appends the ## Plan section to it."
+name: workflow-plan
+description: "Phase 2. Review, iterate, and refine implementation plans. Reads the ## Research section of the active doc in .claude/docs/plans/ and appends the ## Plan section to it. Target-repo aware: pass repo:<name> to run against another workspace repo."
 disable-model-invocation: true
 allowed-tools: Read Grep Glob Bash Write
 ---
@@ -16,11 +16,27 @@ Parse `$ARGUMENTS`:
 
 Reserved words: `review`, `refine`. If no name provided, ask for one.
 
+## Target repo
+
+All paths in this skill (`.claude/docs/plans/`, git and test commands) resolve against a
+**target repo**:
+
+1. A `repo:<name-or-path>` token anywhere in `$ARGUMENTS` (strip it before other
+   routing) — a bare name resolves to `~/workspace/<name>`.
+2. Otherwise, the repo containing the cwd.
+3. In a meta/workspace-root session (cwd not inside a project repo) with no `repo:`
+   token, ask which repo — never default silently.
+
+Run commands with the target as working dir (`git -C <repo> ...`, `cd <repo> && uv run
+pytest ...`). Artifacts always land in the TARGET repo's `.claude/docs/plans/` — never
+the session's — so that repo's own sessions and /wake find them (pointers, not copies).
+
+
 The active doc is the `.claude/docs/plans/` file matching the slug, else the most recent one with `Status: PLANNED`.
 
 ## Start mode
 
-1. Read the active doc's `## Research` section. If no doc exists, create one: `.claude/docs/plans/$DATE-$SLUG.md` (`YYYY-MM-DD`; prefix slug with the issue id when a tracker issue exists) with a `Status: PLANNED` line. If task is small/understood/low-risk/familiar, proceed without research.
+1. Read the active doc's `## Research` section. If no doc exists, create one: `.claude/docs/plans/$DATE-$SLUG.md` (`YYYY-MM-DD`; prefix slug with `lin-<id>-` when a Linear issue exists) with a `Status: PLANNED` line. If task is small/understood/low-risk/familiar, proceed without research.
 2. Run `git status` and `uv run pytest --tb=no -q` for baseline.
 3. Read every file that will be touched before specifying changes.
 
@@ -43,6 +59,11 @@ Based on: [## Research above or "direct codebase inspection"]
 
 ### Goal
 One sentence.
+
+### Open Questions
+FIRST, not last (Ramsey preference, 2026-07-17): the decisions the reviewer must make,
+each with the plan's assumed default. A reader should know what's being asked of them
+before reading a single step. Resolved questions get their answer inline, dated.
 
 ### Approach
 One paragraph — chosen approach and key tradeoff.
@@ -78,4 +99,4 @@ Flag issues as **BLOCKER** / **QUESTION** / **NOTE**.
 If execute-ready: call `/compact "phase: plan → execute"` to snapshot and compact before implementing.
 The PreCompact hook writes a checkpoint to `~/.claude/sessions/` so the execute phase starts with clean context.
 
-**Next step**: `/plan-review review` to verify, then `/execute-plan` to implement.
+**Next step**: `/plan review` to verify, then `/execute` to implement.

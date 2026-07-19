@@ -1,9 +1,17 @@
 ---
-name: scope-initiative
+name: design-initiative
 description: "Take a named initiative and produce a Linear-ready technical backlog: failure modes, HMWs, research section, task backlog with acceptance criteria and t-shirt sizes, dependency mapping, and Linear hierarchy. Use when an initiative is named and agreed on."
 disable-model-invocation: true
 allowed-tools: Read Bash Grep Glob WebSearch Write
 ---
+
+## Target repo
+
+Same convention as the phase protocols (research/plan/execute/code-review): a
+`repo:<name-or-path>` token in `$ARGUMENTS` targets another workspace repo (bare name
+resolves to `~/workspace/<name>`); all repo-relative paths and git/test commands resolve
+against it, and artifacts land in the TARGET repo. No token → the cwd's repo; in a
+meta/workspace-root session, ask rather than defaulting.
 
 Scope the following initiative into a Linear-ready backlog: `$ARGUMENTS`
 

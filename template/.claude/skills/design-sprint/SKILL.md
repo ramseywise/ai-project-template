@@ -5,6 +5,14 @@ disable-model-invocation: true
 allowed-tools: Read Bash Grep Glob WebSearch Write
 ---
 
+## Target repo
+
+Same convention as the phase protocols (research/plan/execute/code-review): a
+`repo:<name-or-path>` token in `$ARGUMENTS` targets another workspace repo (bare name
+resolves to `~/workspace/<name>`); all repo-relative paths and git/test commands resolve
+against it, and artifacts land in the TARGET repo. No token → the cwd's repo; in a
+meta/workspace-root session, ask rather than defaulting.
+
 Run a full design sprint using IDEO / Stanford d.school HMW methodology for: `$ARGUMENTS`
 
 ## Inputs (ask if not provided)

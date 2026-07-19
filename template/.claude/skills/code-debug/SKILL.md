@@ -20,6 +20,6 @@ One change at a time. If you change three things and it works, you don't know wh
 
 ## Escalate when
 
-- Fix requires >3 files → suggest `/research-review` → `/plan-review` → `/execute-plan`
+- Fix requires >3 files → suggest `/research` → `/plan` → `/execute`
 - 3+ fixes failed → mental model is wrong; restart with fresh hypotheses
 - Cannot reproduce → say so and list next diagnostic steps

@@ -1,5 +1,5 @@
 ---
-name: review-pr
+name: code-pr
 description: Review an open pull request against project standards and task acceptance criteria. Use when the user asks to review a PR, or when execute-tasks creates a PR for a breaking change. Triggers like "review PR #42", "check the PR", or automatically after PR creation.
 model: sonnet
 ---
