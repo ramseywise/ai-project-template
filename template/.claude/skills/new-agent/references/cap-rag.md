@@ -8,7 +8,7 @@ Given a query, the system must retrieve ranked text passages with provenance (so
 
 | Runtime | Support | Notes |
 |---|---|---|
-| Claude API | ASSEMBLABLE | No first-party vector store; use own retriever as tool, MCP to vector DB, or Files API + `document` blocks. **Native citations** (`citations: {enabled: true}`) subsume the manual grounding/claim machinery — use them when available. Prompt caching on a stable corpus prefix cuts cost ~90% |
+| Claude API | ASSEMBLABLE | No first-party vector store; use own retriever as tool, MCP to vector DB, or Files API + `document` blocks. **Native citations** (`citations: {enabled: true}` on `document` source blocks, Claude 3.5+ models) subsume the manual grounding/claim machinery — use them when available; they return `cite_start`/`cite_end` offsets into passage text. **Prompt caching**: mark a stable corpus prefix with `cache_control: {type: "ephemeral"}` — cuts cost ~90% on the cached prefix (billed at ~10% of standard input rate after the first call). Cache TTL is ~5 min (prompt cache) or until the context changes. |
 | Google ADK | NATIVE | `VertexAiRagRetrieval` built-in tool against Vertex AI RAG Engine — the only runtime with a first-party managed ingest → chunk → embed → index → retrieve pipeline |
 | LangGraph | ASSEMBLABLE | No retrieval primitive; bring a LangChain retriever. The CRAG loop maps naturally to a cyclic graph with conditional edges |
 | Vercel AI SDK | ASSEMBLABLE | `embed`/`embedMany` for vectors; AI SDK 6 added reranking; retriever is a tool; no managed corpus |

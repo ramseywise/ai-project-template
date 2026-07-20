@@ -14,7 +14,7 @@ One agent must be able to address another as a peer, transmit a structured reque
 | LangGraph | ASSEMBLABLE | Subgraphs for in-process composition; cross-process peer A2A is hand-rolled or via LangGraph Platform assistant API |
 | Vercel AI SDK | ASSEMBLABLE | A2A 1.0 ecosystem protocol; Vercel integration (`json-renderer`, A2UI) is proof-of-concept stage |
 
-> **Security flag:** The original `_verify_secret()` had an auth-bypass bug — when credentials were absent it returned (allow) rather than rejecting. The current version correctly raises 401 on a missing header. Shared-secret-in-header is the minimum acceptable auth; prefer mTLS or OAuth for production cross-trust-boundary calls.
+> **Security fix (2026-07-20):** The original `_verify_secret()` had an auth-bypass: when `_SHARED_SECRET` was set but the request carried no header, the function returned (allowed) instead of rejecting. Fixed — missing header now raises 401 unconditionally when a secret is configured. Uses `secrets.compare_digest` (constant-time) to prevent timing attacks. Shared-secret-in-header is the minimum acceptable auth; prefer mTLS or OAuth 2.0 for production cross-trust-boundary calls.
 
 ## File: {OUTPUT_DIR}/a2a_client.py
 

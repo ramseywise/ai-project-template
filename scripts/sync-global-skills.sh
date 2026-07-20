@@ -49,6 +49,7 @@ AGENTS=(
 RULES_RESERVOIR="$HOME/.claude/rules"
 RULES_TEMPLATE_ROOT="$REPO_ROOT/template/.claude/rules"
 RULES=(
+  agile.md           # workflow states, DoR/DoD, cadence, ceremony mapping
   context-health.md  # compact proactively — always-on cost guard
   docs.md            # doc-writer boundary (machine- vs human-consumed)
   naming.md          # role-based directory/layer convention
@@ -97,6 +98,7 @@ SKILLS=(
   workflow-plan     # phase 2 — plan doc
   workflow-execute  # phase 3 — execute a plan phase
   workflow-review   # phase 4 — plan fidelity check
+  workflow-refine   # batch refinement — backlog → trio triage → DoR gate → ready
   workflow-insights # usage analytics
   workflow-retro    # tooling retrospective + config audit
 

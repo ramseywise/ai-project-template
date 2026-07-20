@@ -1,5 +1,26 @@
 # cap-langchain — Templates for langchain-builder subagent
 
+**Tier: T3 — Runtime-independent (and a modeling anomaly).** LangChain LCEL is a competing composition framework, not a capability an agent has. It is sometimes a capability (LCEL chains inside a LangGraph node or ADK tool handler) and sometimes the framework itself (standalone chain agent) — that overload is a known modeling error in this taxonomy. The file is 100% `langchain_core.*` imports; in a multi-runtime reference its contents become cross-cutting concerns with a per-runtime mapping table, not a standalone capability.
+
+## Agnostic contract
+
+*(none — this is a composition framework, not a capability)*
+
+For cross-runtime equivalents of LCEL concerns:
+
+| LCEL concern | Claude API | Google ADK | Vercel AI SDK |
+|---|---|---|---|
+| Structured output | `output_config.format` + `messages.parse()` (Pydantic) / `strict: true` tools | `output_schema=` on `Agent` | `generateObject` / `streamObject` (Zod) |
+| Prompt template | plain strings + `system` (cache stable prefix) | `static_instruction` / `instruction` callable | template literals |
+| Memory / history | stateless `messages[]`; Agent SDK `resume`; CMA sessions | session `state` | `useChat` message state |
+| Conditional routing | application code / `tool_choice` | `sub_agents` delegation | application code |
+| Parallel branches | parallel tool use (all results in one user message) | parallel tools | `Promise.all` |
+| Token accounting | `response.usage` (+ `cache_read_input_tokens`) | event usage | `result.usage` |
+
+> **Deprecation notice (2026-07-20):** LangChain's public roadmap signals that LCEL's `RunnableParallel`, `RunnableBranch`, and `RunnableWithMessageHistory` are considered "legacy composition patterns" in favor of LangGraph for stateful agents and native SDK patterns for stateless chains. The `langchain_core.*` primitives remain stable, but the composition layer (`langchain.chains.*`) is in maintenance mode. Check the installed `langchain-core` version before using any `langchain.chains.combine_documents` or `langchain.chains.retrieval` imports — these moved between minor versions. Prefer `agent-architecture.md §1` (native agent loop) or `langgraph.md` for new production agents.
+>
+> **Usage note:** Use this file when the agent explicitly targets LangChain/LCEL — either as a standalone chain agent (`--framework` not specified) or composing LCEL chains inside LangGraph nodes / ADK tool handlers. Do not use it as a general-purpose composition reference for other runtimes.
+
 LangChain LCEL composition patterns: chains, output parsers, retrieval chains,
 structured output, memory, streaming, and parallel/conditional runnable routing.
 Use when the agent needs composable chain logic without a full LangGraph state machine.

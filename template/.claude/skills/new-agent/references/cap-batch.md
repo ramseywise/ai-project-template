@@ -13,7 +13,22 @@ A dataset of independent inputs must be processable through the agent with bound
 | LangGraph | ASSEMBLABLE | `graph.abatch()` / `RunnableConfig(max_concurrency=N)`; durability via checkpointer |
 | Vercel AI SDK | ASSEMBLABLE | No batch primitive; `Promise.all` with concurrency limiter, or Workflow SDK for durable fan-out |
 
-> **Spec note:** The `BatchRunner` here implements the client-side semaphore pattern with incremental append (`write_result` appends per item, not at end) and resume (`completed_ids()` skips already-written items on restart). This is the correct fallback pattern. For Claude, prefer the Message Batches API route — it halves cost and moves durability to the provider.
+> **Spec note:** The `BatchRunner` here implements the client-side semaphore pattern with incremental append (`write_result` appends per item, not at end) and resume (`completed_ids()` skips already-written items on restart). This is the correct fallback pattern for any runtime. For Claude, **prefer the Message Batches API route**: 50% cost, up to 100k requests / 256 MB per batch, most complete within 1 hour. Minimal scaffold:
+> ```python
+> import anthropic
+> client = anthropic.Anthropic()
+> batch = client.messages.batches.create(
+>     requests=[
+>         {"custom_id": item["id"], "params": {"model": "claude-sonnet-4-5", "max_tokens": 1024, "messages": [{"role": "user", "content": item["query"]}]}}
+>         for item in items
+>     ]
+> )
+> # Poll until batch.processing_status == "ended"
+> for result in client.messages.batches.results(batch.id):
+>     # result.custom_id maps back to item["id"] — results arrive in any order
+>     process(result.custom_id, result.result)
+> ```
+> Combines with prompt caching on a shared system prefix. Do not use for latency-sensitive workloads (batch API adds ~1h latency by design).
 
 ## File: {OUTPUT_DIR}/batch_runner.py
 

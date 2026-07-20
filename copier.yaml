@@ -1143,6 +1143,7 @@ _tasks:
     _copier_conf.dst_path ~ '/.claude/skills/workflow-execute ' ~
     _copier_conf.dst_path ~ '/.claude/skills/workflow-review ' ~
     _copier_conf.dst_path ~ '/.claude/skills/workflow-insights ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/workflow-refine ' ~
     _copier_conf.dst_path ~ '/.claude/skills/workflow-retro ' ~
     _copier_conf.dst_path ~ '/.claude/skills/design-sprint ' ~
     _copier_conf.dst_path ~ '/.claude/skills/design-initiative ' ~

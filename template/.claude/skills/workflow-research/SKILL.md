@@ -1,6 +1,6 @@
 ---
 name: workflow-research
-description: "Phase 1. Review, iterate, and deepen research artifacts. Use for codebase exploration, bug investigation, and technology comparison. Writes the ## Research section of .claude/docs/plans/YYYY-MM-DD-<slug>.md. Target-repo aware: pass repo:<name> to run against another workspace repo. Pass 'fan-out' for parallel multi-agent breadth-first investigation."
+description: "Phase 1. Review, iterate, and deepen research artifacts. Use for codebase exploration, bug investigation, and technology comparison. Writes the ## Research section of .claude/docs/plans/YYYY-MM-DD-<slug>.md. Target-repo aware: pass repo:<name> to run against another workspace repo. Pass 'fan-out' for parallel multi-agent breadth-first investigation. Aliases: /research, /reserach."
 disable-model-invocation: true
 allowed-tools: Read Bash Grep Glob WebSearch Write
 ---

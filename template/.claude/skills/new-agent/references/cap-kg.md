@@ -1,5 +1,17 @@
 # cap-kg — Templates for knowledge-graph-builder subagent
 
+**Tier: T3 — Runtime-independent.** This is a host-language/library capability, not framework-dependent. Neo4j/Neptune access is a database client; no agent runtime has or should have a graph-store primitive. The capability surfaces to the agent as a tool (§4 genai) and its output as passages (§5 rag).
+
+## Agnostic contract
+
+Entities and typed directed relations must be persistable to and queryable from a graph store, with multi-hop traversal from a seed entity, and graph results must be projectable into the same passage shape the RAG path consumes so that downstream grounding treats graph-derived and document-derived context identically. The **`kg://` pseudo-URL scheme** (`kg://{entity_type}/{entity_id}`) is the key portable idea — it lets graph context flow through the same citation/grounding checks as web sources. The `graph_to_passages()` function is the agent-relevant seam between the KG and the RAG path.
+
+> **Security note on Cypher injection:** `upsert_entity()` builds its `SET` clause via `safe_identifier()` validation of property names — labels, relationship types, and property names cannot be parameterized in Cypher and must be validated against an allowlist pattern (`[A-Za-z_][A-Za-z0-9_]*`). This is now handled by `graph_schema.safe_identifier()`. Do not loosen this guard.
+>
+> **Neptune bug:** `_neptune_query()` passes `parameters=str(params)` (Python `repr`, not JSON) to `execute_open_cypher_query` — this will not parse correctly. Fix: pass `parameters=json.dumps(params)`.
+>
+> **Score bug in `graph_to_passages()`:** Relevance score is computed as `min(1.0, norm/10.0)` from the embedding L2 norm. For normalized embeddings the norm is always 1.0, so every entity gets score 0.1 regardless of actual relevance. Replace with a fixed default (e.g. `0.75`) or a genuine similarity score if available.
+
 ## File: {OUTPUT_DIR}/kg_client.py
 
 ```python
@@ -104,10 +116,11 @@ class KGClient:
 
     def _neptune_query(self, cypher: str, params: dict) -> list[dict]:
         """Neptune openCypher query via REST."""
+        import json as _json  # noqa: PLC0415
         try:
             response = self._driver.execute_open_cypher_query(
                 openCypherQuery=cypher,
-                parameters=str(params),
+                parameters=_json.dumps(params),  # Fixed: was str(params) (Python repr, not JSON)
             )
             return response.get("results", [])
         except Exception as exc:  # noqa: BLE001
@@ -185,7 +198,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-import numpy as np
 from pydantic import BaseModel, Field
 
 # Cypher cannot parameterize labels, relationship types, or property names —
@@ -289,12 +301,10 @@ def graph_to_passages(entities: list[Entity]) -> list[dict[str, Any]]:
         # Use entity ID as a pseudo-URL so grounding checks can track provenance
         url = f"kg://{entity.type.lower()}/{entity.id}"
 
-        # Compute score from embedding norm as a rough confidence proxy
-        score = 0.75  # default
-        if entity.embedding:
-            arr = np.array(entity.embedding)
-            norm = float(np.linalg.norm(arr))
-            score = min(1.0, norm / 10.0) if norm > 0 else 0.5
+        # Fixed: original `min(1.0, norm/10.0)` always yielded 0.1 for unit-normalized
+        # embeddings (norm=1.0 → score=0.1). Use a fixed default unless a genuine
+        # similarity score is available from the retrieval step.
+        score = 0.75  # default confidence; override with cosine-similarity if available
 
         passages.append(
             {

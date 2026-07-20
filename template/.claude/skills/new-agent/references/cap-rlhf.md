@@ -1,5 +1,13 @@
 # cap-rlhf — Templates for rlhf-builder subagent
 
+**Tier: T3 — Runtime-independent.** This is a host-language/library capability, not framework-dependent. Anthropic offers no open-weights RLHF surface. The `RewardTrainer` and `PPOFinetuner` target HuggingFace `trl` against open models — orthogonal to the Claude runtime. The `PreferenceCollector` is runtime-agnostic and genuinely useful for any runtime.
+
+## Agnostic contract
+
+Pairwise human preferences over agent outputs must be collected with annotator attribution and timestamps (runtime-agnostic `PreferenceCollector`), stored as a JSONL record keyed by a stable `pair_id`. The reward-model and policy-update halves (`RewardTrainer`, `PPOFinetuner`) apply only when fine-tuning open-weights models. For Claude-hosted agents, the preference-collection half is still useful — the `{pair_id, query, chosen, rejected, annotator_id, timestamp}` JSONL store feeds LLM-judge evals and prompt iteration regardless of whether any weights are ever updated. For TypeScript-hosted agents, the preference collector is portable (plain file I/O); the reward-training components require a Python + GPU sidecar.
+
+> **Version-brittleness flag (UNVERIFIED — must verify before use):** `PPOFinetuner.train_episode()` calls `self._trainer.step(query_tensors, response_tensors, rewards)` and reads `stats["ppo/loss/total"]` — TRL's PPO API changed significantly across versions. In TRL 0.8+, `PPOTrainer.step()` was replaced by `PPOv2Trainer` with a different interface; the stat key `ppo/loss/total` may not exist. **Pin `trl>=0.9` in `pyproject.toml` and verify this signature against the installed version before shipping `ppo_trainer.py`.** Consider using TRL's `DPOTrainer` (more stable API) instead of PPO for reward-model-based fine-tuning unless you specifically need online RL.
+
 ## File: {OUTPUT_DIR}/rlhf/preference_collector.py
 
 ```python

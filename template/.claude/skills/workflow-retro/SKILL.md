@@ -96,6 +96,7 @@ Per finding, emit exactly this shape:
 
 ```markdown
 ### F<N>: <one-line friction statement>
+- Tag: stop | keep | improve
 - Friction observed: <what kept happening>
 - Evidence: <session/file refs — at least one concrete pointer>
 - Proposed diff: <actual diff or precise edit, ready to apply>
@@ -103,6 +104,11 @@ Per finding, emit exactly this shape:
 - Enforcement level: hook | skill/protocol | CLAUDE.md/rules | MEMORY.md
 - Metric: <type>:<signal> <threshold> (see ledger Experiment Tracking section for types)
 ```
+
+**Tagging rules** (from `~/.claude/rules/agile.md`):
+- **stop** — actively costing us; mechanical fix or delete → `ready` issue if scoped, `backlog` otherwise
+- **keep** — verified working; no issue → ledger row graduates to `verified`
+- **improve** — needs design/research before actionable → `backlog` issue or `inbox.md` line
 
 **Write targets by enforcement strength** (decided, don't relitigate):
 hooks > skills/protocols > CLAUDE.md/rules > MEMORY.md. Pick the strongest level that
@@ -155,3 +161,47 @@ After applying, add the ledger rows (status `hypothesis`, with the verification 
 every finding that landed. Report per finding: applied | skipped-draft | skipped-declined |
 re-proposed (drift), with the file touched. Ramsey commits — this loop never commits or
 pushes.
+
+## Step 6 — Write findings to the board (after approval)
+
+For each approved finding, write it to its destination based on the Tag:
+
+### stop / improve → GitHub Issue
+```bash
+cd ~/workspace/guacamayo && gh issue create \
+  --title "F<N>: <one-line friction>" \
+  --label "<label>" \
+  --body "<problem + evidence + metric>"
+```
+
+Label mapping:
+- **stop** (scoped, mechanical) → `ready`
+- **stop** (needs design) → `backlog`
+- **improve** → `backlog`
+
+Issue body format:
+```markdown
+## Problem
+<Friction observed — one sentence>
+
+## Evidence
+<Session/file refs>
+
+## Proposed fix
+<Proposed diff from the finding, or "needs research">
+
+## Metric
+<type>:<signal> <threshold>
+
+## Source
+<date> /workflow-retro F<N>
+```
+
+### keep → ledger only
+No issue. Graduate the ledger row: `hypothesis → verified (evidence)`.
+
+### Unscoped ideas → inbox
+If a finding is too vague for an issue (no clear problem statement), append one line to
+`~/workspace/guacamayo/.claude/docs/state/inbox.md` instead of creating an issue.
+
+Report the issue URLs created so Ramsey can verify.

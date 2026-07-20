@@ -1,5 +1,13 @@
 # cap-forecast — Templates for forecast-builder subagent
 
+**Tier: T3 — Runtime-independent.** This is a host-language/library capability, not framework-dependent. All runtimes are N/A for the forecasting itself; the model surfaces to the agent as a tool (§4 genai) whose output is injected into context.
+
+## Agnostic contract
+
+Historical time-indexed observations must be transformable into a supervised feature matrix without target leakage, fit to an estimator, used to emit point predictions with calibrated intervals, evaluated against a held-out split, and serialized for later reuse. Features must be constructed exclusively from data available at the prediction time (no leakage from lags or rolling windows that overlap the target date). For TypeScript-hosted agents, this capability requires a Python sidecar service — pandas, scikit-learn, statsforecast, and SHAP have no viable TypeScript equivalents.
+
+> **Spec note:** The design notes below (interval clamping, `math` import guard for the naïve fallback) are genuinely important failure-mode documentation — preserve them. `ForecastPipeline` pickles the sklearn pipeline; unpickling is version-sensitive across sklearn releases — document the sklearn version alongside any saved model file.
+
 ## Design notes
 
 ### Interval validator clamping

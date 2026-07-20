@@ -16,13 +16,13 @@ templates; framework/scaffold docs are workflow guides.
 ## Usage
 
 ```
-/new-agent <name> [--framework adk|langgraph|vercel_ai_sdk] [--domain <string>] [--output path/to/dir]
+/new-agent <name> [--framework adk|langgraph] [--domain <string>] [--output path/to/dir]
 ```
 
 | Arg | Default | Description |
 |-----|---------|-------------|
 | `<name>` | required | snake_case agent name, e.g. `order_support`, `insights_agent` |
-| `--framework` | ask via `framework-selection` | `adk`, `langgraph`, or `vercel_ai_sdk` |
+| `--framework` | ask via `framework-selection` | `adk` or `langgraph` |
 | `--domain` | `general` | Free-form label injected into prompts/README |
 | `--output` | framework default (see below) | Override the output directory |
 
@@ -59,11 +59,6 @@ mentioned) and confirm before proceeding. Do not silently default.
    `references/langgraph-persistence.md`.
 4. If the spec calls for approval/pause-for-input steps, also read
    `references/langgraph-human-in-the-loop.md`.
-
-**If framework == `vercel_ai_sdk`:**
-1. Read `.agents/skills/vercel-ai-sdk-scaffold/SKILL.md` and follow it exactly — it drives
-   requirement-gathering, `DESIGN_SPEC.md`, and the file scaffold.
-2. Follow the Critical Rules in that skill before writing any agent code.
 
 ### Step 4 — Apply capability templates
 

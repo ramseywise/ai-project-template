@@ -1,5 +1,13 @@
 # cap-cluster — Templates for cluster-builder subagent
 
+**Tier: T3 — Runtime-independent.** This is a host-language/library capability, not framework-dependent. All runtimes are N/A for the clustering itself; the only agent-shaped part is `label_clusters()` — an LLM call per cluster, which is capability §4 (genai/tool) applied to ML output.
+
+## Agnostic contract
+
+Text or numeric records must be embeddable into a vector space, partitioned into groups by an algorithm that either discovers or is told k, scored for separation quality, and each partition assigned a human-readable label — with an explicit degenerate-case path when no partition is found. The degenerate case (all-noise HDBSCAN output) must be handled by producing a fallback `"Unclustered"` partition rather than an empty result. For TypeScript-hosted agents, this capability requires a Python sidecar service — scikit-learn, HDBSCAN, UMAP, and NumPy have no viable TypeScript equivalents.
+
+> **Spec note:** `embed_texts()` calls Bedrock Titan directly via `boto3` (`_DEFAULT_EMBED_DIM = 1024`). Refactor: put an `EmbeddingProvider` interface in front (Bedrock / Vertex / Voyage / OpenAI). The design notes below (all-noise fallback, strategy-field discipline, UMAP guard, math helper deduplication) are the highest-value content in this file — preserve them. References to LangGraph-specific concepts (`embedder_node`, `labeler_node`, `SegmentationStrategy`) in the design notes should be read as "the embedding step" / "the labeling step" in any runtime.
+
 ## Design notes
 
 ### All-noise HDBSCAN fallback

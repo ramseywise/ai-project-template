@@ -1,5 +1,13 @@
 # cap-finetune — Templates for finetune-builder subagent
 
+**Tier: T3 — Runtime-independent.** This is a host-language/library capability, not framework-dependent. Anthropic offers no open-weights fine-tuning surface — this spec targets HuggingFace `transformers`/`peft` against open models (`google/gemma-2b-it`), which is orthogonal to the Claude runtime entirely.
+
+## Agnostic contract
+
+Evaluation examples must be convertible to an instruction-tuning format (instruction / input / output triples), split reproducibly, used to adapt a base model's weights (full or parameter-efficient via LoRA), evaluated against a held-out split, and published with provenance metadata linking the artifact to the prompt version it was trained against. For Claude-hosted agents, the functional equivalents are: prompt engineering + few-shot examples + prompt caching on a large stable exemplar prefix, and the eval harness in `eval.md`. For TypeScript-hosted agents, this capability requires a Python sidecar service — `torch`, `transformers`, and `peft` have no TypeScript equivalents.
+
+> **Known bug — bf16 / dtype mismatch:** `trainer.py` hardcodes `bf16=True` in `TrainingArguments` while computing `dtype` conditionally on `torch.cuda.is_available()`. These disagree on CPU-only machines and will fail at training time. Fix: set `bf16=torch.cuda.is_available()`.
+
 ## File: {OUTPUT_DIR}/finetune/dataset.py
 
 ```python
