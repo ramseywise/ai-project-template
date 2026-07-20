@@ -1,6 +1,8 @@
 ---
 name: design-prototype
-description: Prototyping and exploration mode for quickly validating ideas, APIs, or technical approaches. Use when the user wants to prototype, explore, spike, or try something out before committing to a production implementation. Not for production code.
+description: "Designer role — spike/explore before committing. Use when the question is feasibility, not implementation: 'does this work?'. Fast validation mode: state the question, write minimum code, observe, decide (adopt/adapt/discard). Triggers on: 'prototype this', 'spike on X', 'try this approach', 'explore this API', 'validate this idea', 'feasibility check'."
+disable-model-invocation: true
+allowed-tools: Read Bash Grep Glob Write WebSearch WebFetch
 ---
 
 Prototype or explore $ARGUMENTS. Apply all rules below strictly.

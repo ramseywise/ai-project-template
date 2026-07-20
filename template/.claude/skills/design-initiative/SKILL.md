@@ -1,6 +1,6 @@
 ---
 name: design-initiative
-description: "Take a named initiative and produce a Linear-ready technical backlog: failure modes, HMWs, research section, task backlog with acceptance criteria and t-shirt sizes, dependency mapping, and Linear hierarchy. Use when an initiative is named and agreed on. Aliases: /initiative, /design-inistiative."
+description: "PM + EM role — initiative → task backlog. Use when an initiative is named and agreed: 'break this down into tickets'. Produces: failure modes, HMWs, task backlog (t-shirt sized, acceptance criteria), dependency map, Linear hierarchy. Triggers on: 'scope this initiative', 'break this down into tasks', 'generate a backlog for X', 'what are the tickets for X', 'initiative backlog'. Aliases: /initiative, /scope-initiative."
 disable-model-invocation: true
 allowed-tools: Read Bash Grep Glob WebSearch Write
 ---

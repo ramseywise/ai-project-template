@@ -1,11 +1,6 @@
 ---
 name: design-milestones
-description: >
-  Define the milestones inside a named initiative — the phase-level goalposts that break an
-  initiative into verifiable checkpoints before task planning. Follows Linear's hierarchy:
-  Initiative → Project → Milestone → Issue. Use when an initiative is agreed and needs its
-  "done looks like" checkpoints. Triggers on: "define milestones", "break down this initiative",
-  "what are the phases", "milestone plan for X", "what ships first in X", "release planning".
+description: "EM role — initiative → verifiable checkpoints. Use when an initiative is agreed and needs phase-level goalposts before task breakdown. Produces milestone docs with done-conditions (verifiable states, not activity). Triggers on: 'define milestones', 'break down this initiative', 'what are the phases', 'milestone plan for X', 'what ships first in X', 'release planning'."
 ---
 
 ## Target repo

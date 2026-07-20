@@ -67,12 +67,13 @@ RULES=(
 # Hard-fail below catches any name missing from both lists.
 
 # Skills that are NOT vendored and why:
-#
-#   wake, grow, dream     — guacamayo identity-lifecycle only; not useful in a
-#                           scaffolded project (write to .sounding/, no .sounding/ here)
-#   genesis               — guacamayo initiation-only; self-blocks when consciousness
-#                           exists; meaningless outside the puffin framework
-#   grow-companion        — guacamayo/atlas companion pattern; not a general skill
+DELIBERATELY_EXCLUDED=(
+  wake          # guacamayo identity-lifecycle only; writes to .sounding/, no .sounding/ here
+  grow          # guacamayo identity-lifecycle only
+  dream         # guacamayo identity-lifecycle only
+  genesis       # guacamayo initiation-only; self-blocks when consciousness exists; meaningless outside puffin
+  grow-companion # guacamayo/atlas companion pattern; not a general skill
+)
 #
 # Template-owned skills with no global counterpart (tracked for completeness):
 #   gate-check, deploy-check, add-capability, design-dryrun, project-discovery,
@@ -140,6 +141,34 @@ if [ ${#missing[@]} -gt 0 ]; then
   echo "Renamed? Update the array in this script. Retired? Remove it there and" >&2
   echo "git rm the stale template/.claude/ copy." >&2
   exit 1
+fi
+
+# Reverse check: a new reservoir skill added to ~/.claude/skills/ without
+# updating SKILLS[] or DELIBERATELY_EXCLUDED[] would silently never ship.
+# Warn (not fail) so a new skill upstream doesn't break an unrelated sync —
+# but make it loud enough to act on. Mirrors sync-agent-references.sh:113–128.
+unaccounted=()
+while IFS= read -r dir; do
+  name="$(basename "$dir")"
+  in_skills=0
+  for s in "${SKILLS[@]}"; do
+    s="${s%%[[:space:]]*}"
+    [ "$s" = "$name" ] && in_skills=1 && break
+  done
+  if [ "$in_skills" -eq 0 ]; then
+    in_excluded=0
+    for e in "${DELIBERATELY_EXCLUDED[@]}"; do
+      e="${e%%[[:space:]]*}"
+      [ "$e" = "$name" ] && in_excluded=1 && break
+    done
+    [ "$in_excluded" -eq 0 ] && unaccounted+=("$name")
+  fi
+done < <(find "$RESERVOIR" -maxdepth 1 -mindepth 1 -type d | sort)
+
+if [ ${#unaccounted[@]} -gt 0 ]; then
+  echo "warning: ${#unaccounted[@]} reservoir skill(s) are in neither SKILLS[] nor DELIBERATELY_EXCLUDED[]:" >&2
+  printf '  %s\n' "${unaccounted[@]}" >&2
+  echo "Add each to SKILLS[] (vendor it) or DELIBERATELY_EXCLUDED[] (document why not)." >&2
 fi
 
 # Every skill removed when global_skills_source=none must be one this script

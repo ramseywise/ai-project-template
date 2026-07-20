@@ -63,6 +63,14 @@ Read what exists; skip gracefully what doesn't. Note which sources you actually 
    recent session JSONL under `~/.claude/projects/<project-slug>/`. Look for: repeated
    permission prompts for the same command shape, the same manual fix applied in multiple
    sessions, hook blocks that the user then overrode, tool errors retried verbatim.
+
+   Read the `## Failure Attribution` section. Use category weights when triaging findings:
+   - `env` errors → infrastructure/config findings, not code or spec findings
+   - `tool` errors → hook or MCP config findings
+   - `code` errors → skill/hook/workflow findings (note: retry-unknown — may include transients)
+   - `unknown` → flag as a taxonomy gap (lookup table needs expansion)
+   Never attribute an `env` error to a code or spec cause. Do not generate findings
+   from `unknown` — surface the gap count instead.
 2. **Growth-entry graduation**: `guacamayo/.sounding/growth.md` — entries tagged
    `[discovered]` that are *process* learnings (about workflow/tooling, not identity).
    These die in the accumulator unless promoted. Flag each as a graduation candidate with

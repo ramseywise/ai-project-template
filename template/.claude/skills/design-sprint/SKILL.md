@@ -1,6 +1,6 @@
 ---
 name: design-sprint
-description: "Run a full design sprint for any use case — deconstruct problems and pain points, generate HMW statements, define technical solutions, cluster into workstreams, map dependencies, and produce an initiative backlog. Use when starting a new product, feature, or platform initiative from scratch."
+description: "PM role — blank-page problem framing. Use when starting a feature or initiative from scratch: 'what should we build and why?'. Runs IDEO/HMW methodology: deconstruct problems → HMW statements → technical solutions → workstream clusters → initiative backlog. Triggers on: 'start a new feature', 'run a design sprint', 'define what to build for X', 'generate HMW statements', 'blank-page initiative'."
 disable-model-invocation: true
 allowed-tools: Read Bash Grep Glob WebSearch Write
 ---

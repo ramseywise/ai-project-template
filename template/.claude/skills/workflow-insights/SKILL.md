@@ -102,6 +102,40 @@ The engine is `librarian/tools/cartographer/parser.py` (canonical since 2026-07-
    - read:edit ratio (sessions editing without reading first)
    - Long sessions without planning structure
 
+   **Failure attribution** — classify each error event using this lookup table.
+   The parser emits `tool_errors` as counts by error name with no retry-sequence data,
+   so `transient` vs `code` cannot be distinguished at the signal level; merge them
+   into `code (retry unknown)` for v1 and note the limitation.
+
+   | Signal combination | Category | Code |
+   |--------------------|----------|------|
+   | Hook block (`user_rejected` error on any tool) | tool | `tool` |
+   | `permission_denied` + not a hook block | env | `env` |
+   | `command_failed` | code | `code` (retry unknown — parser carries no retry sequence) |
+   | `file_not_found` | code | `code` (retry unknown) |
+   | `file_too_large` | env | `env` |
+   | `edit_failed` | code | `code` |
+   | Quota / rate-limit message in error text | env | `env` |
+   | `other` | unknown | `unknown` |
+
+   Note: `spec` errors (correct execution, wrong outcome) are deferred to v2 — they
+   require session-level success detection not yet present in the parser output.
+
+   Unclassified errors (no signal combination matches) → report as `unknown`; do not
+   force-fit. A high `unknown` rate means the lookup table needs expansion.
+
+   Emit a table:
+   | Category | Count | % of errors | Example |
+   |----------|-------|-------------|---------|
+   | code     | N     | N%          | [error name] in [tool] |
+   | env      | N     | N%          | ... |
+   | tool     | N     | N%          | ... |
+   | unknown  | N     | N%          | ... |
+
+   Then: 1-2 sentence remediation note per non-zero category (skip `unknown` — flag it
+   instead as a taxonomy gap). `env` errors → infrastructure/config action; `tool` errors
+   → hook or MCP config action; `code` errors → skill/hook/workflow action.
+
 10. **Experiment check** — read `~/workspace/guacamayo/.claude/docs/tooling-ledger.md` and
     find rows with status `hypothesis` that have a typed Metric (not `—`). For each, check
     the session data against the metric:
@@ -152,6 +186,11 @@ The engine is `librarian/tools/cartographer/parser.py` (canonical since 2026-07-
 
     ## Experiment Verdicts
     [the experiment table from step 10]
+
+    ## Failure Attribution
+    [category table from Step 9 — counts, %, top example per category]
+    [remediation notes per non-zero non-unknown category]
+    [flag: transient vs code indistinguishable until parser emits retry sequences]
 
     ## Recommendations
     [the ranked recommendations from step 11]
