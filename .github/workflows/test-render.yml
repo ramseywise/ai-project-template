@@ -163,7 +163,7 @@ jobs:
         env:
           ACTIONS_EXPR: '[$]{{'
         run: |
-          if grep -rn '{{' out/ --exclude-dir='.agents' --include='*.py' --include='*.md' --include='*.toml' --include='*.yaml' --include='*.yml' | grep -v "font-family\|border-collapse\|padding: 0.4rem\|background: #f2f2f2\|margin-bottom\|font-weight: bold\|{{prompt}}\|{{question}}\|$ACTIONS_EXPR"; then
+          if grep -rn '{{' out/ --exclude-dir='.agents' --include='*.py' --include='*.md' --include='*.toml' --include='*.yaml' --include='*.yml' | grep -v "font-family\|border-collapse\|padding: 0.4rem\|background: #f2f2f2\|margin-bottom\|font-weight: bold\|{{prompt}}\|{{question}}\|{{ }}\|$ACTIONS_EXPR"; then
             echo "Leftover unrendered Jinja found"
             exit 1
           fi
