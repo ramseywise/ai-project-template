@@ -217,6 +217,13 @@
       "Write(.claude/**)",
       "Bash(uv run *)",
       "Bash(make *)"
+      {% if agent_config_profile == "independent" %},
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(node *)",
+      "Bash(python *)",
+      "Bash(python3 *)"
+      {% endif %}
     ],
     "deny": [
       "Read(.env)",
@@ -229,6 +236,12 @@
       "Write(.env)",
       "Write(.env.*)",
       "Write(production.*)"
+      {% if agent_config_profile == "guarded" %},
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Bash(ssh *)",
+      "Bash(scp *)"
+      {% endif %}
     ]
   },
 

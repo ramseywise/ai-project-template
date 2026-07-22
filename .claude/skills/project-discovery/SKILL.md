@@ -1,5 +1,5 @@
 ---
-name: project_discovery
+name: project-discovery
 description: >
   Guided discovery conversation for new AI project ideas — meets volunteers where
   they are ("what pain does this nonprofit have?") and produces a lightweight Project

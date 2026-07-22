@@ -6,7 +6,7 @@
 
 ```
 {{ project_slug }}/
-├── {{ source_root }}/              Application source
+├── {{ py_project_root }}/{{ ai_source_root }}/              Application source
 ├── tests/                          Unit, smoke, and integration tests
 {%- if enable_structure_guard %}
 ├── {{ eval_root }}/                 Eval suite ({{ eval_allowed_dirs }})
@@ -50,7 +50,7 @@ Folder-level refs live in nested CLAUDE.md stubs (auto-load on file access):
      directory allowlists. These are enforced by hooks in .claude/hooks/ where automatable —
      document the ones that can't be — see .claude/hooks/ for the current hook-enforced set. -->
 
-1. Tests live at root `tests/`, not inside `{{ source_root }}/`.
+1. Tests live at root `tests/`, not inside `{{ py_project_root }}/{{ ai_source_root }}/`.
 2. `.claude/docs/plans/` and `.claude/docs/reviews/` are scratch/local workspace — never commit them. Promote durable findings into project docs instead.
 {%- if enable_structure_guard %}
 3. Never add top-level directories to `{{ eval_root }}/` beyond: {{ eval_allowed_dirs }}. All new eval code fits in one of these.
@@ -69,7 +69,7 @@ Folder-level refs live in nested CLAUDE.md stubs (auto-load on file access):
 
 ## Hook-Enforced Standards
 
-**PostToolUse (Write|Edit):** ruff format + check, no `print()` in {{ source_root }}/, no bare `except`, no mutable default arguments, no hardcoded model strings, no bare LLM/tracing-client instantiation outside factory files, secrets scan, file size warning >400 lines.
+**PostToolUse (Write|Edit):** ruff format + check, no `print()` in {{ py_project_root }}/{{ ai_source_root }}/, no bare `except`, no mutable default arguments, no hardcoded model strings, no bare LLM/tracing-client instantiation outside factory files, secrets scan, file size warning >400 lines.
 
 **PreToolUse (Bash):** `git commit` blocked if tests fail or `uv.lock` is out of sync, `.claude/docs/plans/` or `.claude/docs/reviews/` blocked from being staged or committed, `pip install` blocked (use `uv add`), destructive commands blocked.
 

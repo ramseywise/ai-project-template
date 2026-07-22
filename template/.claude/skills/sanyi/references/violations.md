@@ -121,23 +121,27 @@ Contract: SANYI.md v<N> (last audit <date>)
 - Where: <file:line>
 - What: <what the diff does, in contract terms>
 - Decision options: revert | redesign | amend contract via architecture review
+- `id: SY-NNN` `evidence: verified` `merge_impact: blocker`
 
 ### [WARNING] JY-1 — <title>
 
 - Entry: 简易 Jianyi / <entry name>
 - Where: <file:line>
 - What: <growth vs budget, e.g. "fields 9 → 13, budget ≤ 12">
+- `id: SY-NNN` `evidence: verified` `merge_impact: important`
 
 ### [INFO] BN-1 — <title>
 
 - Entry: 变易 Bianyi / <entry name>
 - Where: <file:line>
 - What: <the literal and where it should live>
+- `id: SY-NNN` `evidence: verified` `merge_impact: suggestion`
 
 ### [NOTICE] UN-1 — <title>
 
 - Where: <file>
 - What: <no contract entry matches; assign a layer or park in Pending>
+- `id: SY-NNN` `evidence: verified` `merge_impact: nit`
 
 ## Bookkeeping
 

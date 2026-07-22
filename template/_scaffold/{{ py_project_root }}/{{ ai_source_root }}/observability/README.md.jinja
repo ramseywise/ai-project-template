@@ -1,0 +1,31 @@
+# {{ py_project_root }}/{{ ai_source_root }}/observability/ — tracing, feedback, cost
+
+LLM tracing for the agentic system. Provider selected at scaffold time:
+**{{ observability_provider }}** (`copier update -d observability_provider=…`
+to swap — `langfuse` | `langsmith` | `none`).
+
+- `observability.py` — the provider factory. **Only this file may instantiate a
+  tracing client.** `.claude/hooks/sdk_lint.sh` (B3) flags bare `Langfuse(` /
+  `langsmith.Client(` anywhere else. Do not rename it — the hook exempts this
+  filename specifically.
+- `tracing.py` — what call sites use: `trace_span()`, `record_feedback()`,
+  `record_cost()`.
+- `settings.py` — pydantic-settings, reads `.env`.
+
+```python
+from observability.tracing import trace_span, record_cost
+
+with trace_span("agent.retrieve", node="retrieve"):
+    docs = retriever.invoke(query)
+record_cost(settings.model, input_tokens=1_200, output_tokens=340)
+```
+
+Tracing never breaks the caller: with no credentials, a missing SDK, or
+`observability_provider=none`, `get_tracer()` returns a `NoOpTracer` and every
+helper degrades to a warning log. Local dev and CI need no tracing keys.
+{% if data_sensitivity in ["restricted", "secret"] %}
+**Redact before trace (data_sensitivity={{ data_sensitivity }}).** `redact()` runs
+inside `trace_span()` before attributes reach the provider — raw field values must
+never leave the process (CLAUDE.md, DESIGN.md). Add domain-sensitive field names to
+`REDACTED_FIELDS` in `tracing.py`; never add a span path that skips it.
+{%- endif %}

@@ -56,6 +56,10 @@ offer to run `init` first.
 | `references/violations.md`      | before emitting any finding or report — violation codes, severities, and the report template live here; use them exactly | review, audit, init's closing audit |
 | `references/interview-guide.md` | drafting and classifying components during an interview                                                                  | init only                           |
 
+Also consumed (via `review-shared` skill preload or on demand):
+- `~/.claude/refs/finding-schema.md` — canonical finding format for cross-reporter merging
+- `~/.claude/refs/evidence-model.md` — evidence classification (verified/supported/hypothesis/question)
+
 ## Shared rules (all modes)
 
 1. **Debt baseline**: report only NEW violations. Anything recorded in
@@ -73,16 +77,50 @@ question bank. Then:
    config/prompt/state files, and integration boundaries. Draft Bianyi and
    Jianyi entries directly from conventions and schemas (measure `current` on
    the spot); collect Buyi _candidates_ only.
-2. **Confirm per component** — one question at a time, multiple-choice
-   (accept / re-layer / park). Disputes go to `## Pending`.
-3. **Buyi interview** — the layer machines cannot infer. Use the question
+
+   ⚠️ These are all **declaration** sources — what the repo says about itself.
+   A draft built only from them describes intent, not the system. Step 2 is
+   what makes it a contract.
+
+2. **Verify every candidate against implementation — BEFORE writing anything.**
+   A contract entry asserting a guarantee the code does not provide is worse
+   than no entry: review mode reports only NEW violations, so a false
+   guarantee baked in at init goes permanently silent. For each candidate:
+
+   | Check | How | If it fails |
+   | --- | --- | --- |
+   | Call sites exist | grep the entry point across the repo; exclude the module's own definition, its `__init__` re-exports, docstrings, and comments | Entry is unimplemented — draft it with the gap named, seed `## Debt` (BY-4) |
+   | Paths resolve | test each declared path exists on disk | Drop or correct the path (UN-2) |
+   | Evidence asserts the contract | open each `evidence` test; confirm it exercises the declared entry point, not a local reimplementation | Narrow the `evidence` line to what it truly covers — never leave it overstated |
+   | No bypass | grep for env vars / flags gating the entry point; check their **defaults** | Record BY-2; a default-off guard is not a guarantee |
+   | No divergent reimplementations | grep for the entry point's core logic (regexes, redaction, validation) living inside consumer packages | Record BY-4 + note each divergence |
+
+   **Vendored/template code is the high-risk case**: modules that arrived via a
+   template or scaffold commit are frequently never wired. Check `git log
+   --diff-filter=A` on suspiciously unused modules.
+
+   Report contradictions rather than resolving them silently — if a grep
+   contradicts something already read, the grep is suspect first. Re-run it
+   before trusting an empty result.
+
+3. **Confirm per component** — one question at a time, multiple-choice
+   (accept / re-layer / park). Present each candidate **with its step-2
+   verification result**, so the human confirms against reality, not intent.
+   Disputes go to `## Pending`.
+4. **Buyi interview** — the layer machines cannot infer. Use the question
    bank; run the first-law probe ("where is this enforced in deterministic
-   code?") on every entry.
-4. **Over-declaration pushback** — more than ~7 Buyi entries: challenge each;
+   code?") on every entry — step 2 has already answered it for most.
+5. **Over-declaration pushback** — more than ~7 Buyi entries: challenge each;
    Buyi must stay scarce, like root access.
-5. **Closing audit** — run the audit mode below; write findings into
+6. **Closing audit** — run the audit mode below; write findings into
    `## Debt`.
-6. **Deliver** — `SANYI.md` at the repo root + a short debt summary.
+7. **Deliver** — `SANYI.md` at the repo root + a short debt summary.
+
+**When a contract states a target the code does not yet meet** (the human
+ratifies intent rather than narrowing to current behavior), say so in the file:
+the entry describes the target, an inline comment names the gap, and `## Debt`
+carries the violation. A contract may aspire — it may not imply the aspiration
+is already true.
 
 ## Mode: review [--fix]
 

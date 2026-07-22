@@ -18,6 +18,16 @@ questions where machines are blind.
 | Security / auth / PII / compliance / escalation-fallback code; `try/except` safety nets around agent output       | Buyi **candidates** (confirm in interview — never auto-assign Buyi) | The code shows where invariants live, but not which guarantees the business actually depends on.                                                                             |
 | Hardcoded prompt strings or literal thresholds in business logic                                                  | Pre-draft BN-1 debt                                                 | "Should-be-Bianyi that isn't" — note for the closing audit.                                                                                                                  |
 
+**Every row above reads a _declaration_ — what the repo says about itself.**
+None of them establish that the declared thing is wired in. Before any
+candidate becomes an entry, run the SKILL.md step-2 verification (call sites,
+path resolution, evidence scope, bypass defaults, divergent
+reimplementations). A shared module with zero call sites is the single most
+common finding, and template-vendored code is where it concentrates: the
+module lands in a scaffold commit and nothing ever imports it. `git log
+--diff-filter=A -- <path>` showing a template/scaffold commit is a strong
+signal to check imports before trusting the module is live.
+
 **Integration boundaries get special treatment.** An `integrations/` module
 typically contains all three layers in one file — which is exactly why it is a
 cross-layer violation hotspot. Split each integration into separate entries:

@@ -2,7 +2,7 @@
   "python.defaultInterpreterPath": ".venv/bin/python",
   "python.testing.pytestEnabled": true,
   "python.testing.pytestArgs": ["tests", "-s", "--ignore=tests/integration"],
-  "python.analysis.extraPaths": ["{{ source_root }}"],
+  "python.analysis.extraPaths": ["{{ py_project_root }}/{{ ai_source_root }}"],
   "editor.formatOnSave": true,
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff",

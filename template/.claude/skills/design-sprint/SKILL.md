@@ -1,9 +1,17 @@
 ---
 name: design-sprint
-description: "Run a full design sprint for any use case — deconstruct problems and pain points, generate HMW statements, define technical solutions, cluster into workstreams, map dependencies, and produce an initiative backlog. Use when starting a new product, feature, or platform initiative from scratch."
+description: "PM role — blank-page problem framing. Use when starting a feature or initiative from scratch: 'what should we build and why?'. Runs IDEO/HMW methodology: deconstruct problems → HMW statements → technical solutions → workstream clusters → initiative backlog. Triggers on: 'start a new feature', 'run a design sprint', 'define what to build for X', 'generate HMW statements', 'blank-page initiative'."
 disable-model-invocation: true
 allowed-tools: Read Bash Grep Glob WebSearch Write
 ---
+
+## Target repo
+
+Same convention as the phase protocols (research/plan/execute/code-review): a
+`repo:<name-or-path>` token in `$ARGUMENTS` targets another workspace repo (bare name
+resolves to `~/workspace/<name>`); all repo-relative paths and git/test commands resolve
+against it, and artifacts land in the TARGET repo. No token → the cwd's repo; in a
+meta/workspace-root session, ask rather than defaulting.
 
 Run a full design sprint using IDEO / Stanford d.school HMW methodology for: `$ARGUMENTS`
 

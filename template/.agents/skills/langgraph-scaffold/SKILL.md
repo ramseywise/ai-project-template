@@ -74,8 +74,8 @@ The spec should be thorough enough for another developer to implement the agent 
 ## Step 3: Scaffold the File Set
 
 Substitute `{AGENT_NAME}` → snake_case agent name, `{DOMAIN}` → the domain label from
-Step 1, `{OUTPUT_DIR}` → the output path (default: `{source_root}/agents/{AGENT_NAME}`,
-confirm with the user if `source_root` isn't obvious from the project layout).
+Step 1, `{OUTPUT_DIR}` → the output path (default: `{py_project_root}/{ai_source_root}/agents/{AGENT_NAME}`,
+confirm with the user if `py_project_root/ai_source_root` isn't obvious from the project layout).
 
 ```
 {OUTPUT_DIR}/

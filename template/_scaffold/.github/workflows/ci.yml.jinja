@@ -13,7 +13,7 @@ jobs:
   ci:
     uses: ramseywise/ai-project-template/.github/workflows/python-ci.yml@main
     with:
-      lint-paths: "{{ source_root }} core {{ eval_root }} tests"
+      lint-paths: "{{ py_project_root }}/{{ ai_source_root }} core {{ eval_root }} tests"
       test-command: "uv run pytest tests/unit -q"
 {%- if has_corpus_pipeline or include_interaction_evals %}
 
@@ -39,10 +39,10 @@ jobs:
       # The retrieval grade reads the corpus index — build it first.
       - run: make corpus-ingest
       - name: Retrieval eval (informational)
-        run: PYTHONPATH={{ source_root }}:. uv run python -m {{ eval_root }}.pipelines.run heuristic
+        run: PYTHONPATH={{ py_project_root }}/{{ ai_source_root }}:. uv run python -m {{ eval_root }}.pipelines.run heuristic
 {%- endif %}
 {%- if include_interaction_evals %}
       - name: Interaction eval (informational)
-        run: PYTHONPATH={{ source_root }}:. uv run python -m {{ eval_root }}.pipelines.grade run --no-judges
+        run: PYTHONPATH={{ py_project_root }}/{{ ai_source_root }}:. uv run python -m {{ eval_root }}.pipelines.grade run --no-judges
 {%- endif %}
 {%- endif %}

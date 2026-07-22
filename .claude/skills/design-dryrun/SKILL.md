@@ -1,5 +1,5 @@
 ---
-name: design_dryrun
+name: design-dryrun
 description: >
   Simulate a volunteer walking the full project discovery pipeline with sample
   nonprofit scenarios. Validates artifact handoffs, checks that the right questions

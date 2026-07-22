@@ -53,38 +53,60 @@ and follow §Re-entry below.
 
 ### Step 1 — Ask, don't hand over a form
 
-Have a short real conversation (not a rigid checklist read verbatim). It mirrors
-`copier.yaml`'s own phased interview — scope first, implementation only where
-Phase 1 makes it relevant:
+Have a short real conversation (not a rigid checklist read verbatim). The
+interview is six open questions plus confirmations of derived values — scope
+first, implementation only where Phase 1 makes it relevant.
 
-**Phase 1 — scoping (always cover these):**
+**The six asked variables (always cover these):**
 
-1. **What are you building, who's it for?** → `project_name`, `project_slug`,
-   `project_description`, `project_type` (`chat_app`/`agent`/`workflow`/`rag`/
+1. **What are you building?** → `project_name` (free text), `project_description`
+   (free text, one sentence).
+2. **What type of project?** → `project_type` (`chat_app`/`agent`/`workflow`/`rag`/
    `mcp_server`/`ai_backend`/`eval_suite`/`prototype`/`existing_repo` — the last
    one is layering-only mode: `.claude/` + whichever of `.agents/`/`mcp_servers/`
-   they want, nothing else touched), `primary_users`
-   (`internal`/`customers`/`developers`/`public_api`).
-2. **What external systems does it touch?** → `external_systems` (multiselect:
+   they want, nothing else touched). This is the derivation root — 54 vars key off it.
+3. **Who uses it?** → `primary_users` (`internal`/`customers`/`developers`/`public_api`).
+   Seeds data sensitivity and deployment target.
+4. **What external systems does it touch?** → `external_systems` (multiselect:
    `slack`/`github`/`google_workspace`/`calendar`/`email`/`database`/`web`) —
-   copier seeds integration and vector-store defaults from this, so get it right
-   rather than skipping it.
-3. **Backend language(s)** — Python (default) or a real TypeScript backend
-   service too? → `primary_backend_language`.
-4. **Where does it run?** → `deployment_target` (`local`/`docker`/`cloud`/`serverless`).
-5. **Does it touch customer or otherwise sensitive data?** → `data_sensitivity`
-   (`public`/`internal`/`restricted`/`secret`). Copier defaults this from
-   `primary_users`, but don't let it default silently in conversation — it
-   drives a hard rule in the generated `CLAUDE.md` and a Terraform tag.
+   copier seeds integrations, `agent_tools`, and `vector_backend` from this,
+   so get it right rather than skipping it.
+5. **Does the agent need human approval before acting?** → `human_approval`
+   (`none`/`sometimes`/`always`). A governance posture — independent of every
+   other answer, and the one variable where a silent default has an irreversible
+   failure mode. Always ask it out loud. (Copier's `sometimes` default is a
+   reasonable seed; the human must confirm it, not accept it blindly.)
 
-**Phase 1b — the AI system itself (agent-shaped projects):**
+**Confirm derived values (don't re-ask — propose and let the user correct):**
 
-6. **What tools will the agent use, will it store memory, does it need human
-   approval before acting?** → `agent_tools` (multiselect; `mcp` seeds
-   `include_mcp_server`), `agent_memory` (`none`/`conversation`/`long_term` —
-   `long_term` seeds the postgres checkpointer), `human_approval`
-   (`none`/`sometimes`/`always`). These land in DESIGN.md's Key Decisions —
-   they matter more than any individual feature toggle.
+After the five open questions above, surface the derived values as explicit
+confirmations. Present: "Given your answers, I'm setting these — correct anything
+wrong:"
+
+- `project_slug` → `{{ project_name.lower().replace(' ', '-') }}`
+- `primary_backend_language` → `python` (default; only genuinely open if the
+  user has an existing TS codebase — if they do, ask now)
+- `deployment_target` → derived from `primary_users`: `internal` → `docker`;
+  `customers`/`public_api` → `cloud`; `developers` → `local`. (Cheap wrong
+  guess — one CD workflow + DESIGN.md row. Surface the derivation, not a blank prompt.)
+- `data_sensitivity` → derived from `primary_users`: `customers`/`public_api`
+  → `restricted`; else `internal`. **Critical:** don't let this default silently
+  — it drives a hard rule in the generated `CLAUDE.md` and a Terraform tag. If
+  the project touches health, financial, or children's data, it must be `secret`.
+  Ask explicitly: "You said customers — I'm setting data sensitivity to
+  `restricted`. Anything regulated (health, financial, minors) that should make
+  this `secret`?"
+- `agent_tools` → seeded from `external_systems` (github/database entries carry
+  over automatically). Confirm the derived list.
+- `agent_memory` → `conversation` (default). Only ask if the design requires
+  durable cross-session memory; `long_term` seeds the postgres checkpointer,
+  which `database` in `external_systems` already implies.
+
+The eight derived variables (`project_slug`, `primary_backend_language`,
+`deployment_target`, `data_sensitivity`, `agent_tools`, `agent_memory`,
+`ticket_prefix`, `enable_macos_notifications`) are all `when: false` in
+`copier.yaml` — they resolve from defaults. The genesis skill's job is to
+confirm them in conversation, not to leave them as invisible guesses.
 
 **Phase 2/3 — only when the conversation raises them (otherwise the seeded
 defaults are right):**
@@ -143,9 +165,14 @@ a deferred decision.
 
 ### Step 2 — Map to copier variables
 
-Build the `-d key=value` list from Step 1's answers. Leave anything not
-explicitly discussed unset — it'll fall through to `copier.yaml`'s own default
-via `--defaults` in Step 4.
+Build the `-d key=value` list from Step 1's answers. The six asked variables
+always go in. The eight derived vars (`project_slug`, `primary_backend_language`,
+`deployment_target`, `data_sensitivity`, `agent_tools`, `agent_memory`,
+`ticket_prefix`, `enable_macos_notifications`) are all `when: false` in
+copier.yaml — include them in the answers file only if the user overrode the
+derived value in Step 1's confirmations. Leave anything else not explicitly
+discussed unset — it'll fall through to `copier.yaml`'s own default via
+`--defaults` in Step 4.
 
 ### Step 3 — Confirm before acting
 
@@ -154,80 +181,61 @@ running anything. If an answer feels like a guess rather than something they
 actually said, ask directly instead of assuming — same discipline as
 `new-agent/SKILL.md`'s "don't silently default."
 
-### Step 4 — Execute non-interactively
+### Step 4 — Write the answers file
 
-From this repo's root:
+Write the answers from Step 2 to `/tmp/genesis-answers.yml`. Do not run copier
+here — the file is the deliverable of this step, and it is reviewable before
+anything hits disk.
 
-```bash
-copier copy --vcs-ref HEAD --trust --defaults \
-  -d "project_name_input=<name>" \
-  -d "project_slug=<slug>" \
-  -d "project_description=<description>" \
-  -d "project_type=<chat_app|agent|workflow|rag|mcp_server|ai_backend|eval_suite|prototype|existing_repo>" \
-  -d "primary_users=<internal|customers|developers|public_api>" \
-  -d "primary_backend_language=<python|typescript|both>" \
-  -d "external_systems=[<slack, github, ...>]" \
-  -d "deployment_target=<local|docker|cloud|serverless>" \
-  -d "data_sensitivity=<classification>" \
-  -d "agent_tools=[<search, mcp, ...>]" \
-  -d "agent_memory=<none|conversation|long_term>" \
-  -d "human_approval=<none|sometimes|always>" \
-  -d "agent_slug=<domain_based_name>" \
-  -d "include_rag_agent=<true|false>" \
-  -d "optional_features=[<akira, dev_companion, ...>]" \
-  -d "eval_metrics=[<escalation, friction, intent, language>]" \
-  . "<output_dir>"
-```
-
-Drop any `-d` the conversation didn't cover — `--defaults` fills it from the
-seeded derivations. Multiselects take YAML list syntax (`[a, b]`). Hidden/
-derived variables (`scaffold_full_project`, `include_*`, `vector_backend`
-when not asked, `source_root`, ...) can still be pinned with `-d` when the
-conversation explicitly named them.
-
-**Prefer a data file over a long `-d` chain.** With more than ~5 answers, write
-them to a YAML file and pass `--data-file` — a 15-flag shell line is where
-operator errors live (a live dry-run lost a cycle to a dropped positional arg):
-
-```bash
-cat > /tmp/genesis-answers.yml <<'EOF'
+```yaml
+# /tmp/genesis-answers.yml  — generated by /project-genesis
+# Review, then run: make project ANSWERS=/tmp/genesis-answers.yml output_dir=<path>
 project_name_input: <name>
-project_type: agent
-external_systems: [database, calendar]
-# ...one key per answer from Step 2's table
-EOF
-copier copy --vcs-ref HEAD --trust --defaults --data-file /tmp/genesis-answers.yml . "<output_dir>"
+project_slug: <slug>
+project_description: <description>
+project_type: <chat_app|agent|workflow|rag|mcp_server|ai_backend|eval_suite|prototype|existing_repo>
+primary_users: <internal|customers|developers|public_api>
+# ...one key per answer from Step 2's table; omit keys not covered (--defaults fills them)
 ```
+
+Include only the variables explicitly covered in the conversation. Multiselects
+use YAML list syntax (`[a, b]`). Hidden/derived variables (`scaffold_full_project`,
+`include_*`, `vector_backend` when not asked, `source_root`, ...) may be pinned
+here when the conversation explicitly named them — otherwise omit and let
+`--defaults` derive them.
+
+Show the user the written file path and contents, then present the render command
+from Step 5. **Do not run it — the user runs it after review.**
+
+### Step 5 — Review and render
+
+Tell the user to review `/tmp/genesis-answers.yml`, then render:
+
+```bash
+make project ANSWERS=/tmp/genesis-answers.yml output_dir=<absolute_path>
+```
+
+Resolve `<output_dir>` to an absolute path first (e.g. `mkdir -p ~/workspace/my-project && cd ~/workspace/my-project && pwd`) — a relative path has previously caused a broken `mv` mid-render.
 
 **Rendering into an existing repo** (files already present) needs a protocol, not
 hope:
 1. Before rendering: `git status` the target; snapshot any UNTRACKED files that the
    template will touch (`README.md`, `.claude/**`) to a backup dir — git cannot
    restore untracked files.
-2. Render with `--overwrite` (non-interactive conflict prompts fail otherwise).
+2. Add `OVERWRITE=1` to the make invocation (`make project ANSWERS=... output_dir=... OVERWRITE=1`).
 3. After rendering: restore user-owned files the template clobbered — at minimum
    `git checkout -- README.md` if the repo had a real README — and report exactly
    which pre-existing files were overwritten vs preserved.
-
-Resolve `<output_dir>` to an absolute path first (`mkdir -p` then `cd ... && pwd`)
-— a relative path here has previously caused a broken `mv` mid-render (see
-`Makefile`'s `run_copier` target, which now does this resolution for the
-`make new_project`/`make new_project_dev` path; this skill must do the same
-since it calls `copier` directly rather than through `make`).
-
-`--vcs-ref HEAD` renders from the working tree (including uncommitted changes,
-with copier's own `DirtyLocalWarning`) rather than requiring a commit first —
-this was verified working end-to-end against this exact repo state.
 
 After a successful render: if Step 0 found a DESIGN.md, copy it over
 `<output_dir>/DESIGN.md` (the rendered stub is blank — the real design wins), and
 transcribe its Evaluation table into `<output_dir>/evals/targets.yaml` (uncomment/
 add one `metric: target` line per table row whose metric the eval runner measures;
-metrics it doesn't measure stay in DESIGN.md only — name them in the Step 5 report
+metrics it doesn't measure stay in DESIGN.md only — name them in the Step 6 report
 as manual-grading targets). If the design's data classification disagrees with the
 `data_sensitivity` answer just rendered, stop and ask — don't reconcile silently.
 
-### Step 5 — Report
+### Step 6 — Report
 
 Summarize what was generated (directory tree, notable toggles that ended up
 on/off), report whether a DESIGN.md was carried over and which Evaluation

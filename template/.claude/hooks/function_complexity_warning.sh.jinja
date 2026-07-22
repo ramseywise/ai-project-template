@@ -6,7 +6,7 @@ source .claude/hooks/lib.sh
 
 path=$(claude_path)
 [ -z "$path" ] && exit 0
-echo "$path" | grep -qE '^/?.*/{{ source_root }}/.*\.py$|^{{ source_root }}/.*\.py$' || exit 0
+echo "$path" | grep -qE '^/?.*/{{ py_project_root }}/{{ ai_source_root }}/.*\.py$|^{{ py_project_root }}/{{ ai_source_root }}/.*\.py$' || exit 0
 
 python3 - "$path" <<'PY'
 import ast

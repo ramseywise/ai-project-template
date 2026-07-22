@@ -15,8 +15,7 @@ it runs in **phases** (see "The interview" below), and the tiers describe what l
    pre-flighted by `/deploy-check`),
    `.claude/settings.json` (hook wiring: secrets scan, branch naming, code quality,
    test coverage, SDK-pattern checks, docs hygiene, memory-duplication guard, commit gates), and
-   `.claude/hooks/*.sh` + `.claude/skills/` (21 workflow skills — research-review, plan-review,
-   execute-plan, code-review, quick-pr, mcp-builder, new-agent, etc. — see `.claude/skills/README.md` in
+   `.claude/hooks/*.sh` + `.claude/skills/` (26 workflow skills — see `.claude/skills/README.md` in
    the generated project for the full map).
 2. **Independent toggles** (available even with `scaffold_full_project=false`, i.e. layering-only mode
    onto an existing repo): `.agents/skills/` (`include_agent_reference_library`) — a tool-agnostic
@@ -121,7 +120,8 @@ The corpus data pipeline (`core/pipelines/corpus/`, `data/corpus/`, the retrieva
 
 Everything else is **inferred, never asked**: `source_root` (`src`), `eval_root`/`eval_allowed_dirs`,
 `enable_structure_guard` (on only for eval-suite/RAG shapes), `python_version` (3.12), `aws_region`,
-`ts_source_root`/`ts_project_root`, `mcp_server_name`/`mcp_server_slug`, `scaffold_full_project`
+`ts_source_root`/`ts_project_root`, `mcp_server_name`/`mcp_server_slug` (plus the
+`py_mcp_server_slug`/`ts_mcp_server_slug` pair derived from it), `scaffold_full_project`
 (false only for the layer-onto-existing-repo project type), `has_typescript`, `has_corpus_pipeline`, and
 the derived architecture + `include_*` toggles above. Every inferred/`-d`-only value remains overridable
 non-interactively — `-d source_root=lib`, `-d primary_chat_agent=both`, `-d include_mcp_server=true`,
@@ -206,7 +206,7 @@ isn't in the multiselect — it derives directly from Calendar in `external_syst
 | `has_corpus_pipeline` | `lg_agent`/`both` present, or `include_rag_agent` | Ships `core/pipelines/corpus/` + `data/corpus/` + the retrieval golden-QA eval + `tests/unit/core/`; off = empty `core/` ETL home |
 | `enable_postgres_checkpointer` | `vector_backend=postgres` or `agent_memory=long_term` | Adds `langgraph-checkpoint-postgres`; runtime default stays `memory` either way |
 | `python_version` / `aws_region` | `3.12` / `eu-central-1` | pyproject floor / Terraform default region |
-| `mcp_server_name` / `mcp_server_slug` | `<project_slug>` | MCP server naming |
+| `mcp_server_name` / `mcp_server_slug` | `<project_slug>` | MCP server naming. `mcp_server_slug` is the seed for `py_mcp_server_slug` / `ts_mcp_server_slug` — the chosen language renders at the real slug, the other gets an `__unchosen_*` suffix that `_tasks` prunes |
 | `expensive_command_patterns` | *(blank)* | Regex for commands that should nudge `--dry-run`; blank disables the hook |
 | `include_agent_reference_library` | `false` | `.agents/skills/` (ADK + LangGraph reference library) + `/new-agent` — opt in for offline/team-portability; canonical home stays this template |
 | `global_skills_source` | `vendored` | Maintainer knob — see `scripts/sync-global-skills.sh` |
@@ -219,12 +219,12 @@ template-maintainer material.
 | Path | What it is |
 |---|---|
 | `copier.yaml` | The whole interview + derivation logic + `_tasks` post-processing. The comments in it are load-bearing — read them before changing any toggle. |
-| `template/CLAUDE.md.jinja`, `DESIGN.md.jinja`, `LIFECYCLE.md.jinja`, `DEPLOYMENT.md.jinja` | Rendered to the project root in every mode (including layering-only). LIFECYCLE.md is the phase/gate status contract maintained by `/gate-check` and read by DSSG's project-mgmt-ai; DEPLOYMENT.md is the Phase-3 runbook (staged rollout, rollback, monitoring), pre-flighted by `/deploy-check`. |
+| `template/CLAUDE.md.jinja`, `DESIGN.md.jinja`, `LIFECYCLE.md.jinja`, `DEPLOYMENT.md.jinja`, `DELIVERY.md.jinja`, `RELEASE.md.jinja`, `design.yaml.jinja` | Rendered to the project root in every mode (including layering-only). LIFECYCLE.md is the phase/gate status contract maintained by `/gate-check` and read by DSSG's project-mgmt-ai; DEPLOYMENT.md is the Phase-3 runbook (staged rollout, rollback, monitoring), pre-flighted by `/deploy-check`; DELIVERY.md and RELEASE.md cover delivery process and release notes. |
 | `template/.claude/` | Hooks, skills, agent defs, settings — the always-on Claude tooling tier. Ships in every mode. |
 | `template/.agents/` | Tool-agnostic ADK/LangGraph reference library (`include_agent_reference_library`). |
 | `template/mcp_servers/` | Python FastMCP server scaffold (`include_mcp_server`); swapped for the TS tree when `mcp_server_language=typescript`. |
 | `template/_scaffold/` | **Staging dir** for the full-project tier. Copier renders it verbatim, then `_tasks` prunes unselected features and `mv`s the survivors to the project root. Never collides with a pre-existing repo — layering-only mode discards it wholesale. |
-| `template/_mcp_ts/`, `template/_split_service_frontend_staging/` | Same staging convention for the TS MCP server and the split_service Next.js frontend; always `rm -rf`'d after their conditional `mv`. |
+| `template/_scaffold/configs/` | Environment config files (dev.yaml, prod.yaml) — rendered into project root by `_tasks`. |
 | `scripts/` | Maintainer utilities (see `scripts/README.md`). |
 | `.claude/docs/` | This repo's own plan/research docs (local-only, git-ignored by policy). |
 | `.github/workflows/test-render.yml` | CI render matrix — leftover-Jinja + ruff checks per config. |
