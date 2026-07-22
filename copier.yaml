@@ -1134,7 +1134,6 @@ _tasks:
     {{ 'true' if global_skills_source == 'vendored' else 'rm -rf ' ~
     _copier_conf.dst_path ~ '/.claude/skills/git-commit ' ~
     _copier_conf.dst_path ~ '/.claude/skills/git-pr ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/code-pr ' ~
     _copier_conf.dst_path ~ '/.claude/skills/code-refactor ' ~
     _copier_conf.dst_path ~ '/.claude/skills/code-review ' ~
     _copier_conf.dst_path ~ '/.claude/skills/code-debug ' ~
@@ -1150,6 +1149,7 @@ _tasks:
     _copier_conf.dst_path ~ '/.claude/skills/design-milestones ' ~
     _copier_conf.dst_path ~ '/.claude/skills/design-prototype ' ~
     _copier_conf.dst_path ~ '/.claude/skills/akira ' ~
+    _copier_conf.dst_path ~ '/.claude/skills/review-shared ' ~
     _copier_conf.dst_path ~ '/.claude/skills/docs-check ' ~
     _copier_conf.dst_path ~ '/.claude/skills/github-projects ' ~
     _copier_conf.dst_path ~ '/.claude/skills/mcp-builder ' ~

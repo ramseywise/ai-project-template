@@ -46,11 +46,15 @@ unstaged = **the changed set**. Empty set → report "clean, nothing to review" 
 
 Split the changed set into batches of ~5 files. Spawn the global **`akira-scan`** agent
 on each batch **in parallel** (pass file paths + one-line repo context; restate
-`model: haiku` on the Agent call). Scan output is cheap and unverified: **confirm each
-finding against the source before it enters the report** (see `~/.claude/refs/models.md`).
-Merge results — dedupe, drop anything the repo linter would already catch, rank
-most-important-first. This is the same scan `/code-review` runs; `/akira scan` and
-`/code-review`'s quality-scan section produce the same findings on the same diff.
+`model: haiku` on the Agent call). Agent outputs canonical schema with evidence tags
+(see `~/.claude/refs/finding-schema.md`). **Confirm each finding against the source
+before it enters the report** (see `~/.claude/refs/models.md`).
+
+**Merge** parallel batch results using canonical schema: group findings by file+lines
+overlap (within 5 lines) AND category similarity, judge if same underlying issue, merge
+duplicates preserving all source IDs, dedupe against linter findings, rank blockers first.
+This is the same scan `/code-review` runs; `/akira scan` and `/code-review`'s quality-scan
+section produce the same findings on the same diff.
 
 ## wander (Kiyoko)
 

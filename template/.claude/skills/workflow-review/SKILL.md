@@ -1,45 +1,51 @@
 ---
 name: workflow-review
-description: "Phase 4. Runs tests, reviews the implementation diff against the active plan doc in .claude/docs/plans/, validates plan fidelity, and appends a ## Review section to that doc. Approval sets Status: EXECUTED. Target-repo aware: pass repo:<name> to run against another workspace repo."
-disable-model-invocation: true
-allowed-tools: Read Grep Glob Bash Write
+description: "Phase 4 review — plan fidelity + multi-reporter code review + DoD assessment + merge verdict. Use after execution completes, or to review an open PR. Triggers: 'review PR #42', '/workflow-review', '/workflow-review my-feature', 'check the PR', 'review the diff', 'code-pr 42'."
+skills: [review-shared]
+allowed-tools: Read Grep Glob Bash Agent
 ---
 
-You are a senior engineer doing a thorough code review. Be direct and specific. Flag real problems only — style is the linter's job.
+Review implementation against plan (if one exists) AND review code quality via
+multi-reporter orchestration. This is the unified post-execution / post-PR review.
 
-`$ARGUMENTS` — work-item slug (kebab-case). If omitted, the active doc is the `.claude/docs/plans/` file with `Status: IN PROGRESS`.
+`$ARGUMENTS` — one of:
+- A PR number or URL (`42`, `#42`, `https://...`) → PR review mode
+- A work-item slug (`my-feature`) → plan-doc review mode
+- Empty → discover: check for `Status: IN PROGRESS` plan doc, else `gh pr list`
 
 ## Target repo
 
-All paths in this skill (`.claude/docs/plans/`, git and test commands) resolve against a
-**target repo**:
+All paths resolve against a **target repo**:
 
-1. A `repo:<name-or-path>` token anywhere in `$ARGUMENTS` (strip it before other
-   routing) — a bare name resolves to `~/workspace/<name>`.
+1. A `repo:<name-or-path>` token anywhere in `$ARGUMENTS` (strip before routing)
+   — bare name resolves to `~/workspace/<name>`.
 2. Otherwise, the repo containing the cwd.
-3. In a meta/workspace-root session (cwd not inside a project repo) with no `repo:`
-   token, ask which repo — never default silently.
+3. In a meta/workspace-root session with no `repo:` token, ask which repo.
 
-Run commands with the target as working dir (`git -C <repo> ...`, `cd <repo> && uv run
-pytest ...`). Artifacts always land in the TARGET repo's `.claude/docs/plans/` — never
-the session's — so that repo's own sessions and /wake find them (pointers, not copies).
+Run commands with the target as working dir. Artifacts land in the TARGET repo's
+`.claude/docs/plans/` so that repo's own sessions find them.
 
-This review is diff-scoped against one plan — it catches whether *this change* matches *this plan*. It does not catch slow architectural decay across many diffs (an invariant quietly made configurable, a threshold hardcoded outside its declared layer). That is the standing `SANYI.md` contract's job: when one exists at the repo root, the contract check below runs as part of this review; the full-repo `/sanyi audit` stays a separate invocation. For a standing review with no plan doc (any repo, all changed files, quality scan included), use `/review-sweep` instead; see `/akira` for its question (`wander`) and fix (`dao`) modes.
+---
 
-## Before reviewing
+## Stage 1: Context Brief
 
-1. Read the active doc's `## Plan` section. Read `.claude/docs/CHANGELOG.md` if it exists and the workflow uses it.
-2. `uv run pytest --tb=short -q` — if tests fail, stop
-3. `git diff main...HEAD` — read every changed file in full
-4. **Contract check**: if `SANYI.md` exists at the repo root, run the `/sanyi review` protocol on the diff — glob-match changed files against the contract registry, report NEW violations only (entries in `## Debt` stay silent). Map severities into this review's findings: BY-\* → **[Blocking]**, JY-\* → **[Non-blocking]**, BN-1/notices → **[Nit]**. Report-only — never auto-fix a contract violation inside a review. Skip silently when no `SANYI.md` exists.
+Produce a context brief (per `review-shared/references/context-brief.md`). Gather:
 
-## Review rules
+1. **PR metadata** (if PR mode): `gh pr view <number> --json title,body,headRefName,baseRefName,labels,reviewRequests`
+2. **Diff**: `gh pr diff <number>` (PR mode) or `git diff main...HEAD` (plan mode)
+3. **Changed files**: from PR or git diff
+4. **Repo context**: read CLAUDE.md, check for SANYI.md, check for Refs: line
+5. **CI status** (PR mode): `gh pr checks <number>`
+6. **Callers of changed symbols**: Grep for function/class names from the diff
+7. **Review profile**: infer `general` or `agent-system` from imports and file paths.
+   Agent-system if any changed file imports LLM/agent frameworks or lives under `agents/`,
+   `*_agent/`, `prompts/`.
+8. **Plan doc** (if exists): find matching `.claude/docs/plans/*.md` by slug or branch name.
+   If found, read `## Plan` section for fidelity check.
 
-- Every finding gets a severity: **[Blocking]** (must fix), **[Non-blocking]** (should fix), **[Nit]** (take or leave)
-- Lead with the most important finding — do not bury concerns in nits
-- If unsure: "I am not certain this is a bug, but [observation]"
+Fill the context brief template. Unknown fields = "unknown", not guessed.
 
-## Plan fidelity
+## Stage 2: Plan Fidelity (conditional — skip if no plan doc)
 
 For each plan step:
 
@@ -49,48 +55,137 @@ For each plan step:
 
 ### Stub detection
 
-Check key files for: `TODO`, `NotImplementedError`, `return None`, `pass` on critical paths. Blocker if on critical path, warning otherwise.
+Check key files for: `TODO`, `NotImplementedError`, `return None`, `pass` on critical
+paths. Blocker if on critical path, warning otherwise.
 
-## Output
+Deviations become findings with `merge_impact: important` (justified deviation) or
+`blocker` (unjustified omission).
 
-Append to the active doc:
+## Stage 3: Dispatch Reporters
+
+Run these in parallel where possible:
+
+### akira-scan (quality)
+Split changed files into batches of ~5. Spawn `akira-scan` agent on each batch
+(model: haiku, pass context brief summary + file paths). Agent outputs canonical schema
+with evidence tags (see `~/.claude/refs/finding-schema.md`).
+
+### SANYI (contracts)
+If SANYI.md exists at repo root: run `/sanyi review` protocol on the diff.
+Map severities: BY-* → **[Blocking]**, JY-* → **[Non-blocking]**, BN-1/notices → **[Nit]**.
+Report-only — never auto-fix a contract violation inside a review.
+If no SANYI.md: skip, note in dispatch summary.
+
+### Lint and tests
+Run `make lint` / `make test` if available; fallback to stack-specific commands
+(`uv run pytest --tb=short -q`, `npx tsc --noEmit`, etc.).
+Record pass/fail. Test failures become findings with `merge_impact: blocker`.
+
+### Dimension coverage
+For agent-system PRs: akira-scan already checks conditional dimensions 6-7 from
+`review-dimensions.md`. No separate dispatch needed.
+
+## Stage 4: Merge and Deduplicate
+
+Collect all findings (plan fidelity + reporters) in canonical schema format. Apply
+merge logic from `review-shared`:
+
+1. **Group** findings by file+lines overlap (within 5 lines) AND category similarity
+2. **Judge** if grouped findings describe the same underlying issue
+3. **Merge** confirmed duplicates: preserve all source IDs, use most precise root cause,
+   take higher merge_impact, take more certain evidence_state
+4. **Rank** merged findings: blockers first, then important, questions, suggestions, nits
+
+## Stage 5: DoD Assessment
+
+Assess each item from `~/.claude/refs/review-dod.md` as met / gap / n/a.
+Gaps become findings with appropriate merge_impact. Repo-specific DoD overrides defaults.
+
+If a plan doc exists, also check:
+- All plan steps accounted for (from Stage 2)
+- Status line present and correct
+- Acceptance criteria from the plan/issue met
+
+## Stage 6: Judge — Merge Verdict
+
+Apply verdict rules from `review-shared/references/review-report.md`:
+
+- Any `merge_impact: blocker` → **request_changes**
+- Only important + suggestion + nit → **comment**
+- No findings or only nits → **approve**
+- Reporter failures that could mask blockers → **insufficient_context**
+- Questions alone (no blockers) → **comment**
+
+## Stage 7: Report
+
+Produce the unified report:
 
 ```markdown
-## Review — [today]
+# Review — #<number> <title> (or <slug>)
 
-### Automated checks
-- Tests: PASSED / FAILED
+## 1. Overall Understanding
+[1-3 sentences]
 
-### Plan fidelity
-| Step | Plan | Implemented | Tests | Status |
+## 2. Review Contract
+[From context brief]
 
-### Findings
-- **[Blocking]** `file:line` — issue and fix
-- **[Non-blocking]** `file:line` — issue and fix
+## 3. Plan Fidelity
+[Plan step table — only if plan doc exists. Otherwise: "No plan doc — standalone review."]
 
-### Verdict
-[ ] Needs changes | [ ] Approved with minor fixes | [ ] Approved
+## 4. What Looks Strong
+[Genuine positives, not filler]
+
+## 5. Blocking Findings
+[merge_impact: blocker findings with canonical IDs]
+
+## 6. Important Findings
+[merge_impact: important]
+
+## 7. Questions and Hypotheses
+[merge_impact: question + hypothesis-state findings]
+
+## 8. Suggestions and Nits
+[merge_impact: suggestion | nit]
+
+## 9. Testing and Evaluation Assessment
+[Coverage, gaps, repeated-run consideration for agent code]
+
+## 10. Definition of Done Assessment
+[DoD checklist table: item | status | note]
+
+## 11. Reporter Dispatch Summary
+| Reporter | Status | Findings |
+|----------|--------|----------|
+| plan-fidelity | ran/skipped | N findings |
+| akira-scan | dispatched/skipped | N findings |
+| SANYI | dispatched/skipped | N findings |
+| lint/tests | ran/skipped | pass/fail |
+
+## 12. Merge Verdict
+**approve** | **comment** | **request_changes** | **insufficient_context**
+[1-2 sentence rationale]
 ```
 
-## If verdict != Approved: track findings to resolution
+If plan doc exists, append the review section to the plan doc and set `Status: EXECUTED`
+on approval.
 
-If verdict is "Needs changes" or "Approved with minor fixes", add this table under the `## Review` section (keep `Status: IN PROGRESS` on the doc):
+## Stage 8: Action (read-only default)
 
-```markdown
-### Findings status
+Report the verdict to the user. Do NOT run `gh pr review` unless explicitly authorized.
 
-| Finding | Severity | Status |
-|---------|----------|--------|
-| [description] `file:line` | Blocking / Non-blocking | open / addressed / deferred / won't-fix |
-```
+> "Verdict: **[verdict]**. Want me to submit this as a GH review?"
 
-Each blocking finding must have a Status of `open` until resolved. Update the table (do not create a new one) on subsequent review passes.
+If authorized:
+- `approve` → `gh pr review <number> --approve -b "<summary>"`
+- `request_changes` → `gh pr review <number> --request-changes -b "<summary>"`
+- `comment` → `gh pr review <number> --comment -b "<summary>"`
 
-## If approved: phase checkpoint + PR description
+For plan-doc mode (no PR): append `## Review` section to plan doc, update Status.
 
-Set the doc's `Status:` line to `EXECUTED`.
+## Boundaries
 
-Call `/compact "phase: review → done"` to snapshot the review phase before opening the PR.
-The PreCompact hook writes the checkpoint to `~/.claude/sessions/`, then context is compacted.
-
-PR description — title under 60 chars, imperative mood. Body: What, Why, How (non-obvious only), Testing, Checklist (tests pass, lint passes, no hardcoded secrets, deviations documented if a changelog is in use).
+- Never commit, push, or merge — Ramsey commits.
+- Never auto-fix findings — report only. Recommend `/akira dao` for safe fixes.
+- Read-only by default; GH review submission requires explicit authorization.
+- Per-reporter failures are reported (not retried infinitely), noted in dispatch summary.
+- Max 3 review rounds — if issues persist, escalate to user.

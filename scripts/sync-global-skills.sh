@@ -89,9 +89,8 @@ SKILLS=(
   git-pr            # stage + commit + PR
 
   # code quality
-  code-pr           # review an open PR
   code-refactor     # quality-driven refactor
-  code-review       # standing diff review (leveled 1/2/3)
+  code-review       # standing diff review (leveled 1/2/3); absorbed code-pr (2026-07-22)
   code-debug        # quick fix from error
 
   # workflow pipeline
@@ -111,6 +110,7 @@ SKILLS=(
 
   # cross-cutting
   akira             # interactive quality scanner (scan/wander/dao/all)
+  review-shared     # evidence model, finding schema, merge logic — consumed by code-review/workflow-review/akira
   docs-check        # structural drift detection (README/DESIGN.md vs codebase)
   github-projects   # Projects V2 GraphQL templates
   mcp-builder       # build MCP servers (Python FastMCP or Node SDK)

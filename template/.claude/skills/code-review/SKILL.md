@@ -3,9 +3,10 @@ name: code-review
 description: "Standing repo/workspace review — no plan doc required. Leveled: level:1 diff+lint+doc-flags, level:2 (default) +tests+SANYI diff+akira-scan, level:3 +full sanyi audit (single repo only). Pass repo:<name> for one repo, 'sweep' for all dirty workspace repos, 'headless' for non-interactive runs (questions go to a Needs-input section). For plan-fidelity review of a specific work item, use /code-review instead."
 disable-model-invocation: true
 allowed-tools: Read Grep Glob Bash Write Agent
+skills: [review-shared]
 ---
 
-You are a senior engineer running a standing review. Report-only for code (never fix
+You are a staff engineer running a standing review. Report-only for code (never fix
 findings inline); direct and specific; real problems only — style is the linter's job.
 
 ## Routing
@@ -52,18 +53,25 @@ lead the report.
 ### 3. Contract (SANYI) — level ≥2
 If `SANYI.md` exists at the repo root: run the `/sanyi review` protocol on the changed
 set — glob-match changed files against the contract registry, report NEW violations
-only (entries in `## Debt` stay silent). Severity mapping: BY-* → **[Blocking]**,
-JY-* → **[Non-blocking]**, BN-1/notices → **[Nit]**. Report-only — never auto-fix a
-contract violation. Skip silently when no `SANYI.md` exists.
+only (entries in `## Debt` stay silent). SANYI outputs canonical schema fields alongside
+its native report (see `~/.claude/refs/finding-schema.md`). Merge-impact mapping:
+BY-* → `blocker`, JY-* → `important`, BN-1 → `suggestion`, MG-*/UN-* → `nit`.
+Report-only — never auto-fix a contract violation. Skip silently when no `SANYI.md` exists.
 At **level 3** additionally run the full `/sanyi audit` protocol on the whole repo
 (not just the diff) — this is the expensive step and why level 3 is single-repo.
 
 ### 4. Quality scan (akira-scan) — level ≥2
 Split the changed set into batches of ~5 files. Spawn the global `akira-scan` agent on
 each batch **in parallel** (pass file paths + one-line repo context; `model: haiku` —
-pinned in the agent def, restate on the Agent call). Scan output is cheap and unverified:
-confirm findings against the source before they enter the report (see `refs/models.md`). Merge results:
-dedupe, drop findings the linter already caught in step 2, rank most-important-first.
+pinned in the agent def, restate on the Agent call). Agent outputs canonical schema
+with evidence tags (see `~/.claude/refs/finding-schema.md`).
+
+**Merge step** (per `review-shared` merge logic): collect all akira-scan + SANYI findings
+in canonical schema format. Group by file+lines overlap (within 5 lines) AND category
+similarity. Judge if grouped findings describe the same underlying issue. Merge confirmed
+duplicates: preserve all source IDs, use most precise root cause, take higher merge_impact,
+take more certain evidence_state. Drop findings the linter already caught in step 2.
+Rank blockers first, then important, questions, suggestions, nits.
 
 ### 5. Docs
 - Machine-consumed docs (`.claude/`, CLAUDE.md, SANYI.md): if changed code contradicts
@@ -85,20 +93,23 @@ append there; otherwise write `<repo>/.claude/docs/plans/YYYY-MM-DD-review-sweep
 ### Mechanical
 - Lint: PASS/FAIL  ·  Tests: PASS/FAIL/SKIPPED (fast)
 
-### Findings (ranked)
-- **[Blocking]** `file:line` — issue and suggested fix
-- **[Non-blocking]** ...
-- **[Nit]** ...
+### Findings (ranked, canonical schema)
+- **[blocker:verified]** `AK-001` `file:line` — claim title
+  Evidence: basis · Merge impact: blocker
+- **[important:supported]** `SY-001 + AK-003` `file:line` — merged finding
+  Evidence: basis · Merge impact: important
+- **[nit:verified]** ...
 
 ### Contract (SANYI)
-[findings or "no contract" / "no new violations"]
+[findings with canonical schema fields or "no contract" / "no new violations"]
 
 ### Docs
 - Proposed diffs (machine-consumed): ...
 - Flags (human-consumed): ...
 
 ### Verdict
-[ ] Needs changes | [ ] Approved with minor fixes | [ ] Clean
+**approve** | **needs-changes** | **clean**
+[1-line rationale. If needs-changes: list blocking finding IDs.]
 ```
 
 In `sweep` mode, finish with a one-line-per-repo summary table (repo · lint · tests ·

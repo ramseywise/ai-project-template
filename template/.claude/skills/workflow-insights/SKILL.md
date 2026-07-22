@@ -26,13 +26,13 @@ The engine is `librarian/tools/cartographer/parser.py` (canonical since 2026-07-
 
 3. Run the insights engine:
    ```
-   python3 ~/.claude/scripts/insights.py --output ~/.claude/usage-data/report.html
+   python3 ~/.claude/scripts/insights.py --output ~/workspace/guacamayo/.claude/docs/state/insights-report.html
    ```
    For dry-run: `python3 ~/.claude/scripts/insights.py --dry-run`
 
 4. Once complete (non-dry-run), open the report:
    ```
-   open ~/.claude/usage-data/report.html
+   open ~/workspace/guacamayo/.claude/docs/state/insights-report.html
    ```
 
 5. **Summary** — present the headline numbers:
@@ -207,7 +207,7 @@ Arguments pass through to the engine:
 
 - `--dry-run` — extract stats only, no API call, print JSON to stdout
 - `--model claude-sonnet-5` — report-generation model
-- `--output <path>` — report path (default: `~/.claude/usage-data/report.html`)
+- `--output <path>` — report path (default: `~/workspace/guacamayo/.claude/docs/state/insights-report.html`)
 - `--sessions-dir <path>` — session-note markdown files (default `~/.claude/sessions`)
 - `--projects-dir <path>` — JSONL location (default `~/.claude/projects`)
 

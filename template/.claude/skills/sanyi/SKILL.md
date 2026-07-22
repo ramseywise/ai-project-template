@@ -56,6 +56,10 @@ offer to run `init` first.
 | `references/violations.md`      | before emitting any finding or report — violation codes, severities, and the report template live here; use them exactly | review, audit, init's closing audit |
 | `references/interview-guide.md` | drafting and classifying components during an interview                                                                  | init only                           |
 
+Also consumed (via `review-shared` skill preload or on demand):
+- `~/.claude/refs/finding-schema.md` — canonical finding format for cross-reporter merging
+- `~/.claude/refs/evidence-model.md` — evidence classification (verified/supported/hypothesis/question)
+
 ## Shared rules (all modes)
 
 1. **Debt baseline**: report only NEW violations. Anything recorded in
