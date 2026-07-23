@@ -66,7 +66,7 @@ jobs:
             args: "-d primary_backend_language=typescript"
             tier: test-ts
           - name: split-service
-            args: "-d primary_backend_language=both -d frontend_backend_topology=split_service"
+            args: "-d primary_backend_language=both -d frontend_backend_topology=split_service -d include_frontend=true"
             tier: test-split
           - name: ml
             args: "-d include_ml=true"
@@ -234,9 +234,9 @@ jobs:
           # subsequent `git submodule update` fails because there is no .gitmodules
           # entry. copier copy --overwrite doesn't need the destination to have VCS
           # history, so removing .git is safe.
-          rm -rf .git
+          rm -rf .git || true
           copier copy --overwrite --vcs-ref HEAD --trust --defaults \
-            -d include_rag_agent=true "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/out"
+            ${{ matrix.args }} -d include_rag_agent=true "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/out"
           test -d backend/src/agents/rag_agent \
             || { echo "add-capability re-entry did not land rag_agent"; exit 1; }
           # rag_agent implies has_corpus_pipeline → the corpus subpackage + its
@@ -263,7 +263,7 @@ jobs:
 
       - name: split_service frontend — install/build
         if: matrix.tier == 'test-split'
-        working-directory: out/render-test
+        working-directory: out/frontend/render-test
         run: |
           npm install
           npm run build
