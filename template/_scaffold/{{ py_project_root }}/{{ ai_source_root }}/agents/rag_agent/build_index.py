@@ -26,7 +26,11 @@ def build_index(jsonl_path: Path) -> int:
             skipped += 1
             log.warning("skipping malformed JSONL line %d in %s: %s", lineno, jsonl_path, exc)
     if skipped:
-        log.warning("skipped %d malformed line(s) while building index from %s", skipped, jsonl_path)
+        log.warning(
+            "skipped %d malformed line(s) while building index from %s",
+            skipped,
+            jsonl_path,
+        )
     index = get_vector_index()
     index.upsert([(row["id"], row["title"], row["text"]) for row in rows])
     return len(rows)

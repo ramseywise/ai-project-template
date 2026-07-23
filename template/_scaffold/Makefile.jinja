@@ -174,6 +174,7 @@ test-integration:
 # Scoped to this project's own source, not the whole repo root — .claude/.agents/
 # ship vendored reference material (e.g. mcp-builder's example scripts) that
 # isn't held to this project's lint config and was never meant to be.
+{% if primary_backend_language in ["python", "both"] -%}
 LINT_PATHS := {{ py_project_root }}/{{ ai_source_root }} core {{ eval_root }} tests{% if include_ml %} {{ py_project_root }}/{{ ml_source_root }}{% endif %}
 
 lint:
@@ -186,6 +187,16 @@ lint-check:
 
 typecheck:
 	uv run pyright
+{% else -%}
+lint:
+	@echo "Python lint skipped (primary_backend_language={{ primary_backend_language }})"
+
+lint-check:
+	@echo "Python lint-check skipped (primary_backend_language={{ primary_backend_language }})"
+
+typecheck:
+	@echo "Python typecheck skipped (primary_backend_language={{ primary_backend_language }})"
+{% endif -%}
 
 {% if primary_backend_language in ["typescript", "both"] -%}
 # --- TS backend service ({{ ts_project_root }}/) ---
