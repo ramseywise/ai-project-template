@@ -14,7 +14,7 @@ from security.guards import check_input, check_output, filter_content
 
 inbound = check_input(user_text)
 if inbound.blocked:
-    return inbound.text          # refusal message, never the reason
+    return inbound.text  # refusal message, never the reason
 
 docs = [filter_content(d.page_content, source="rag").text for d in retrieved]
 answer = check_output(llm.invoke(prompt).content)
