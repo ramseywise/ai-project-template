@@ -958,14 +958,25 @@ def run_catalog_checks() -> list[dict[str, Any]]:
             })
 
     # Check 2: every `adds` path resolves into template/
+    # Catalog paths are rendered-output paths (e.g. `evals/graders/escalation.py`).
+    # In the template tree they may live under _scaffold/{{ py_project_root }}/.
+    _SCAFFOLD_PREFIXES = [
+        "",
+        f"_scaffold/{VAR_DEFAULTS.get('py_project_root', 'backend')}/",
+        f"_scaffold/{VAR_DEFAULTS.get('ts_project_root', 'my-project')}/",
+    ]
     for cap in capabilities:
         cap_name = cap["name"]
         for path in cap["adds_paths"]:  # type: ignore[union-attr]
-            # Strip trailing / for directory checks
             path_clean = path.rstrip("/")
-            if not _path_exists_in_template(
-                path_clean, template_files, template_dirs, VAR_DEFAULTS
-            ):
+            found = False
+            for prefix in _SCAFFOLD_PREFIXES:
+                if _path_exists_in_template(
+                    prefix + path_clean, template_files, template_dirs, VAR_DEFAULTS
+                ):
+                    found = True
+                    break
+            if not found:
                 findings.append({
                     "type": "CATALOG_PATH_MISSING",
                     "severity": "WARNING",

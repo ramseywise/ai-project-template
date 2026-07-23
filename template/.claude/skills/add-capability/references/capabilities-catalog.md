@@ -92,7 +92,7 @@ scale vector store or the project already has a Postgres dependency.
 |-------|-------|
 | sets | add `escalation` to `eval_metrics` (merge with existing list) |
 | requires | `has_gradeable_interactions=true` (i.e., a chat agent is scaffolded: `primary_chat_agent` in `[lg_agent, adk_agent, both]`) |
-| adds | `evals/graders/escalation.py`, LLM judge, report section |
+| adds | `evals/graders/heuristic/escalation.py`, `evals/graders/judges/escalation.py`, `evals/metrics/escalation.py` |
 
 ---
 
@@ -104,7 +104,7 @@ scale vector store or the project already has a Postgres dependency.
 |-------|-------|
 | sets | add `friction` to `eval_metrics` |
 | requires | `has_gradeable_interactions=true` |
-| adds | `evals/graders/friction.py`, LLM judge, report section |
+| adds | `evals/graders/heuristic/friction.py`, `evals/graders/judges/friction.py`, `evals/metrics/friction.py` |
 
 ---
 
@@ -116,7 +116,7 @@ scale vector store or the project already has a Postgres dependency.
 |-------|-------|
 | sets | add `intent` to `eval_metrics` |
 | requires | `has_gradeable_interactions=true` |
-| adds | `evals/graders/intent.py`, LLM judge, report section |
+| adds | `evals/graders/heuristic/intent.py`, `evals/graders/judges/intent.py`, `evals/metrics/intent.py` |
 
 ---
 
@@ -128,7 +128,7 @@ scale vector store or the project already has a Postgres dependency.
 |-------|-------|
 | sets | add `language` to `eval_metrics` |
 | requires | `has_gradeable_interactions=true` |
-| adds | `evals/graders/language.py`, LLM judge, report section |
+| adds | `evals/graders/heuristic/language.py`, `evals/graders/judges/language.py`, `evals/metrics/language.py` |
 
 ---
 
