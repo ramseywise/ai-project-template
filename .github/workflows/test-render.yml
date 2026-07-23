@@ -56,17 +56,17 @@ jobs:
             tier: test-py
           # A2: a non-retrieval shape — no lg_agent BM25, no rag_agent, so
           # has_corpus_pipeline is false: core/ is an empty ETL home, the corpus
-          # subpackage + retrieval golden-QA eval + tests/unit/core are dropped,
-          # and only the interaction-eval suite (ai_backend is agent-shaped)
-          # remains. Proves the gutted-corpus render's pytest passes.
+          # subpackage + retrieval golden-QA eval + tests/unit/core are dropped.
+          # primary_chat_agent defaults to none for ai_backend, so
+          # has_gradeable_interactions is also false — interaction evals and all
+          # test subdirs are removed. Lint-only (no unit tests to run).
           - name: no-corpus-ai_backend
             args: "-d project_type=ai_backend"
-            tier: test-py
           - name: ts-backend
             args: "-d primary_backend_language=typescript"
             tier: test-ts
           - name: split-service
-            args: "-d primary_backend_language=both -d frontend_backend_topology=split_service"
+            args: "-d primary_backend_language=both -d frontend_backend_topology=split_service -d include_frontend=true"
             tier: test-split
           - name: ml
             args: "-d include_ml=true"
@@ -147,6 +147,8 @@ jobs:
       # .agents/ is vendored reference material that mentions copier variables in
       # prose (e.g. framework-selection's SKILL.md) — excluded here for the same
       # reason the generated Makefile's LINT_PATHS and pre-commit exclude it.
+      # .claude/skills/new-agent/references/ carries Cypher/JSON/prose examples
+      # with literal {{ }} (not unrendered copier) — same exclusion rationale.
       # {{prompt}}/{{question}} are promptfoo's own runtime template syntax, not
       # unrendered copier Jinja — filtered by pattern (not by excluding the whole
       # file, which also carries real copier substitutions worth checking).
@@ -163,7 +165,7 @@ jobs:
         env:
           ACTIONS_EXPR: '[$]{{'
         run: |
-          if grep -rn '{{' out/ --exclude-dir='.agents' --include='*.py' --include='*.md' --include='*.toml' --include='*.yaml' --include='*.yml' | grep -v "font-family\|border-collapse\|padding: 0.4rem\|background: #f2f2f2\|margin-bottom\|font-weight: bold\|{{prompt}}\|{{question}}\|$ACTIONS_EXPR"; then
+          if grep -rn '{{' out/ --exclude-dir='.agents' --exclude-dir='references' --include='*.py' --include='*.md' --include='*.toml' --include='*.yaml' --include='*.yml' | grep -v "font-family\|border-collapse\|padding: 0.4rem\|background: #f2f2f2\|margin-bottom\|font-weight: bold\|{{prompt}}\|{{question}}\|{{ }}\|$ACTIONS_EXPR"; then
             echo "Leftover unrendered Jinja found"
             exit 1
           fi
@@ -226,8 +228,15 @@ jobs:
         run: |
           git init -q && git add -A
           git -c user.email=ci@ci -c user.name=ci commit -qm "genesis render"
+          # Remove out/.git before copier re-render: copier 9.17 detects a dirty
+          # local template and runs `git add -A --work-tree=$GITHUB_WORKSPACE` on
+          # its temp clone. That picks up out/ as a gitlink (nested .git), and the
+          # subsequent `git submodule update` fails because there is no .gitmodules
+          # entry. copier copy --overwrite doesn't need the destination to have VCS
+          # history, so removing .git is safe.
+          rm -rf .git || true
           copier copy --overwrite --vcs-ref HEAD --trust --defaults \
-            -d include_rag_agent=true "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/out"
+            ${{ matrix.args }} -d include_rag_agent=true "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/out"
           test -d backend/src/agents/rag_agent \
             || { echo "add-capability re-entry did not land rag_agent"; exit 1; }
           # rag_agent implies has_corpus_pipeline → the corpus subpackage + its
@@ -254,7 +263,7 @@ jobs:
 
       - name: split_service frontend — install/build
         if: matrix.tier == 'test-split'
-        working-directory: out/render-test
+        working-directory: out/frontend/render-test
         run: |
           npm install
           npm run build

@@ -117,7 +117,7 @@ const NEUTRALIZED = "[filtered]";
  */
 export function filterContent(
   text: string,
-  source: string = "tool"
+  source: string = "tool",
 ): GuardResult {
   if (!settings.contentFilterEnabled) {
     return { text, blocked: false, reasons: [] };
@@ -245,7 +245,7 @@ export function checkOutput(text: string): GuardResult {
  */
 export async function guardTurn(
   userText: string,
-  modelCall: (safeInput: string) => Promise<string>
+  modelCall: (safeInput: string) => Promise<string>,
 ): Promise<GuardResult> {
   const inbound = checkInput(userText);
   if (!allowed(inbound)) {
