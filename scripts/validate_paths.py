@@ -88,13 +88,16 @@ JINJA_VAR_RE = re.compile(r"\{\{[^}]+\}\}")
 # Path fragment patterns that _tasks uses (rm, mv, cp, mkdir).
 # We extract the path arguments after the command name.
 # Matches a bare Jinja identifier used as concatenation operand: ~ var_name ~
-JINJA_CONCAT_VAR_RE = re.compile(r"~\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*~|~\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*$|^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*~")
+JINJA_CONCAT_VAR_RE = re.compile(
+    r"~\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*~|~\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*$|^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*~"
+)
 
 
 # ---------------------------------------------------------------------------
 # YAML parsing helpers (stdlib only — no PyYAML fallback needed; we parse just
 # enough to extract _tasks strings without executing Jinja).
 # ---------------------------------------------------------------------------
+
 
 def _load_yaml_raw(path: Path) -> str:
     return path.read_text(encoding="utf-8")
@@ -241,8 +244,15 @@ def _extract_paths_from_task(task_str: str, vars_: dict[str, str]) -> list[str]:
     paths: list[str] = []
 
     staging_prefixes = (
-        "_scaffold/", ".claude/", ".agents/", "mcp_servers/",
-        "frontend/", "infrastructure/", "configs/", ".vscode/", ".github/",
+        "_scaffold/",
+        ".claude/",
+        ".agents/",
+        "mcp_servers/",
+        "frontend/",
+        "infrastructure/",
+        "configs/",
+        ".vscode/",
+        ".github/",
     )
 
     for s in concrete_strings:
@@ -268,6 +278,7 @@ def _extract_paths_from_task(task_str: str, vars_: dict[str, str]) -> list[str]:
 # Template tree inventory
 # ---------------------------------------------------------------------------
 
+
 def _inventory_template(template_dir: Path) -> tuple[set[str], set[str]]:
     """
     Return (all_files, all_dirs) as sets of paths relative to template_dir.
@@ -287,6 +298,7 @@ def _inventory_template(template_dir: Path) -> tuple[set[str], set[str]]:
 # ---------------------------------------------------------------------------
 # Path resolution: map a _tasks path (post-substitution) to a template path
 # ---------------------------------------------------------------------------
+
 
 def _task_path_to_template_path(path: str, vars_: dict[str, str]) -> str:
     """
@@ -346,7 +358,7 @@ def _all_reverse_substitutions(path: str, vars_: dict[str, str]) -> list[str]:
     def _product(lists: list[list[str]]) -> list[list[str]]:
         result: list[list[str]] = [[]]
         for lst in lists:
-            result = [r + [item] for r in result for item in lst]
+            result = [[*r, item] for r in result for item in lst]
         return result
 
     return ["/".join(combo) for combo in _product(per_segment)]
@@ -415,6 +427,7 @@ def _path_exists_in_template(
 # Orphan detection: every template dir under _scaffold/ should be reachable
 # ---------------------------------------------------------------------------
 
+
 def _collect_addressable_paths(tasks: list[str], vars_: dict[str, str]) -> set[str]:
     """
     Collect all substituted-value paths addressed by any _tasks entry.
@@ -436,11 +449,13 @@ def _substitute_vars_in_template_path(template_path: str, vars_: dict[str, str])
     E.g. `_scaffold/{{ py_project_root }}/{{ ai_source_root }}` →
          `_scaffold/backend/src`
     """
+
     def replacer(m: re.Match) -> str:
         inner = m.group(0)[2:-2].strip()
         if re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", inner):
             return vars_.get(inner, m.group(0))
         return m.group(0)
+
     return JINJA_VAR_RE.sub(replacer, template_path)
 
 
@@ -451,9 +466,7 @@ def _is_addressed(template_path: str, addressed: set[str], vars_: dict[str, str]
     """
     substituted = _substitute_vars_in_template_path(template_path, vars_)
     for a in addressed:
-        if (substituted == a or
-                substituted.startswith(a + "/") or
-                a.startswith(substituted + "/")):
+        if substituted == a or substituted.startswith(a + "/") or a.startswith(substituted + "/"):
             return True
     return False
 
@@ -461,6 +474,7 @@ def _is_addressed(template_path: str, addressed: set[str], vars_: dict[str, str]
 # ---------------------------------------------------------------------------
 # Static analysis driver
 # ---------------------------------------------------------------------------
+
 
 def run_static_analysis() -> list[dict[str, Any]]:
     """Run static analysis and return list of finding dicts."""
@@ -488,12 +502,14 @@ def run_static_analysis() -> list[dict[str, Any]]:
             if not any(p.startswith(pfx) for pfx in staging_check_prefixes):
                 continue
             if not _path_exists_in_template(p, template_files, template_dirs, VAR_DEFAULTS):
-                findings.append({
-                    "type": "MISSING_TASK_PATH",
-                    "severity": "ERROR",
-                    "path": p,
-                    "detail": f"_tasks references '{p}' but no matching entry in template/",
-                })
+                findings.append(
+                    {
+                        "type": "MISSING_TASK_PATH",
+                        "severity": "ERROR",
+                        "path": p,
+                        "detail": f"_tasks references '{p}' but no matching entry in template/",
+                    }
+                )
 
     # --- Check 2: every _scaffold/ dir in template/ is addressed by _tasks ---
     addressed = _collect_addressable_paths(tasks, VAR_DEFAULTS)
@@ -527,13 +543,15 @@ def run_static_analysis() -> list[dict[str, Any]]:
         if len(parts) > 4:
             continue
         if not _is_addressed(d, addressed, VAR_DEFAULTS):
-            findings.append({
-                "type": "ORPHAN_DIR",
-                "severity": "WARNING",
-                "path": d,
-                "detail": f"template/{d} is not referenced by any _tasks entry "
-                          f"(may render but never be moved/deleted)",
-            })
+            findings.append(
+                {
+                    "type": "ORPHAN_DIR",
+                    "severity": "WARNING",
+                    "path": d,
+                    "detail": f"template/{d} is not referenced by any _tasks entry "
+                    f"(may render but never be moved/deleted)",
+                }
+            )
 
     # --- Check 3: verify no {{ }} vars remain in template directory NAMES ---
     # (These must all be defined variables with defaults)
@@ -541,15 +559,19 @@ def run_static_analysis() -> list[dict[str, Any]]:
     for path in sorted(template_dirs | template_files):
         for m in JINJA_VAR_RE.finditer(path):
             inner = m.group(0)[2:-2].strip()
-            if re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", inner):
-                if inner not in known_vars and inner != "_copier_conf":
-                    findings.append({
+            if (
+                re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", inner)
+                and inner not in known_vars
+                and inner != "_copier_conf"
+            ):
+                findings.append(
+                    {
                         "type": "UNDEFINED_PATH_VAR",
                         "severity": "ERROR",
                         "path": path,
-                        "detail": f"Path uses undefined variable '{inner}' "
-                                  f"(not in VAR_DEFAULTS)",
-                    })
+                        "detail": f"Path uses undefined variable '{inner}' (not in VAR_DEFAULTS)",
+                    }
+                )
 
     return findings
 
@@ -562,65 +584,104 @@ RENDER_MATRIX = [
     {
         "label": "python-only defaults",
         "flags": [
-            "-d", "project_name=TestProject",
-            "-d", "scaffold_full_project=true",
-            "-d", "primary_backend_language=python",
-            "-d", "primary_chat_agent=lg_agent",
-            "-d", "include_agent_reference_library=false",
-            "-d", "global_skills_source=none",
-            "-d", "enable_macos_notifications=false",
+            "-d",
+            "project_name=TestProject",
+            "-d",
+            "scaffold_full_project=true",
+            "-d",
+            "primary_backend_language=python",
+            "-d",
+            "primary_chat_agent=lg_agent",
+            "-d",
+            "include_agent_reference_library=false",
+            "-d",
+            "global_skills_source=none",
+            "-d",
+            "enable_macos_notifications=false",
         ],
     },
     {
         "label": "typescript-only",
         "flags": [
-            "-d", "project_name=TestProject",
-            "-d", "scaffold_full_project=true",
-            "-d", "primary_backend_language=typescript",
-            "-d", "ts_agent_framework=vercel_ai_sdk",
-            "-d", "include_agent_reference_library=false",
-            "-d", "global_skills_source=none",
-            "-d", "enable_macos_notifications=false",
+            "-d",
+            "project_name=TestProject",
+            "-d",
+            "scaffold_full_project=true",
+            "-d",
+            "primary_backend_language=typescript",
+            "-d",
+            "ts_agent_framework=vercel_ai_sdk",
+            "-d",
+            "include_agent_reference_library=false",
+            "-d",
+            "global_skills_source=none",
+            "-d",
+            "enable_macos_notifications=false",
         ],
     },
     {
         "label": "both languages",
         "flags": [
-            "-d", "project_name=TestProject",
-            "-d", "scaffold_full_project=true",
-            "-d", "primary_backend_language=both",
-            "-d", "primary_chat_agent=lg_agent",
-            "-d", "ts_agent_framework=vercel_ai_sdk",
-            "-d", "include_agent_reference_library=false",
-            "-d", "global_skills_source=none",
-            "-d", "enable_macos_notifications=false",
+            "-d",
+            "project_name=TestProject",
+            "-d",
+            "scaffold_full_project=true",
+            "-d",
+            "primary_backend_language=both",
+            "-d",
+            "primary_chat_agent=lg_agent",
+            "-d",
+            "ts_agent_framework=vercel_ai_sdk",
+            "-d",
+            "include_agent_reference_library=false",
+            "-d",
+            "global_skills_source=none",
+            "-d",
+            "enable_macos_notifications=false",
         ],
     },
     {
         "label": "layering-only",
         "flags": [
-            "-d", "project_name=TestProject",
-            "-d", "scaffold_full_project=false",
-            "-d", "include_agent_reference_library=false",
-            "-d", "global_skills_source=none",
-            "-d", "enable_macos_notifications=false",
+            "-d",
+            "project_name=TestProject",
+            "-d",
+            "scaffold_full_project=false",
+            "-d",
+            "include_agent_reference_library=false",
+            "-d",
+            "global_skills_source=none",
+            "-d",
+            "enable_macos_notifications=false",
         ],
     },
     {
         "label": "python ml + all metrics",
         "flags": [
-            "-d", "project_name=TestProject",
-            "-d", "scaffold_full_project=true",
-            "-d", "primary_backend_language=python",
-            "-d", "primary_chat_agent=lg_agent",
-            "-d", "include_ml=true",
-            "-d", "include_metric_escalation=true",
-            "-d", "include_metric_friction=true",
-            "-d", "include_metric_intent=true",
-            "-d", "include_metric_language=true",
-            "-d", "include_agent_reference_library=false",
-            "-d", "global_skills_source=none",
-            "-d", "enable_macos_notifications=false",
+            "-d",
+            "project_name=TestProject",
+            "-d",
+            "scaffold_full_project=true",
+            "-d",
+            "primary_backend_language=python",
+            "-d",
+            "primary_chat_agent=lg_agent",
+            "-d",
+            "include_ml=true",
+            "-d",
+            "include_metric_escalation=true",
+            "-d",
+            "include_metric_friction=true",
+            "-d",
+            "include_metric_intent=true",
+            "-d",
+            "include_metric_language=true",
+            "-d",
+            "include_agent_reference_library=false",
+            "-d",
+            "global_skills_source=none",
+            "-d",
+            "enable_macos_notifications=false",
         ],
     },
 ]
@@ -637,19 +698,22 @@ def run_render_tests() -> list[dict[str, Any]]:
             capture_output=True,
         )
     except (subprocess.CalledProcessError, FileNotFoundError):
-        findings.append({
-            "type": "RENDER_SKIP",
-            "severity": "WARNING",
-            "path": "",
-            "detail": "copier not found or not runnable — skipping render tests",
-        })
+        findings.append(
+            {
+                "type": "RENDER_SKIP",
+                "severity": "WARNING",
+                "path": "",
+                "detail": "copier not found or not runnable — skipping render tests",
+            }
+        )
         return findings
 
     for combo in RENDER_MATRIX:
         label = combo["label"]
         with tempfile.TemporaryDirectory(prefix="validate_paths_") as dst:
             cmd = [
-                "copier", "copy",
+                "copier",
+                "copy",
                 "--overwrite",
                 "--defaults",
                 "--trust",
@@ -659,13 +723,15 @@ def run_render_tests() -> list[dict[str, Any]]:
             ]
             result = subprocess.run(cmd, capture_output=True, text=True)
             if result.returncode != 0:
-                findings.append({
-                    "type": "RENDER_FAILED",
-                    "severity": "ERROR",
-                    "path": f"[{label}]",
-                    "detail": f"copier exited {result.returncode}: "
-                              + (result.stderr or result.stdout)[:300].replace("\n", " "),
-                })
+                findings.append(
+                    {
+                        "type": "RENDER_FAILED",
+                        "severity": "ERROR",
+                        "path": f"[{label}]",
+                        "detail": f"copier exited {result.returncode}: "
+                        + (result.stderr or result.stdout)[:300].replace("\n", " "),
+                    }
+                )
                 continue
 
             # Walk output and check for unrendered {{ }} in paths or file bodies
@@ -674,28 +740,34 @@ def run_render_tests() -> list[dict[str, Any]]:
                 for d in dirnames:
                     rel = str(rel_root / d)
                     if JINJA_VAR_RE.search(rel):
-                        findings.append({
-                            "type": "UNRENDERED_PATH",
-                            "severity": "ERROR",
-                            "path": f"[{label}] {rel}",
-                            "detail": "Directory name contains unrendered {{ }} after render",
-                        })
+                        findings.append(
+                            {
+                                "type": "UNRENDERED_PATH",
+                                "severity": "ERROR",
+                                "path": f"[{label}] {rel}",
+                                "detail": "Directory name contains unrendered {{ }} after render",
+                            }
+                        )
                     if d == "":
-                        findings.append({
-                            "type": "EMPTY_DIR_NAME",
-                            "severity": "ERROR",
-                            "path": f"[{label}] {rel_root}/",
-                            "detail": "Empty-named directory created",
-                        })
+                        findings.append(
+                            {
+                                "type": "EMPTY_DIR_NAME",
+                                "severity": "ERROR",
+                                "path": f"[{label}] {rel_root}/",
+                                "detail": "Empty-named directory created",
+                            }
+                        )
                 for f in filenames:
                     rel = str(rel_root / f)
                     if JINJA_VAR_RE.search(rel):
-                        findings.append({
-                            "type": "UNRENDERED_PATH",
-                            "severity": "ERROR",
-                            "path": f"[{label}] {rel}",
-                            "detail": "File path contains unrendered {{ }} after render",
-                        })
+                        findings.append(
+                            {
+                                "type": "UNRENDERED_PATH",
+                                "severity": "ERROR",
+                                "path": f"[{label}] {rel}",
+                                "detail": "File path contains unrendered {{ }} after render",
+                            }
+                        )
                     # Check file body for unrendered {{ }}
                     full_path = Path(root) / f
                     try:
@@ -707,7 +779,10 @@ def run_render_tests() -> list[dict[str, Any]]:
                             # Only flag .py, .ts, .toml, .json, .yaml, .yml, .sh, Makefile.
                             suffix = full_path.suffix.lower()
                             allowed_template_exts = {
-                                ".md", ".jinja", ".txt", ".example",
+                                ".md",
+                                ".jinja",
+                                ".txt",
+                                ".example",
                             }
                             # Secondary filter: {{ }} in rendered .py files can be
                             # legitimate Python f-string escaping for literal braces
@@ -716,25 +791,32 @@ def run_render_tests() -> list[dict[str, Any]]:
                             # expression (bare identifier, filter, or operator) —
                             # not CSS properties (contain ; or start with a CSS keyword
                             # followed by non-identifier chars).
-                            _CSS_RE = re.compile(
-                                r"\{\{\s*[\w-]+(?:\s*:\s*[^}]+|[^}]*;[^}]*)\}\}"
-                            )
+                            _CSS_RE = re.compile(r"\{\{\s*[\w-]+(?:\s*:\s*[^}]+|[^}]*;[^}]*)\}\}")
                             jinja_matches = [
-                                m for m in JINJA_VAR_RE.finditer(body)
+                                m
+                                for m in JINJA_VAR_RE.finditer(body)
                                 if not _CSS_RE.fullmatch(m.group(0))
                             ]
-                            if suffix not in allowed_template_exts and full_path.name not in {
-                                "Makefile", "Dockerfile",
-                            } and jinja_matches:
+                            if (
+                                suffix not in allowed_template_exts
+                                and full_path.name
+                                not in {
+                                    "Makefile",
+                                    "Dockerfile",
+                                }
+                                and jinja_matches
+                            ):
                                 # Find first match for context
                                 m = jinja_matches[0]
-                                findings.append({
-                                    "type": "UNRENDERED_BODY",
-                                    "severity": "ERROR",
-                                    "path": f"[{label}] {rel}",
-                                    "detail": f"File body contains unrendered Jinja: "
-                                              f"'{m.group(0)[:60]}'",
-                                })
+                                findings.append(
+                                    {
+                                        "type": "UNRENDERED_BODY",
+                                        "severity": "ERROR",
+                                        "path": f"[{label}] {rel}",
+                                        "detail": f"File body contains unrendered Jinja: "
+                                        f"'{m.group(0)[:60]}'",
+                                    }
+                                )
                     except (PermissionError, IsADirectoryError):
                         pass
 
@@ -759,44 +841,83 @@ CATALOG_PATH = (
 # not user-facing capabilities, so we don't flag them as "uncovered".
 _CATALOG_SKIP_VARS: set[str] = {
     # copier internal
-    "_min_copier_version", "_subdirectory", "_external_data",
-    "_message_before_copy", "_message_after_copy", "_exclude", "_tasks",
+    "_min_copier_version",
+    "_subdirectory",
+    "_external_data",
+    "_message_before_copy",
+    "_message_after_copy",
+    "_exclude",
+    "_tasks",
     "_migrations",
     # computed / derived booleans driven by optional_features / other vars
-    "is_agent_shaped", "has_typescript", "has_corpus_pipeline",
-    "has_gradeable_interactions", "include_interaction_evals",
+    "is_agent_shaped",
+    "has_typescript",
+    "has_corpus_pipeline",
+    "has_gradeable_interactions",
+    "include_interaction_evals",
     "enable_structure_guard",
     # derived slug vars (computed from mcp_server_slug; not set independently)
-    "py_mcp_server_slug", "ts_mcp_server_slug",
+    "py_mcp_server_slug",
+    "ts_mcp_server_slug",
     # derived from optional_features multiselect — catalog references the
     # multiselect itself, not each derived boolean
-    "include_akira", "include_dev_companion", "include_promptfoo",
-    "include_ragas_grader", "include_web_research",
-    "include_meeting_intelligence", "include_marketing_integrations",
-    "include_n8n_webhook", "include_composio", "include_ml",
+    "include_akira",
+    "include_dev_companion",
+    "include_promptfoo",
+    "include_ragas_grader",
+    "include_web_research",
+    "include_meeting_intelligence",
+    "include_marketing_integrations",
+    "include_n8n_webhook",
+    "include_composio",
+    "include_ml",
     # derived from eval_metrics multiselect
-    "include_metric_escalation", "include_metric_friction",
-    "include_metric_intent", "include_metric_language",
+    "include_metric_escalation",
+    "include_metric_friction",
+    "include_metric_intent",
+    "include_metric_language",
     # config/infra vars — not capability-shaped
-    "project_name", "project_slug", "project_description", "project_type",
-    "primary_users", "external_systems", "deployment_target", "cloud",
-    "agent_memory", "human_approval", "observability_provider",
-    "data_sensitivity", "ticket_prefix", "python_version", "aws_region",
-    "expensive_command_patterns", "eval_allowed_dirs",
-    "agent_config_profile", "enable_macos_notifications",
+    "project_name",
+    "project_slug",
+    "project_description",
+    "project_type",
+    "primary_users",
+    "external_systems",
+    "deployment_target",
+    "cloud",
+    "agent_memory",
+    "human_approval",
+    "observability_provider",
+    "data_sensitivity",
+    "ticket_prefix",
+    "python_version",
+    "aws_region",
+    "expensive_command_patterns",
+    "eval_allowed_dirs",
+    "agent_config_profile",
+    "enable_macos_notifications",
     "global_skills_source",
     # path-root vars — covered indirectly via `adds` paths
-    "py_project_root", "ai_source_root", "ml_source_root", "eval_root",
-    "ts_project_root", "ts_source_root",
+    "py_project_root",
+    "ai_source_root",
+    "ml_source_root",
+    "eval_root",
+    "ts_project_root",
+    "ts_source_root",
     # agent naming vars
-    "agent_slug", "lg_agent_dir", "adk_agent_dir",
-    "mcp_server_name", "mcp_server_slug",
+    "agent_slug",
+    "lg_agent_dir",
+    "adk_agent_dir",
+    "mcp_server_name",
+    "mcp_server_slug",
     # rag sub-options not independently capability-shaped
-    "rag_impl", "corpus_pipeline_kind", "include_ts_rag",
+    "rag_impl",
+    "corpus_pipeline_kind",
+    "include_ts_rag",
     "enable_postgres_checkpointer",
     # calendar — no catalog entry yet (not in add-capability scope)
-    "include_calendar_integration", "include_security_guards",
-    "include_dev_companion",
+    "include_calendar_integration",
+    "include_security_guards",
 }
 
 # Copier var=value pattern — extract var name only (left of =)
@@ -809,17 +930,17 @@ _VAR_STANDALONE_RE = re.compile(r"`([a-zA-Z_][a-zA-Z0-9]*(?:_[a-zA-Z0-9_]+)+)`")
 # Known catalog tokens that look like var names (contain _) but are actually
 # enum values, multiselect item names, or mode strings — not copier var names.
 _CATALOG_VALUE_TOKENS: set[str] = {
-    "existing_repo",         # value for scaffold_full_project=false mode label
-    "n8n_webhook",           # optional_features list item
-    "web_research",          # optional_features list item
+    "existing_repo",  # value for scaffold_full_project=false mode label
+    "n8n_webhook",  # optional_features list item
+    "web_research",  # optional_features list item
     "meeting_intelligence",  # optional_features list item
-    "lg_agent",              # primary_chat_agent enum value
-    "adk_agent",             # primary_chat_agent enum value
-    "vercel_ai_sdk",         # ts_agent_framework enum value
-    "split_service",         # frontend_backend_topology enum value
-    "rag_agent",             # project_type / agent type label
-    "streamText",            # Vercel AI SDK function name (mentioned in adds text)
-    "agent_slug",            # path segment var (in _CATALOG_SKIP_VARS; not a set target)
+    "lg_agent",  # primary_chat_agent enum value
+    "adk_agent",  # primary_chat_agent enum value
+    "vercel_ai_sdk",  # ts_agent_framework enum value
+    "split_service",  # frontend_backend_topology enum value
+    "rag_agent",  # project_type / agent type label
+    "streamText",  # Vercel AI SDK function name (mentioned in adds text)
+    "agent_slug",  # path segment var (in _CATALOG_SKIP_VARS; not a set target)
 }
 # Copier var in a Jinja-style {var_name} reference used in adds paths
 _JINJA_CATALOG_VAR_RE = re.compile(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
@@ -884,16 +1005,16 @@ def _parse_catalog(catalog_text: str) -> list[dict[str, object]]:
                     current["vars"].add(token)  # type: ignore[union-attr]
 
         # Extract path strings from adds rows only
-        if line.strip().startswith("| adds") or (
-            "adds" in line and "|" in line
-        ):
+        if line.strip().startswith("| adds") or ("adds" in line and "|" in line):
             for m in _ADDS_PATH_RE.finditer(line):
                 path = m.group(1)
                 # Strip leading / if any
                 path = path.lstrip("/")
+
                 # Replace {var} placeholders with VAR_DEFAULTS values
-                def _sub_var(vm: re.Match) -> str:  # noqa: E306
+                def _sub_var(vm: re.Match) -> str:
                     return VAR_DEFAULTS.get(vm.group(1), vm.group(1))
+
                 path = _JINJA_CATALOG_VAR_RE.sub(_sub_var, path)
                 # Only keep paths that look like relative template paths
                 if "/" in path and not path.startswith("http"):
@@ -919,12 +1040,14 @@ def run_catalog_checks() -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
 
     if not CATALOG_PATH.exists():
-        findings.append({
-            "type": "CATALOG_MISSING",
-            "severity": "ERROR",
-            "path": str(CATALOG_PATH.relative_to(REPO_ROOT)),
-            "detail": "Capabilities catalog file not found",
-        })
+        findings.append(
+            {
+                "type": "CATALOG_MISSING",
+                "severity": "ERROR",
+                "path": str(CATALOG_PATH.relative_to(REPO_ROOT)),
+                "detail": "Capabilities catalog file not found",
+            }
+        )
         return findings
 
     catalog_text = CATALOG_PATH.read_text(encoding="utf-8")
@@ -934,12 +1057,14 @@ def run_catalog_checks() -> list[dict[str, Any]]:
     capabilities = _parse_catalog(catalog_text)
 
     if not capabilities:
-        findings.append({
-            "type": "CATALOG_EMPTY",
-            "severity": "WARNING",
-            "path": str(CATALOG_PATH.relative_to(REPO_ROOT)),
-            "detail": "No capability entries parsed from catalog",
-        })
+        findings.append(
+            {
+                "type": "CATALOG_EMPTY",
+                "severity": "WARNING",
+                "path": str(CATALOG_PATH.relative_to(REPO_ROOT)),
+                "detail": "No capability entries parsed from catalog",
+            }
+        )
         return findings
 
     # Collect all vars the catalog touches across all capabilities
@@ -950,12 +1075,14 @@ def run_catalog_checks() -> list[dict[str, Any]]:
     # Check 1: every catalog var exists in copier.yaml
     for var in sorted(all_catalog_vars):
         if var not in copier_vars:
-            findings.append({
-                "type": "CATALOG_VAR_MISSING",
-                "severity": "ERROR",
-                "path": f"capabilities-catalog.md",
-                "detail": f"Var `{var}` referenced in catalog but not in copier.yaml",
-            })
+            findings.append(
+                {
+                    "type": "CATALOG_VAR_MISSING",
+                    "severity": "ERROR",
+                    "path": "capabilities-catalog.md",
+                    "detail": f"Var `{var}` referenced in catalog but not in copier.yaml",
+                }
+            )
 
     # Check 2: every `adds` path resolves into template/
     # Catalog paths are rendered-output paths (e.g. `evals/graders/escalation.py`).
@@ -977,24 +1104,29 @@ def run_catalog_checks() -> list[dict[str, Any]]:
                     found = True
                     break
             if not found:
-                findings.append({
-                    "type": "CATALOG_PATH_MISSING",
-                    "severity": "WARNING",
-                    "path": f"[{cap_name}] {path_clean}",
-                    "detail": f"`adds` path not found in template/ (may be conditional)",
-                })
+                findings.append(
+                    {
+                        "type": "CATALOG_PATH_MISSING",
+                        "severity": "WARNING",
+                        "path": f"[{cap_name}] {path_clean}",
+                        "detail": "`adds` path not found in template/ (may be conditional)",
+                    }
+                )
 
     # Check 3: uncovered copier vars (exist in copier.yaml, not in catalog, not skipped)
     uncovered = copier_vars - all_catalog_vars - _CATALOG_SKIP_VARS
     for var in sorted(uncovered):
-        findings.append({
-            "type": "CATALOG_VAR_UNCOVERED",
-            "severity": "INFO",
-            "path": "copier.yaml",
-            "detail": f"Var `{var}` has no catalog entry (consider documenting)",
-        })
+        findings.append(
+            {
+                "type": "CATALOG_VAR_UNCOVERED",
+                "severity": "INFO",
+                "path": "copier.yaml",
+                "detail": f"Var `{var}` has no catalog entry (consider documenting)",
+            }
+        )
 
     return findings
+
 
 def _print_report(findings: list[dict[str, Any]]) -> None:
     errors = [f for f in findings if f["severity"] == "ERROR"]
@@ -1043,6 +1175,7 @@ def _print_report(findings: list[dict[str, Any]]) -> None:
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(
