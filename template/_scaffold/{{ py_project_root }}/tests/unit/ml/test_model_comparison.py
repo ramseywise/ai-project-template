@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from sklearn.datasets import load_breast_cancer
-
 from ml.model_comparison.compare import (
     TabularPreprocessor,
     compare_classifiers,
     default_baseline_models,
 )
+from sklearn.datasets import load_breast_cancer
 
 
 def test_tabular_preprocessor_handles_missing_and_categorical():

@@ -4,7 +4,6 @@ import json
 from types import SimpleNamespace
 
 import pytest
-
 from integrations import meeting_intelligence as mi_module
 from integrations.meeting_intelligence import ActionItem, MeetingExtraction, extract_action_items
 

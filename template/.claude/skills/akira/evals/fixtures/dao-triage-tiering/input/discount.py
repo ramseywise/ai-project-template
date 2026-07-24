@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import math  # dead import — nothing in this module uses math (FINDING 1: low/nit)
-
 
 def apply_discount(price: float, pct: float) -> float:
     """Apply a percentage discount to a price.

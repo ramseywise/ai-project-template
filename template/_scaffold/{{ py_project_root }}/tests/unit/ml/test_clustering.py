@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from sklearn.datasets import make_blobs
-
 from ml.clustering.gmm import (
     build_cluster_features,
     filter_by_cluster_overlap,
     fit_gmm,
     predict_cluster_probs,
 )
+from sklearn.datasets import make_blobs
 
 
 def _blob_df(n_samples: int = 300, centers: int = 4, seed: int = 0) -> pd.DataFrame:

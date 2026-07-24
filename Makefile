@@ -7,8 +7,9 @@ input_dir := .
 help:  ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-12s %s\n", $$1, $$2}'
 
-lint:  ## Validate template paths and copier config
+lint:  ## Validate template paths, copier config, and Python lint
 	@python3 scripts/validate_paths.py
+	@ruff check scripts/
 
 test:  ## Validate paths + catalog check
 	@python3 scripts/validate_paths.py
