@@ -1,4 +1,6 @@
-.PHONY: help lint test new_project new_project_dev run_copier check_tools preview_defaults project pull status push quick-pr ship
+include ~/.claude/Makefile.common
+
+.PHONY: help lint test new_project new_project_dev run_copier check_tools preview_defaults project
 
 input_dir := .
 
@@ -11,37 +13,6 @@ lint:  ## Validate template paths and copier config
 test:  ## Validate paths + catalog check
 	@python3 scripts/validate_paths.py
 	@python3 scripts/validate_paths.py --catalog-check
-
-pull:  ## Pull latest from origin/main
-	git pull origin main
-
-status:  ## Show branch, unpushed commits, staged changes, open PRs
-	@echo "=== ai-project-template ==="
-	@echo "Branch: $$(git branch --show-current)"
-	@echo "Unpushed:"
-	@git log origin/$$(git branch --show-current)..HEAD --oneline 2>/dev/null || echo "  (no remote tracking)"
-	@echo "Staged:"
-	@git diff --cached --stat 2>/dev/null || true
-	@echo "Modified:"
-	@git diff --stat 2>/dev/null || true
-	@echo "Open PRs:"
-	@gh pr list --state open --json number,title,headBranch --jq '.[] | "#\(.number) \(.title) [\(.headBranch)]"' 2>/dev/null || echo "  (none)"
-
-push:  ## Push current branch to origin
-	git push -u origin $$(git branch --show-current)
-
-quick-pr:  ## Create PR from current branch with auto-generated body
-	@BRANCH=$$(git branch --show-current); \
-	if [ "$$BRANCH" = "main" ]; then echo "Error: can't PR from main"; exit 1; fi; \
-	EXISTING=$$(gh pr list --head "$$BRANCH" --json number --jq '.[0].number' 2>/dev/null); \
-	if [ -n "$$EXISTING" ]; then echo "PR #$$EXISTING already exists for $$BRANCH"; exit 0; fi; \
-	COMMITS=$$(git log origin/main..HEAD --oneline 2>/dev/null); \
-	ISSUES=$$(echo "$$COMMITS" | grep -oE '#[0-9]+' | sort -u | tr '\n' ' ' | xargs); \
-	BODY=$$(printf "## Summary\n%s\n\n%s\n" "$$COMMITS" "$${ISSUES:+(no issue references found)}"); \
-	echo "Creating PR for $$BRANCH..."; \
-	gh pr create --title "$$BRANCH" --body "$$BODY"
-
-ship: lint test pull push quick-pr  ## lint → test → pull → push → PR
 
 check_tools:
 	@command -v copier >/dev/null 2>&1 || { echo "copier not found — install with: uv tool install copier"; exit 1; }
