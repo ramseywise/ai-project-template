@@ -84,6 +84,9 @@ STAGING_PREFIXES = ("_scaffold",)
 
 # Copier template variable pattern — {{ variable_name }}
 JINJA_VAR_RE = re.compile(r"\{\{[^}]+\}\}")
+# Matches CSS-style {{ }} blocks (contain `:` property syntax or `;`) — not Jinja expressions.
+# Compiled once at module level; used in render-test body sweep.
+_CSS_RE = re.compile(r"\{\{\s*[\w-]+(?:\s*:\s*[^}]+|[^}]*;[^}]*)\}\}")
 
 # Path fragment patterns that _tasks uses (rm, mv, cp, mkdir).
 # We extract the path arguments after the command name.
@@ -184,6 +187,9 @@ def _eval_jinja_concat(expr: str, vars_: dict[str, str]) -> list[str]:
     # Simple split — works for copier.yaml's flat ternaries (no nested if/else)
     if " else " in expr:
         parts = expr.split(" else ", 1)
+        # Strip the ` if <condition>` suffix that leaks into the first branch.
+        # e.g. `'true' if _use_feature else 'false'` → first part is `'true' if _use_feature`
+        parts[0] = re.sub(r"\s+if\s+.*", "", parts[0])
         branches.extend(parts)
     else:
         branches.append(expr)
@@ -790,8 +796,7 @@ def run_render_tests() -> list[dict[str, Any]]:
                             # Only flag if the inner content looks like a Jinja
                             # expression (bare identifier, filter, or operator) —
                             # not CSS properties (contain ; or start with a CSS keyword
-                            # followed by non-identifier chars).
-                            _CSS_RE = re.compile(r"\{\{\s*[\w-]+(?:\s*:\s*[^}]+|[^}]*;[^}]*)\}\}")
+                            # followed by non-identifier chars). _CSS_RE is at module level.
                             jinja_matches = [
                                 m
                                 for m in JINJA_VAR_RE.finditer(body)
