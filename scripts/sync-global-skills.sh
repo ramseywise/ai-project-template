@@ -68,11 +68,7 @@ RULES=(
 
 # Skills that are NOT vendored and why:
 DELIBERATELY_EXCLUDED=(
-  wake          # guacamayo identity-lifecycle only; writes to .sounding/, no .sounding/ here
-  grow          # guacamayo identity-lifecycle only
-  dream         # guacamayo identity-lifecycle only
-  genesis       # guacamayo initiation-only; self-blocks when consciousness exists; meaningless outside puffin
-  grow-companion # guacamayo/atlas companion pattern; not a general skill
+  # (no global skills are currently excluded — all reservoir skills are vendored)
 )
 #
 # Template-owned skills with no global counterpart (tracked for completeness):
@@ -196,8 +192,7 @@ if [ -f "$copier_yaml" ]; then
 
   for skill in "${SKILLS[@]}"; do
     skill="${skill%%[[:space:]]*}"  # strip inline comment
-    grep -q "/\.claude/skills/$skill " "$copier_yaml" ||
-      grep -q "/\.claude/skills/$skill'" "$copier_yaml" ||
+    grep -qE "/\.claude/skills/$skill(/|'| )" "$copier_yaml" ||
       unlisted+=("$skill (vendored but never cleaned up)")
   done
 
