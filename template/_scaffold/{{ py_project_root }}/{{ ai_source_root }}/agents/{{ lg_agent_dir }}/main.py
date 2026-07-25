@@ -37,7 +37,6 @@ except ImportError:
 
 try:
     from fastapi.middleware.cors import CORSMiddleware
-
     from middleware.settings import settings as auth_settings
 
     app.add_middleware(

@@ -37,7 +37,13 @@ def extract_questions(raw: str) -> list[dict]:
             if current:
                 questions.append(current)
             name = line.split(":")[0]
-            current = {"name": name, "type": "str", "default": None, "choices": None, "when": "true"}
+            current = {
+                "name": name,
+                "type": "str",
+                "default": None,
+                "choices": None,
+                "when": "true",
+            }
         elif current and line.startswith("  "):
             stripped = line.strip()
             if stripped.startswith("type:"):
@@ -48,9 +54,8 @@ def extract_questions(raw: str) -> list[dict]:
             elif stripped.startswith("when:"):
                 val = stripped.split(":", 1)[1].strip().strip('"').strip("'")
                 current["when"] = val
-            elif stripped.startswith("multiselect:"):
-                if "true" in stripped.lower():
-                    current["type"] = "multiselect"
+            elif stripped.startswith("multiselect:") and "true" in stripped.lower():
+                current["type"] = "multiselect"
 
     if current:
         questions.append(current)
@@ -171,8 +176,11 @@ def main():
     # Show key derived values
     print("\n── Key derived values ──")
     derived_keys = [
-        "scaffold_full_project", "is_agent_shaped", "has_typescript",
-        "include_mcp_server", "enable_postgres_checkpointer"
+        "scaffold_full_project",
+        "is_agent_shaped",
+        "has_typescript",
+        "include_mcp_server",
+        "enable_postgres_checkpointer",
     ]
     for k in derived_keys:
         if k in resolved:

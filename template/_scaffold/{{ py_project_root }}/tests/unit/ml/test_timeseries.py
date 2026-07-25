@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import numpy as np
-
 from ml.timeseries.arima import ARIMAForecaster, check_arima_assumptions
 from ml.timeseries.preprocessing import (
     apply_scaler,

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LinearRegression
-
 from ml.feature_engineering.features import (
     add_calendar_features,
     add_ewm_features,
@@ -14,6 +12,7 @@ from ml.feature_engineering.features import (
     mutual_information_importance,
     permutation_importance,
 )
+from sklearn.linear_model import LinearRegression
 
 
 def _panel_df(n: int = 100) -> pd.DataFrame:

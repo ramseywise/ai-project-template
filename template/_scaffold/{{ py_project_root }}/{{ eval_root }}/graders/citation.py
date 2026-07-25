@@ -14,9 +14,8 @@ from __future__ import annotations
 
 import re
 
-from pydantic import BaseModel
-
 from core.pipelines.corpus.models import SearchResult
+from pydantic import BaseModel
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 

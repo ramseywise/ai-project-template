@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import numpy as np
-
 from ml.stats_testing.ab_test import (
     bootstrap_cliffs_delta,
     cliffs_delta,
