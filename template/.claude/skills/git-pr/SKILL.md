@@ -13,7 +13,7 @@ End-to-end PR flow for the current working tree.
 
 1. **Check**: `git status` + `git diff main...HEAD --stat` — if clean and no unpushed commits, stop
 2. **Commit** (if needed): list files, skip secrets/`.env`/large binaries, show list + message, confirm before `git commit`
-3. **Push**: `git push -u origin HEAD` — if rejected, `git pull --rebase origin main`, resolve conflicts, retry
+3. **Push**: `git push -u origin HEAD` — if rejected, `git fetch origin main && git rebase origin/main`, resolve conflicts, retry
 4. **Draft PR**: read active plan if present, write title + body per conventions below, show full content, confirm before `gh pr create`
 5. **Merge** (optional): ask **"Merge now? (y/n/squash)"** → merge with `--delete-branch` or leave open
 
