@@ -3,20 +3,16 @@ name: scope-poc
 description: >
   System design interview for a new AI project — produces DESIGN.md capturing problem,
   actors, MVP scope, and key decisions before handing off to /project-genesis.
-  Triggers on: "scope a project", "design interview", "what should we build", "system design",
-  "help me scope", "POC planning", "before genesis", "/scope-poc". Also triggered automatically
-  when a user seems to be starting from scratch without a clear design.
-  DSSG-aware: recognizes nonprofit-success-ai (customer portal) and project-mgmt-ai (lifecycle
-  backend) and applies DSSG platform context automatically.
+  Triggers on: "scope a project", "design interview", "what should we build", "system design", "help me scope", "POC planning", "before genesis", "/scope-poc". Also triggered automatically when a user seems to be starting from scratch without a clear design.
+
+  DSSG-aware: recognizes nonprofit-success-ai (customer portal) and project-mgmt-ai (lifecycle backend) and applies DSSG platform context automatically.
 ---
 
 # /scope-poc
 
-Upstream design conversation that runs **before** `/project-genesis`. Produces `DESIGN.md`.
-The two skills in sequence: `/scope-poc` → `/project-genesis` → `copier`.
+Upstream design conversation that runs **before** `/project-genesis`. Produces `DESIGN.md`. The two skills in sequence: `/scope-poc` → `/project-genesis` → `copier`.
 
-`/project-genesis` answers HOW to build it (infrastructure). This skill answers WHAT to build.
-Don't conflate them — many design sessions happen weeks before the scaffold is run.
+`/project-genesis` answers HOW to build it (infrastructure). This skill answers WHAT to build. Don't conflate them — many design sessions happen weeks before the scaffold is run.
 
 ## Usage
 
