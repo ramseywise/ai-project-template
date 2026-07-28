@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
+
 from ml.timeseries.preprocessing import (
     StationarityReport,
     check_stationarity,
