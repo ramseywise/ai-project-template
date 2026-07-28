@@ -43,7 +43,7 @@ dependencies = [
 {%- endif %}
 {%- if primary_chat_agent in ["adk_agent", "both"] %}
     "google-adk>=1.0.0",
-    "mcp>=1.0.0",
+    "mcp>=1.0.0,<2.0.0",
 {%- endif %}
 {%- if frontend_backend_topology == "split_service" %}
     "pyjwt[crypto]>=2.9.0",
