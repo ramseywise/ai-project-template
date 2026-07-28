@@ -43,6 +43,9 @@ dependencies = [
 {%- endif %}
 {%- if primary_chat_agent in ["adk_agent", "both"] %}
     "google-adk>=1.0.0",
+{%- endif %}
+{%- if primary_chat_agent != "none" %}
+    # mcp 2.0 (2026-07-28) drops 1.x APIs that langchain-mcp-adapters and google-adk import
     "mcp>=1.0.0,<2.0.0",
 {%- endif %}
 {%- if frontend_backend_topology == "split_service" %}
