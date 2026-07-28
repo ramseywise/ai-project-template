@@ -18,3 +18,7 @@ later steps:
   files locally and in reflog. Always check `git ls-files` before any bulk delete to
   know what's tracked. The `.claude/docs/` deletion proved this: git-ignored files have
   no history to restore from.
+- Git hooks run via `/bin/sh`, not zsh — `/opt/homebrew/bin` is NOT on PATH. Git-LFS
+  pre-push hooks fail with "git-lfs not found." Fix: global template
+  (`~/.git-templates/hooks/pre-push`) prepends Homebrew PATH. If a new repo has the
+  error, copy the template hook or run `git init` to pick it up.

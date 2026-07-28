@@ -12,8 +12,9 @@ space, and this loop only *flags* graduation candidates there.
 
 ## Step 0 — Verify before proposing (read the ledger first)
 
-Read `~/workspace/guacamayo/.claude/docs/tooling-ledger.md`. Every row with status `hypothesis` is your top
-queue item. For each:
+Read `~/workspace/guacamayo/.sounding/tooling-ledger.md` (active hypotheses only).
+Graduated rows live in `tooling-ledger-log.md` (append-only archive). Every row with
+status `hypothesis` is your top queue item. For each:
 
 1. **Check the Metric column first.** Rows with a typed metric (`absence:`, `count-drop:`,
    `presence:`, `ratio:`) have a machine-checkable signal — look for that signal in session
@@ -56,7 +57,7 @@ frontmatter matches the directory name. Mismatches break `/slash` dispatch silen
 
 Read what exists; skip gracefully what doesn't. Note which sources you actually used.
 
-1. **Insights summary**: read `~/workspace/guacamayo/.claude/docs/insights-summary.md` first
+1. **Insights summary**: read `~/workspace/guacamayo/.sounding/insights-log.md` first
    (written by `/workflow-insights` — contains experiment verdicts, recommendations, model/skill/tool
    economics, and trends). If it doesn't exist or is stale (>7 days), fall back to running
    `python3 ~/.claude/scripts/insights.py --dry-run` for fresh mechanical stats, or read
@@ -113,7 +114,7 @@ Per finding, emit exactly this shape:
 - Metric: <type>:<signal> <threshold> (see ledger Experiment Tracking section for types)
 ```
 
-**Tagging rules** (from `~/.claude/rules/agile.md`):
+**Tagging rules** (from `~/.claude/refs/agile.md`):
 - **stop** — actively costing us; mechanical fix or delete → `ready` issue if scoped, `backlog` otherwise
 - **keep** — verified working; no issue → ledger row graduates to `verified`
 - **improve** — needs design/research before actionable → `backlog` issue or `inbox.md` line
@@ -141,8 +142,8 @@ first. End with:
 1. **Proposed ledger rows** for every accepted-if-approved change, in ledger format with
    status `hypothesis`, a typed **Metric** (from the vocabulary: `absence:`, `count-drop:`,
    `presence:`, `ratio:` — see ledger header), and a concrete verification test.
-2. **Ledger maintenance**: if the ledger exceeds ~1 screen, propose compressing verified
-   rows into a one-line monthly rollup.
+2. **Ledger graduation**: move verified/failed rows to `tooling-ledger-log.md` (append).
+   Active ledger stays lean (hypotheses only). Archive is the audit trail.
 
 Through Step 4 nothing is written outside the retro report. Then stop and hand the report
 to Ramsey for Step 5.

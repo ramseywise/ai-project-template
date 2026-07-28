@@ -99,4 +99,38 @@ Flag issues as **BLOCKER** / **QUESTION** / **NOTE**.
 If execute-ready: call `/compact "phase: plan → execute"` to snapshot and compact before implementing.
 The PreCompact hook writes a checkpoint to `~/.claude/sessions/` so the execute phase starts with clean context.
 
-**Next step**: `/plan review` to verify, then `/execute` to implement.
+**Next step**: `/workflow-refine` to DoR-gate the issue, then `/workflow-execute` to implement.
+
+For initiative-scale work, `/design-initiative` provides milestone decomposition + task backlog generation in one pass — use it when the plan covers a named initiative that needs phase checkpoints and a Linear-ready task breakdown rather than a single implementation plan.
+
+## Exit
+
+When the plan is execute-ready (review verdict passes):
+
+1. **Label sync** — if there's a GitHub issue, keep it at `refinement` (refine will promote to `ready`).
+
+2. **Compact** — `/compact "phase: plan → execute"` (already called in review mode above; if not yet called, call now).
+
+3. **Print exit block**:
+
+```
+──────────────────────────────────────
+Plan complete.
+Next: /workflow-refine (DoR gate), then /workflow-execute <slug>
+Model: fable for refine, sonnet for execute
+
+Spawn prompt (refine):
+┌─────────────────────────────────────
+│ cd <repo-path>
+│ Read <plan-doc-path>
+│ /workflow-refine
+└─────────────────────────────────────
+
+Spawn prompt (execute — after refine passes):
+┌─────────────────────────────────────
+│ cd <repo-path>
+│ Read <plan-doc-path>
+│ /workflow-execute <slug>
+└─────────────────────────────────────
+──────────────────────────────────────
+```

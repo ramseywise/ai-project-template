@@ -53,6 +53,10 @@ Wait for all agents to complete before proceeding.
 
 ## Step 3 — Trio triage
 
+**Model note**: Steps 1-2 use haiku for fan-out breadth. This step synthesizes
+agent reports into priority-sorted verdicts — fable's lane. When `/workflow-refine`
+is dispatched as a spawned agent, use `model: "fable"` for Steps 3-5.
+
 For each issue, apply the PM / designer / EM framing. This is where the three
 perspectives converge on whether the issue is worth doing, well-scoped, and ready.
 
@@ -88,7 +92,7 @@ Verdicts:
 ## Step 4 — DoR gate
 
 For each issue with verdict `ready`, check against the Definition of Ready
-(from `~/.claude/rules/agile.md`):
+(from `~/.claude/refs/agile.md`):
 
 - [ ] Problem stated in one sentence (observed friction, not solution)
 - [ ] Acceptance criteria — checkable by someone who didn't scope it
@@ -163,3 +167,28 @@ explaining the gap, or gets closed. Don't let issues sit in perpetual refinement
 - **`/workflow-retro`**: produces backlog items from session friction. Feeds into this skill.
 
 Pipeline: `/workflow-retro` → backlog → **`/workflow-refine`** → ready → `/workflow-plan` → plan doc → `/workflow-execute`
+
+## Exit
+
+When refinement is complete and ready items are promoted:
+
+1. **Label sync** — already handled in Step 6 (`--remove-label "backlog" --add-label "ready"`).
+
+2. **Compact** — call `/compact "phase: refine → execute"` to shed triage context.
+
+3. **Print exit block**:
+
+```
+──────────────────────────────────────
+✅ Refinement complete.
+👉 Next: /workflow-plan <slug> (for highest-priority ready item)
+🧠 Model: opus
+
+Spawn prompt (for each ready item):
+┌─────────────────────────────────────
+│ cd <repo-path>
+│ gh issue view <N>
+│ /workflow-plan <slug>
+└─────────────────────────────────────
+──────────────────────────────────────
+```

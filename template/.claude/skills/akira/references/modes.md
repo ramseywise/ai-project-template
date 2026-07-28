@@ -26,23 +26,24 @@ apply→test→revert loop that a subagent can't safely hand back clean. dao con
 findings, triages them by blast radius, applies only the safe ones behind a test gate,
 and syncs docs. See `dao.md` for the full contract.
 
-## `all` and `auto`
+## Full flow and sweep
 
-`all` = wander → scan → dao, unconditionally. "Look at this properly, run everything."
+**Bare `/akira`** = full flow: wander → scan → sanyi → dao. Scope is automatic: if a diff
+exists (uncommitted + branch changes), scope = diff. If clean, scope = whole repo (scan
+fans out over all tracked files, wander skips, sanyi runs audit).
 
-`auto` = the same family, routed. It classifies the changed set and skips modes that have
-nothing to act on — scan is skipped when nothing executable changed — but **always ends at
-dao**, because dao is the only mode that actuates. dao's test gate is untouched by routing:
-skipping scan changes what dao is given to work from, never whether it is allowed to mutate.
+**`/akira all`** = repo sweep. Runs the full flow across all included repos sequentially.
+Not a mode — a scope directive. Each repo gets independent scope detection. Results
+aggregate into a cross-repo summary table.
 
-Prefer `auto` as the default entrypoint; reach for `all` when you want to force a scan the
-router would have skipped.
+Included repos: guacamayo, job-system, learn-ai-engineering, librarian, atlas,
+ai-project-template, listen-wiseer.
 
 ## Why one skill, not three
 
-The modes share diff-scoping, repo resolution, and the report format, and they compose
-(`all`). Splitting them into three skills would duplicate that shared setup and hide the
-family relationship. One `/akira` skill, four mode tokens.
+The primitives share scope detection, repo resolution, and the report format. Splitting
+them into three skills would duplicate that shared setup and hide the family relationship.
+One `/akira` skill, 3 primitive tokens + full flow + sweep.
 
 ## Relationship to the other review tools
 

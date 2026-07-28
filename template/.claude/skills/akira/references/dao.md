@@ -8,7 +8,7 @@ real evidence they're correct.
 ## 1. Get findings
 
 If invoked bare (`/akira dao`), run `scan` first and use its merged, source-verified
-findings. If dao is the `all` leg, reuse the scan output already produced.
+findings. If dao runs as part of the full flow, reuse the scan output already produced.
 
 ## 2. Test gate (the hard precondition)
 
@@ -80,7 +80,7 @@ anything in the diff. When a doc contradicts the tree, update the doc (working t
 - **Machine-consumed docs** (`.claude/`, `CLAUDE.md`, `SANYI.md`): edit freely — this is
   the feedback loop the docs.md rule already permits.
 - **Human-consumed docs** (README, DESIGN.md): this is the akira exception in
-  `~/.claude/rules/docs.md`. Look for the repo's **doc-style ref** — the repo's `Refs:`
+  the doc-writer boundary (akira dao exception). Look for the repo's **doc-style ref** — the repo's `Refs:`
   line pointing at a docs-style ref, or repo-local stakeholder guidelines. Conform to it.
   **No style ref found → still edit, but flag prominently in the run report** that a human
   doc was edited without a style guide, so the human reviewer checks tone before committing.

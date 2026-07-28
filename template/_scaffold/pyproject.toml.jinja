@@ -95,6 +95,12 @@ markers = ["integration: real external calls, opt-in only"]
 line-length = 100
 target-version = "py{{ python_version.replace('.', '') }}"
 
+# .claude/ is vendored tooling payload (skills/agents shipped by the template) —
+# not project code, and skill eval fixtures contain deliberate lint findings.
+# force-exclude keeps the exclusion when hooks/CI pass files to ruff by name.
+extend-exclude = [".claude"]
+force-exclude = true
+
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "N", "UP", "B", "C4", "SIM", "RUF"]
 # RUF001-003: typographic unicode in prose; N803/N806: ML naming (X, y, X_train)

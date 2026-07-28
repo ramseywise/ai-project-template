@@ -5,9 +5,10 @@ akira's `references/behavioral-eval-scaffold.md`.
 
 ## 1. Triggering eval (default, cheap) — `trigger-eval.json`
 
-20 realistic queries, ~half should-trigger / half should-not. Covers all four modes
-(`scan`/`wander`/`dao`/`all`), fires on natural phrasings ("quality check", "what did I
-miss", "interrogate the intent, find the bugs, fix what's safe"), and — critically — does
+20 realistic queries, ~half should-trigger / half should-not. Covers 3 primitives + full
+flow + sweep (`scan`/`wander`/`dao`/bare `/akira`/`all` sweep), fires on natural phrasings
+("quality check", "what did I miss", "interrogate the intent, find the bugs, fix what's
+safe"), and — critically — does
 NOT false-trigger on the near-misses akira sits between: `/review-sweep` (standing report),
 `/code-review` (plan-fidelity), `/sanyi audit` (contract), `/review-pr`, plain `make test`,
 and commit/refactor/debug requests.

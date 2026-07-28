@@ -95,12 +95,16 @@ The engine is `librarian/tools/cartographer/parser.py` (canonical since 2026-07-
    - Hook overhead (number of hooks × fire frequency)
    - Recommend: which skills/hooks/always-loaded content to slim or lazy-load
 
-9. **Friction patterns** — from tool errors, bash antipatterns, hook blocks:
+9. **Friction patterns** — from tool errors, bash antipatterns, hook blocks, and
+   explicit user signals:
    - Error types and frequency
    - Bash antipatterns per session (shell used where dedicated tools exist)
    - Hook blocks (PreToolUse blocks, Stop blocks) — useful vs. false-positive
    - read:edit ratio (sessions editing without reading first)
    - Long sessions without planning structure
+   - **Friction label count** and content summary (from `FRICTION:` prefixes in user messages)
+   - **Execution skill compliance rate** (% of execution-intent sessions invoking ≥1 skill)
+   - **Spawned-agent-type distribution** (from parent Agent tool calls — compare to cost attribution)
 
    **Failure attribution** — classify each error event using this lookup table.
    The parser emits `tool_errors` as counts by error name with no retry-sequence data,
@@ -136,8 +140,9 @@ The engine is `librarian/tools/cartographer/parser.py` (canonical since 2026-07-
    instead as a taxonomy gap). `env` errors → infrastructure/config action; `tool` errors
    → hook or MCP config action; `code` errors → skill/hook/workflow action.
 
-10. **Experiment check** — read `~/workspace/guacamayo/.claude/docs/tooling-ledger.md` and
-    find rows with status `hypothesis` that have a typed Metric (not `—`). For each, check
+10. **Experiment check** — read `~/workspace/guacamayo/.sounding/tooling-ledger.md`
+    (active hypotheses; graduated rows in `tooling-ledger-log.md`). For each `hypothesis`
+    row with a typed Metric (not `—`), check
     the session data against the metric:
     - `absence:<signal>` — search sessions for the signal; 0 occurrences = confirmed
     - `count-drop:<signal>` — count occurrences per session, compare to threshold
@@ -166,7 +171,7 @@ The engine is `librarian/tools/cartographer/parser.py` (canonical since 2026-07-
     Rank by cost-weighted impact. The single biggest lever goes first.
 
 12. **Persist summary** — write the machine-readable output to
-    `~/workspace/guacamayo/.claude/docs/insights-summary.md` (overwrite each run):
+    `~/workspace/guacamayo/.sounding/insights-log.md` (append a new dated section at the top — do NOT overwrite):
 
     ```markdown
     # Insights Summary — [date]

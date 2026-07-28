@@ -29,6 +29,16 @@ the session's — so that repo's own sessions and /wake find them (pointers, not
 2. Read the active doc fully; set its `Status:` line to `IN PROGRESS` before starting
 3. `git status` + `uv run pytest --tb=no -q` — if baseline tests fail, stop and report
 
+## Worktree agent dispatch
+
+When a step uses `isolation: "worktree"`, the Agent tool auto-creates throwaway
+`worktree-agent-{id}` branches. These cannot be pushed for review. Before spawning:
+
+1. Create a named branch: `git checkout -b {PREFIX}-{NUM}-slug`
+2. Commit any structural changes (moves/renames) — agents see the committed state
+3. Agent prompt must include: `git checkout {PREFIX}-{NUM}-slug`, commit format with `(#{num})`, and `git pull --rebase origin main` before first commit
+4. After agent returns: `git -C .claude/worktrees/agent-{id} branch --show-current` — if `worktree-agent-*`, cherry-pick onto the named branch before proceeding
+
 ## Per-step loop
 
 For each step in the plan:
@@ -61,6 +71,35 @@ Flag any of these and wait for guidance.
 Any departure from the plan — even small — should be recorded in CHANGELOG.md when that artifact is part of the workflow: what the plan said, what was done, why. A clean execution has zero deviations. Deviations are not failures — hiding them is.
 
 **Phase checkpoint**: when all steps are done, call `/compact "phase: execute → review"` before switching.
-The PreCompact hook writes a final execute-phase snapshot and compacts so `/code-review` starts with clean context.
+The PreCompact hook writes a final execute-phase snapshot and compacts so review starts with clean context.
 
-**Next step**: `/code-review <name>` after all steps are complete.
+**Next step**: `/workflow-review` after all steps are complete — run BEFORE committing so
+findings can be fixed without amend/fixup commits. User commits after review passes.
+
+## Exit
+
+When all plan steps are done and tests pass:
+
+1. **Label sync** — update the GitHub issue:
+   ```bash
+   gh issue edit <N> --remove-label "in-progress" --add-label "in-review"
+   ```
+
+2. **Compact** — `/compact "phase: execute → review"` (already called in phase checkpoint above; if not yet called, call now).
+
+3. **Print exit block**:
+
+```
+──────────────────────────────────────
+✅ Execution complete.
+👉 Next: /workflow-review <slug>
+🧠 Model: fable
+
+Spawn prompt:
+┌─────────────────────────────────────
+│ cd <repo-path>
+│ Read <plan-doc-path>
+│ /workflow-review <slug>
+└─────────────────────────────────────
+──────────────────────────────────────
+```

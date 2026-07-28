@@ -66,12 +66,8 @@ each batch **in parallel** (pass file paths + one-line repo context; `model: hai
 pinned in the agent def, restate on the Agent call). Agent outputs canonical schema
 with evidence tags (see `~/.claude/refs/finding-schema.md`).
 
-**Merge step** (per `review-shared` merge logic): collect all akira-scan + SANYI findings
-in canonical schema format. Group by file+lines overlap (within 5 lines) AND category
-similarity. Judge if grouped findings describe the same underlying issue. Merge confirmed
-duplicates: preserve all source IDs, use most precise root cause, take higher merge_impact,
-take more certain evidence_state. Drop findings the linter already caught in step 2.
-Rank blockers first, then important, questions, suggestions, nits.
+**Merge step:** Apply merge/dedup logic from review-shared — see its "Merge and deduplication" section.
+Drop findings the linter already caught in step 2.
 
 ### 5. Docs
 - Machine-consumed docs (`.claude/`, CLAUDE.md, SANYI.md): if changed code contradicts
@@ -79,13 +75,29 @@ Rank blockers first, then important, questions, suggestions, nits.
   diff in the report at level ≥2.
 - Human-consumed docs (README, DESIGN.md, wiki): at level ≥2, run the `/docs-check`
   protocol (diff mode — scoped to changed dirs). Flag staleness only — never edit
-  (doc-writer boundary, `~/.claude/rules/docs.md`). At level 1, skip structural check
+  (doc-writer boundary). At level 1, skip structural check
   but still flag obviously broken references caught by the `docs_hygiene` hook.
 
 ### 6. Report
 If the repo has a plan doc with `Status: IN PROGRESS` whose scope covers this diff,
 append there; otherwise write `<repo>/.claude/docs/plans/YYYY-MM-DD-review-sweep.md`
 (`Status: EXECUTED` once written).
+
+### 6b. Persist findings
+
+After writing the report, append each merged finding as one JSON line to
+`~/workspace/guacamayo/.claude/docs/review-findings.jsonl` (create if missing).
+Use the persistence format from `~/.claude/refs/finding-schema.md`:
+
+- `date`: today's date (YYYY-MM-DD)
+- `repo`: the repo being reviewed
+- `review_type`: "code-review"
+- `session_id`: from environment if available, else omit
+- All other fields from the canonical finding (id, source, file, lines, title,
+  merge_impact, evidence_state, category)
+
+Skip if there are zero findings. Do not persist linter-only pass/fail — only
+structured findings from akira-scan and SANYI.
 
 ```markdown
 ## Review — sweep [date]

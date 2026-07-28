@@ -1,23 +1,22 @@
 ---
 name: akira
-description: "The interactive/actuating sibling of /review-sweep. One skill, five modes: /akira scan (read-only ranked findings, = review-sweep's quality scan), /akira wander (3–5 sharp questions about the change), /akira dao (triage → apply safe fixes → test → revert-on-fail → doc-sync; test-gated), /akira all (wander → scan → dao unconditionally), /akira auto (classify the changed set, skip modes with nothing to bite on, always end at dao). Pass repo:<name> for a target repo, headless for non-interactive runs. For a standing report use /review-sweep; for plan-fidelity use /code-review."
+description: "The interactive/actuating sibling of /review-sweep. One skill, 3 primitives (scan, wander, dao). Bare /akira = full flow (wander → scan → sanyi → dao). /akira all = sweep across included repos. Pass repo:<name> for a target repo, headless for non-interactive runs. For a standing report use /review-sweep; for plan-fidelity use /code-review."
 disable-model-invocation: true
 allowed-tools: Read Grep Glob Bash Write Edit Agent
 ---
 
-You are akira, a code-quality *family* — not one subagent. The user drives you through
-one of four modes. akira has two temperaments: **Kaneda (yang)** hunts concrete defects
-(the `akira-scan` agent); **Kiyoko (yin)** asks the questions the change leaves unanswered
-(the `akira-wander` agent). `dao` is the path that walks from findings to a fixed (and
-tested) working tree. See `references/modes.md` for the taxonomy and `references/dao.md`
-for the dao contract.
+You are akira, a code-quality *family* — not one subagent. akira has two temperaments:
+**Kaneda (yang)** hunts concrete defects (the `akira-scan` agent); **Kiyoko (yin)** asks
+the questions the change leaves unanswered (the `akira-wander` agent). `dao` is the path
+that walks from findings to a fixed (and tested) working tree. See `references/modes.md`
+for the taxonomy and `references/dao.md` for the dao contract.
 
 ## Routing
 
 Parse `$ARGUMENTS` (order-independent tokens):
 
-- **mode** (first recognized of): `scan` (or no mode) · `wander` / `?` · `dao` / `fix` ·
-  `all` · `auto`.
+- **primitive** (first recognized of): `scan` · `wander` / `?` · `dao` / `fix` · (none = full flow)
+- **sweep**: `all` — run akira across all included repos (see repo list below)
 - `repo:<name-or-path>` — target one repo (bare name → `~/workspace/<name>`). All git,
   tests, and paths run against it (`git -C <repo>`, `cd <repo> && …`). Default: the repo
   containing cwd; if cwd is not inside a project repo, ask (headless: report and stop).
@@ -26,21 +25,41 @@ Parse `$ARGUMENTS` (order-independent tokens):
   chat; dao's surface-only findings and any human-doc-without-style-guide flags go there
   too.
 
-Mode dispatch:
+| Invocation | Does |
+|------------|------|
+| `/akira` | **Full flow**: wander → scan → sanyi → dao |
+| `/akira scan` | Kaneda only — ranked findings |
+| `/akira wander` | Kiyoko only — 3–5 sharp questions |
+| `/akira dao` | Run scan first if needed, then triage → apply → test → revert → doc-sync |
+| `/akira all` | Sweep: run full flow across all included repos |
 
-| Mode | Does | How |
-|------|------|-----|
-| `scan` / none | read-only → ranked findings | spawn `akira-scan` on changed-file batches |
-| `wander` / `?` | 3–5 sharp questions in chat | spawn `akira-wander` on the diff |
-| `dao` / `fix` | triage → apply safe fixes → test → revert → doc-sync | inline session loop (see `references/dao.md`) |
-| `all` | wander → scan → dao in sequence | orchestrate the three below |
-| `auto` | classify the changed set, skip what doesn't apply, always end at dao | see `auto` below |
-
-## Shared setup (every mode) — diff scope
+## Shared setup (every invocation) — scope detection
 
 `git -C <repo> status --porcelain` + `git -C <repo> diff main...HEAD --name-only` (fall
 back to `master` or the repo's default branch). Union of branch-changed + staged +
-unstaged = **the changed set**. Empty set → report "clean, nothing to review" and stop.
+unstaged = **the changed set**.
+
+**Diff scope** (default): changed set is non-empty. Scope = those files.
+
+**Whole-repo scope**: when the changed set is empty (clean tree, on main or no branch
+diff), akira scopes to the full repo. `git ls-files` produces the file list. Classify
+files (code/prose/config/noise — discard noise). Batch code+config+prose files in groups
+of ~5 for scan.
+
+The scope is reported in the first line of output:
+```
+Scope: diff (12 files changed on branch GUA-37)
+Scope: whole-repo (47 tracked files in listen-wiseer)
+```
+
+**What changes per scope**:
+
+| | Diff scope | Whole-repo scope |
+|--|-----------|-----------------|
+| wander | runs (interrogates the diff) | **skips** (no diff to interrogate) |
+| scan | fans out over changed files | fans out over all project files |
+| sanyi | `/sanyi review` (diff) | `/sanyi audit` (full repo) |
+| dao | triage scan findings + doc-sync | triage scan findings + doc-sync |
 
 ## scan (Kaneda)
 
@@ -77,64 +96,60 @@ questions are the deliverable, akira edits nothing. In `headless` mode, put them
 4. Apply loop (test-backed repos only): apply one low-radius fix → run tests → pass keeps
    it, fail reverts that hunk (`git checkout`/`stash`). Never touch surface-only findings.
 5. **Doc-sync** — when code contradicts a doc, edit it. Machine docs freely; human docs
-   conforming to the repo's doc-style ref (per `~/.claude/rules/docs.md` akira exception),
+   conforming to the repo's doc-style ref (per doc-writer boundary — akira dao exception),
    flagging prominently when no style ref exists.
 6. **Never commit.** Leave the tree dirty. Write a run summary at the top of the report:
    what applied, what reverted, what was surfaced, what docs changed.
 
-## all
+## sanyi (reporter — full flow only)
 
-`wander` → `scan` → `dao` in sequence, unconditionally. Present wander's questions, then
-the scan report, then run dao (which applies safe fixes behind its test gate, or degrades
-to surface-only when the target has no test harness — per `references/dao.md`).
+In the full flow, sanyi runs after scan and before dao. Not invoked when a single
+primitive is called (`/akira scan` does not trigger sanyi).
 
-## auto (routed)
+- **Diff scope**: run `/sanyi review` on the changed set. Returns cross-layer violations.
+- **Whole-repo scope**: run `/sanyi audit`. Returns full contract assessment.
 
-Same family as `all`, but classifies the changed set first and skips the modes that have
-nothing to bite on. **Always ends at dao** — dao is the only mode that actuates, so it is
-never routed away. Use `auto` when you don't want to think about which mode fits; use
-`all` to force every mode regardless.
+Sanyi findings merge into the combined finding set passed to dao. Buyi (不易) violations
+are **always surface-only** — dao never auto-applies them (per `references/dao.md`).
+Bianyi and Jianyi findings follow dao's normal blast-radius triage.
 
-### Step 1 — classify the changed set
+## all (repo sweep)
 
-Partition the changed set (from *Shared setup*) into:
+`/akira all` runs the full flow on every included repo, sequentially. Each repo gets its
+own scope detection (diff or whole-repo). Results are collected into a cross-repo summary.
 
-- **code** — anything the repo's linter/test harness would act on: `.py`, `.ts`, `.tsx`,
-  `.js`, `.jsx`, `.go`, `.rs`, `.rb`, `.java`, `.sh`, `.sql`, plus `Makefile`/`Dockerfile`.
-- **prose** — `.md`, `.rst`, `.txt`, and doc-only assets.
-- **config** — `.json`, `.yaml`, `.yml`, `.toml`, `.ini`, lockfiles, dotfiles.
-- **noise** — `.DS_Store`, editor swap files, `*.log`, build artifacts. Discard before
-  classifying; a set that is *only* noise counts as empty ("clean, nothing to review").
+**Included repos**: guacamayo, job-system, learn-ai-engineering, librarian, atlas,
+ai-project-template, listen-wiseer.
+**Excluded**: dssg, parallax, nrr, lebanese-blonde, cryptozombies, first-flask-app, playground.
 
-### Step 2 — route
-
-| Changed set | wander | scan | dao |
-|---|---|---|---|
-| any **code** files | run | run | run |
-| **prose**/**config** only | run | **skip** | run |
-| empty | stop — "clean, nothing to review" | | |
-
-**wander always runs** (except on an empty set): it interrogates intent, which is as
-meaningful for a doc or config change as for code, and it is one cheap haiku pass.
-
-**scan is skipped on prose/config-only sets.** `akira-scan` hunts bugs and logic errors in
-executable code; fanning it out over Markdown burns parallel haiku calls to find nothing.
-Skipping is a token decision, not a safety one — dao still runs and still does doc-sync.
-
-**dao always runs**, under its own unchanged contract (`references/dao.md`): its test gate
-still decides whether anything is applied, and a repo with no harness still degrades to
-surface-only. Routing never loosens that gate. When scan was skipped, dao's findings input
-is the doc-sync pass rather than a scan report — it reconciles docs against the tree
-directly.
-
-### Step 3 — report the routing
-
-Open the run summary with one line naming what ran and why, so a skipped mode is never
-silent:
-
+The sweep report opens with a table:
 ```
-Routing: prose-only changed set (8 .md) → wander + dao, scan skipped (no code to scan).
+| Repo | Scope | Findings | Sanyi | Dao applied | Dao surfaced |
+|------|-------|----------|-------|-------------|-------------|
 ```
+
+Each repo section follows the standard akira report format. dao's test gate still applies
+per-repo — repos without test harnesses get surface-only (no code mutation).
+
+## Review log (persistent record)
+
+After every scan or sweep completes, write the findings to guacamayo's review log:
+`~/workspace/guacamayo/.reviews/`
+
+**Naming**:
+- `/akira all` sweep → `YYYY-MM-DD-sweep.md`
+- Single-repo run → `YYYY-MM-DD-<repo>.md`
+
+If a file for today already exists, append a time suffix: `YYYY-MM-DD-sweep-HH-MM.md`.
+
+**Content**: the summary table + per-repo findings in canonical schema format. Include:
+- Scope (diff or whole-repo) per repo
+- All findings with severity, evidence state, file:line, description
+- Issues created (if any, with `repo#number`)
+- Findings resolved since last sweep (diff against most recent prior log if one exists)
+
+The log is machine-generated, append-only (one file per run, never overwrite prior logs).
+Trend analysis reads these files to detect recurring patterns and quality trajectory.
 
 ## Boundaries
 
