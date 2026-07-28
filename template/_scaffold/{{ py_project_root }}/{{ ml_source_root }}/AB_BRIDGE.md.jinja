@@ -69,10 +69,10 @@ import numpy as np
 from ml.stats_testing.ab_test import mann_whitney_test, bootstrap_cliffs_delta
 
 control = np.array([...])  # per-interaction metric scores, control arm
-canary  = np.array([...])  # same metric, canary arm
+canary = np.array([...])  # same metric, canary arm
 
-sig = mann_whitney_test(control, canary)        # is there any difference at all?
-eff = bootstrap_cliffs_delta(control, canary)   # how big, and which direction, with a CI
+sig = mann_whitney_test(control, canary)  # is there any difference at all?
+eff = bootstrap_cliffs_delta(control, canary)  # how big, and which direction, with a CI
 
 # Promote when the effect is non-negative (canary >= control on a good metric,
 # <= control on a harm metric) AND the CI excludes meaningful harm.

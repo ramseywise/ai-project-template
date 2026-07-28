@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import pandas as pd
+from sklearn.datasets import load_breast_cancer
+
 from ml.regression.logit import (
     coefficient_table,
     compare_coefficients,
@@ -9,7 +11,6 @@ from ml.regression.logit import (
     split_by_direction,
 )
 from ml.regression.plots import model_comparison_table, plot_feature_importance
-from sklearn.datasets import load_breast_cancer
 
 
 def _breast_cancer_df() -> tuple[pd.DataFrame, list[str]]:
