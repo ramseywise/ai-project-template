@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import atexit
 from functools import lru_cache
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -18,9 +19,12 @@ def get_checkpointer() -> BaseCheckpointSaver:
 
     Cached (@lru_cache) since PostgresSaver's connection pool is meant to live for
     the process lifetime, not be recreated per call — same singleton shape as
-    get_vector_index()/get_embeddings() elsewhere in this template. The
-    from_conn_string() context manager is entered but deliberately never exited:
-    the pool needs to outlive this function call, and process teardown reclaims it.
+    get_vector_index()/get_embeddings() elsewhere in this template.
+
+    The from_conn_string() context manager is entered once and kept alive for the
+    process lifetime (the pool must outlive this call). An atexit handler calls
+    __exit__ on graceful shutdown so the connection pool drains cleanly. SIGKILL
+    and hard crashes bypass atexit — those are the honestly-unfixable cases.
     PostgresSaver's async methods run the underlying sync psycopg calls via a
     thread-pool executor (not native async) — fine at this starter's scale; swap to
     AsyncPostgresSaver if checkpoint I/O becomes a throughput bottleneck.
@@ -30,7 +34,9 @@ def get_checkpointer() -> BaseCheckpointSaver:
     if settings.lg_checkpointer == "postgres":
         from langgraph.checkpoint.postgres import PostgresSaver
 
-        checkpointer = PostgresSaver.from_conn_string(settings.postgres_dsn).__enter__()
+        _cm = PostgresSaver.from_conn_string(settings.postgres_dsn)
+        checkpointer = _cm.__enter__()
+        atexit.register(_cm.__exit__, None, None, None)
         checkpointer.setup()
         return checkpointer
     raise NotImplementedError(

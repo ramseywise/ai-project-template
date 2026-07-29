@@ -23,6 +23,15 @@ class LinkedInClient:
         )
         self._author_urn = settings.linkedin_author_urn
 
+    def close(self) -> None:
+        self._client.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info) -> None:
+        self.close()
+
     def post_update(self, text: str) -> dict:
         try:
             resp = self._client.post(

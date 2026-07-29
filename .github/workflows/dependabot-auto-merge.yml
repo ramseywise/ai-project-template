@@ -2,28 +2,23 @@ name: Dependabot auto-merge
 on:
   pull_request:
   workflow_call:
+    inputs:
+      pr_url:
+        type: string
+        required: false
 
 permissions:
   contents: write
   pull-requests: write
 
 jobs:
-  wait-for-ci:
-    if: github.actor == 'dependabot[bot]'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Wait for CI placeholder
-        run: echo "Reusable workflow not available; proceeding with merge job."
-
   auto-merge:
-    needs: [wait-for-ci]
-    if: github.actor == 'dependabot[bot]'
+    if: github.event_name == 'workflow_call' || github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: dependabot/fetch-metadata@v3
         id: metadata
       - run: gh pr merge --auto --squash "$PR_URL"
         env:
-          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_URL: ${{ inputs.pr_url || github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

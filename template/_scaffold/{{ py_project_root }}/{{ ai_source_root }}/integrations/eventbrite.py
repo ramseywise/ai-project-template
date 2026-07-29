@@ -22,6 +22,15 @@ class EventbriteClient:
         )
         self._organization_id = settings.eventbrite_organization_id
 
+    def close(self) -> None:
+        self._client.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info) -> None:
+        self.close()
+
     def publish_event(
         self,
         name: str,
