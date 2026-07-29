@@ -18,6 +18,8 @@ real scores here.
 
 from __future__ import annotations
 
+from evals.graders.judges.base import judge_model
+
 
 def grade_with_ragas(
     question: str, contexts: list[str], answer: str, ground_truth: str
@@ -42,7 +44,7 @@ def grade_with_ragas(
             "ground_truth": [ground_truth],
         }
     )
-    judge_llm = LangchainLLMWrapper(ChatAnthropic(model="claude-haiku-4-5-20251001"))
+    judge_llm = LangchainLLMWrapper(ChatAnthropic(model=judge_model()))
     result = evaluate(
         dataset,
         metrics=[faithfulness, answer_relevancy, context_precision],

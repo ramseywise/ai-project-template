@@ -117,20 +117,20 @@ def _extract_response(event) -> dict:
             elif isinstance(raw, str):
                 structured_from_state = json.loads(raw)
     except Exception:
-        pass
+        log.debug("adk-response-extract-skipped state-read", exc_info=True)
 
     if structured_from_state:
         try:
             return AssistantResponse(**structured_from_state).model_dump()
         except Exception:
-            pass
+            log.debug("adk-response-extract-skipped state-parse", exc_info=True)
 
     if text.strip().startswith("{"):
         try:
             parsed = json.loads(text.strip())
             return AssistantResponse(**parsed).model_dump()
         except Exception:
-            pass
+            log.debug("adk-response-extract-skipped text-parse", exc_info=True)
 
     return AssistantResponse(message=text or "(no response)").model_dump()
 

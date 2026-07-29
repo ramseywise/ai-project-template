@@ -20,6 +20,15 @@ class CanvaClient:
             timeout=30.0,
         )
 
+    def close(self) -> None:
+        self._client.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info) -> None:
+        self.close()
+
     def generate_asset(self, brand_template_id: str, data: dict) -> dict:
         """``data`` maps template field names to autofill values — see Canva's
         Autofill API docs for the per-field-type shape (text/image fields

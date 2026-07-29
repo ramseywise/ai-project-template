@@ -7,10 +7,13 @@ grading): requires ANTHROPIC_API_KEY; without it â€” or on any API/parse error â
 
 from __future__ import annotations
 
+import logging
 import os
 
 from evals.graders.judges.schema import JudgeVerdict
 from evals.models import EvalInteraction, GraderResult
+
+log = logging.getLogger(__name__)
 
 DEFAULT_JUDGE_MODEL = "claude-opus-4-8"
 
@@ -56,6 +59,7 @@ class LLMJudge:
             text = next(block.text for block in response.content if block.type == "text")
             verdict = JudgeVerdict.from_response_text(text)
         except Exception:
+            log.debug("llm-judge-failed metric=%s", self.metric, exc_info=True)
             return None
         return GraderResult(
             interaction_id=interaction.id,
