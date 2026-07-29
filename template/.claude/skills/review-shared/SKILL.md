@@ -36,7 +36,8 @@ Two separate fields in the canonical schema (`~/.claude/refs/finding-schema.md`)
   Never invent or rewrite another system's codes.
 - **`merge_impact`** — PR-level impact: `blocker | important | question | suggestion | nit`.
   Reporters propose this using default mappings (see finding-schema.md); orchestrators may
-  adjust during merge.
+  adjust during merge. For SANYI findings, the canonical mapping lives in `review/sanyi.py`
+  (`violation_merge_impact`) — `validate_finding` enforces consistency.
 
 ## Merge and deduplication
 
@@ -52,7 +53,17 @@ When multiple reporters produce findings, the orchestrator merges them:
    - Take the higher `merge_impact`
    - Take the more certain `evidence.state`
    - Preserve SANYI violation codes as `source_native`
-4. **Report** merged findings with provenance: which reporters contributed
+4. **Rank** merged findings: blockers first, then important, questions, suggestions, nits.
+   Report with provenance (which reporters contributed).
+
+**Boundary — deterministic vs LLM-instructed:**
+Clustering (step 1) is deterministic (`review.deduplication.find_duplicate_clusters` in
+the Python backbone). Merge judgment (step 2: same underlying issue?) is LLM-instructed.
+Step 3 merge rules (take higher impact, take more certain state) are deterministic.
+
+**docs-check integration:** When `/docs-check` is invoked by `/code-review level:2+`,
+its findings should carry `id: DC-NNN`, `merge_impact`, and `evidence_state` to enter
+the canonical pool and participate in the merge/dedup step above.
 
 ## DoD assessment
 

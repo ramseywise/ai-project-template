@@ -43,7 +43,10 @@ dependencies = [
 {%- endif %}
 {%- if primary_chat_agent in ["adk_agent", "both"] %}
     "google-adk>=1.0.0",
-    "mcp>=1.0.0",
+{%- endif %}
+{%- if primary_chat_agent != "none" %}
+    # mcp 2.0 (2026-07-28) drops 1.x APIs that langchain-mcp-adapters and google-adk import
+    "mcp>=1.0.0,<2.0.0",
 {%- endif %}
 {%- if frontend_backend_topology == "split_service" %}
     "pyjwt[crypto]>=2.9.0",
@@ -94,6 +97,12 @@ markers = ["integration: real external calls, opt-in only"]
 [tool.ruff]
 line-length = 100
 target-version = "py{{ python_version.replace('.', '') }}"
+
+# .claude/ is vendored tooling payload (skills/agents shipped by the template) —
+# not project code, and skill eval fixtures contain deliberate lint findings.
+# force-exclude keeps the exclusion when hooks/CI pass files to ruff by name.
+extend-exclude = [".claude"]
+force-exclude = true
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "N", "UP", "B", "C4", "SIM", "RUF"]

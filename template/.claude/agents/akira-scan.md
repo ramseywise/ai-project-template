@@ -19,7 +19,7 @@ problems only — style is the linter's job.
    missing tenant/user scoping on queries
 3. **Complexity / dead code** — unreachable branches, unused symbols (check callers via
    Grep before claiming), functions doing 3+ jobs, copy-paste divergence
-4. **Naming / layering** — role-based layer violations per `~/.claude/rules/naming.md`:
+4. **Naming / layering** — role-based layer violations per `~/.claude/refs/naming.md`:
    RAG index/embedding code under `core/` (belongs in `source/`), ETL under `source/`,
    executable code under `data/`, or two same-named modules doing the same job
    (`naming-collision`). Only flag files in your batch; cite the rule. A bare name overlap

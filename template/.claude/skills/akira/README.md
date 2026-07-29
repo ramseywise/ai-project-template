@@ -8,22 +8,22 @@ Named after the film: Kaneda (yang) hunts concrete defects; Kiyoko (yin) asks
 the questions no one thought to ask. Dao is the path from findings to a fixed
 working tree.
 
-## Modes
+## Invocations
 
-| Mode | What it does | Subagent |
-|------|-------------|----------|
-| `scan` | Read-only ranked findings across 9 categories | `akira-scan` (haiku, parallel batches) |
-| `wander` | 3-5 sharp questions about what the change leaves open | `akira-wander` (haiku) |
-| `dao` | Triage findings → apply safe fixes → test → revert on fail → doc-sync | Inline (test-gated, see `references/dao.md`) |
-| `all` | wander → scan → dao in sequence | All of the above |
-| `auto` | Classify changed set, skip modes with nothing to bite, end at dao | Adaptive |
+| Invocation | What it does | Subagent(s) |
+|------------|-------------|-------------|
+| `/akira` | **Full flow**: wander → scan → sanyi → dao (auto-scoped: diff or whole-repo) | akira-wander + akira-scan + sanyi + inline dao |
+| `/akira scan` | Read-only ranked findings across 9 categories | `akira-scan` (haiku, parallel batches) |
+| `/akira wander` | 3-5 sharp questions about what the change leaves open | `akira-wander` (haiku) |
+| `/akira dao` | Triage findings → apply safe fixes → test → revert on fail → doc-sync | Inline (test-gated, see `references/dao.md`) |
+| `/akira all` | Sweep: run full flow across all included repos | All of the above, per-repo |
 
 ```
-/akira              # defaults to scan
-/akira wander       # or /akira ?
-/akira dao          # test-gated actuation
-/akira all          # full pipeline
-/akira auto         # adaptive
+/akira                           # full flow (wander → scan → sanyi → dao), auto-scoped
+/akira scan                      # Kaneda only — ranked findings
+/akira wander                    # or /akira ? — Kiyoko only — sharp questions
+/akira dao                       # test-gated actuation
+/akira all                       # sweep across included repos
 /akira scan repo:listen-wiseer   # target a specific repo
 /akira dao headless              # non-interactive (for spawned agents)
 ```
@@ -37,7 +37,11 @@ quality review. It is also **composed by orchestrators**:
 - `/code-review level:3` adds full `/sanyi` on top
 - `/workflow-review` uses the same composition for PR review
 
-akira and `/sanyi` are complementary lenses:
+In the **full flow** (`/akira` bare), sanyi runs as a built-in reporter between scan and
+dao. Single primitives (`/akira scan`, `/akira wander`, `/akira dao`) do not trigger sanyi
+— they run their own pass only.
+
+akira and `/sanyi` as lenses:
 - **akira** asks "is this any good?" — structure, patterns, decisions, quality
 - **sanyi** asks "did this move a boundary?" — contract violations, layer drift
 

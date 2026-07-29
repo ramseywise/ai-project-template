@@ -14,6 +14,14 @@
 line-length = 100
 target-version = "py312"
 
+# template/.claude/ is vendored payload synced one-way from ~/.claude by
+# scripts/sync-global-skills.sh — never edited here, and its eval fixtures
+# contain deliberate lint findings the evals exist to catch. force-exclude
+# keeps the exclusion in effect when files are passed by name (the Stop hook
+# lints changed files explicitly).
+extend-exclude = ["template/.claude"]
+force-exclude = true
+
 [lint]
 select = ["E", "W", "F", "I", "N", "UP", "B", "C4", "SIM", "RUF"]
 # RUF001-003: typographic unicode in prose; N803/N806: ML naming (X, y, X_train)

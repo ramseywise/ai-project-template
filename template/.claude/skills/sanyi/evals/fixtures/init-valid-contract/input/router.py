@@ -1,6 +1,6 @@
 """Main router — imports config and states but NOT guards."""
 
-from config import CONFIDENCE_THRESHOLD, MODEL_NAME
+from config import MODEL_NAME, CONFIDENCE_THRESHOLD
 from states import AgentState
 
 

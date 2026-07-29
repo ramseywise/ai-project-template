@@ -86,6 +86,8 @@ The PreCompact hook writes a snapshot to `~/.claude/sessions/` with the phase la
 
 **Next step**: `/workflow-plan <name>` when research is reviewed and approved.
 
+If this research defines a new initiative (blank-page problem framing, new product or feature area), consider `/design-sprint` for structured HMW/workstream problem framing, or `/design-initiative` for milestone + task backlog breakdown of a named initiative.
+
 ## Fan-out mode
 
 Quick breadth-first investigation via parallel haiku agents. Use when a topic needs
@@ -102,3 +104,31 @@ multiple angles explored simultaneously rather than deep sequential research.
 
 Agent count heuristics: 1–2 aspects → 2–3 agents; 3–5 angles → 4–5; complex → 6–8;
 very broad → 8–10 (max parallel).
+
+## Exit
+
+When research is reviewed and approved:
+
+1. **Label sync** — if there's a GitHub issue, update its label:
+   ```bash
+   gh issue edit <N> --remove-label "backlog" --add-label "refinement"
+   ```
+
+2. **Compact** — call `/compact "phase: research → plan"` to shed research context.
+
+3. **Print exit block**:
+
+```
+──────────────────────────────────────
+✅ Research complete.
+👉 Next: /workflow-plan <slug>
+🧠 Model: opus
+
+Spawn prompt:
+┌─────────────────────────────────────
+│ cd <repo-path>
+│ Read <plan-doc-path>
+│ /workflow-plan <slug>
+└─────────────────────────────────────
+──────────────────────────────────────
+```

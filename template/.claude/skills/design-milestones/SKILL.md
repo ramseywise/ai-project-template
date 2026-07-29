@@ -11,7 +11,7 @@ resolves to `~/workspace/<name>`); all repo-relative paths and git/test commands
 against it, and artifacts land in the TARGET repo. No token → the cwd's repo; in a
 meta/workspace-root session, ask rather than defaulting.
 
-# define-milestones
+# design-milestones
 
 Break one initiative into milestones. A milestone is a checkpoint *inside* an initiative — a
 verifiable state of the system, not a bundle of work. Hierarchy (matches Linear):

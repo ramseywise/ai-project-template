@@ -45,14 +45,13 @@ AGENTS=(
 )
 
 # Rules (always-on session instructions). Scaffolded projects get the same
-# shell/context/naming/docs guardrails as the global environment.
+# shell/context guardrails as the global environment. agile.md and naming.md
+# moved to ~/.claude/refs/ (load-on-demand) and docs.md to the librarian wiki
+# — refs are not vendored; see refs/agile.md for the conventions themselves.
 RULES_RESERVOIR="$HOME/.claude/rules"
 RULES_TEMPLATE_ROOT="$REPO_ROOT/template/.claude/rules"
 RULES=(
-  agile.md           # workflow states, DoR/DoD, cadence, ceremony mapping
   context-health.md  # compact proactively — always-on cost guard
-  docs.md            # doc-writer boundary (machine- vs human-consumed)
-  naming.md          # role-based directory/layer convention
   shell.md           # zsh gotchas (always-on safety)
 )
 
@@ -68,7 +67,8 @@ RULES=(
 
 # Skills that are NOT vendored and why:
 DELIBERATELY_EXCLUDED=(
-  # (no global skills are currently excluded — all reservoir skills are vendored)
+  archive       # retired skills parked in the reservoir — never ship
+  inbox-clean   # personal Gmail hygiene — not project tooling
 )
 #
 # Template-owned skills with no global counterpart (tracked for completeness):
@@ -153,7 +153,8 @@ while IFS= read -r dir; do
   done
   if [ "$in_skills" -eq 0 ]; then
     in_excluded=0
-    for e in "${DELIBERATELY_EXCLUDED[@]}"; do
+    # ${arr[@]+...} guards bash-3.2 set -u, which treats an empty array as unset
+    for e in ${DELIBERATELY_EXCLUDED[@]+"${DELIBERATELY_EXCLUDED[@]}"}; do
       e="${e%%[[:space:]]*}"
       [ "$e" = "$name" ] && in_excluded=1 && break
     done
