@@ -12,12 +12,16 @@ dependencies = [
     "langchain-mcp-adapters>=0.1.0",
 {%- endif %}
     "langchain-anthropic>=0.3.0",
+{%- if has_corpus_pipeline or (include_rag_agent and vector_backend == "duckdb") %}
     "duckdb>=1.1.0",
+{%- endif %}
+{%- if include_rag_agent %}
     "sentence-transformers>=3.0.0",
-{%- if vector_backend == "opensearch" %}
+{%- endif %}
+{%- if include_rag_agent and vector_backend == "opensearch" %}
     "opensearch-py>=2.7.0",
 {%- endif %}
-{%- if vector_backend == "postgres" %}
+{%- if include_rag_agent and vector_backend == "postgres" %}
     "psycopg[binary]>=3.2.0",
     "pgvector>=0.3.6",
 {%- endif %}
@@ -51,7 +55,9 @@ dependencies = [
 {%- if frontend_backend_topology == "split_service" %}
     "pyjwt[crypto]>=2.9.0",
 {%- endif %}
+{%- if has_corpus_pipeline %}
     "wandb>=0.18.0",
+{%- endif %}
     "pyyaml>=6.0.0",
     "pydantic>=2.9.0",
     "pydantic-settings>=2.6.0",

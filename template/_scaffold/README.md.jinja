@@ -33,7 +33,7 @@ make rag-up && make rag-wait && make rag-chat   # start + smoke test rag_agent
 ```
 
 {% if primary_chat_agent in ["lg_agent", "both"] -%}
-Try `{{ lg_agent_dir }}` (BM25 retrieval) with `make corpus-ingest && make {{ lgmk }}-up && make {{ lgmk }}-chat`.
+Try `{{ lg_agent_dir }}`{% if has_corpus_pipeline %} (BM25 retrieval){% endif %} with `make {% if has_corpus_pipeline %}corpus-ingest && make {% endif %}{{ lgmk }}-up && make {{ lgmk }}-chat`.
 {% endif -%}
 {% if primary_chat_agent in ["adk_agent", "both"] -%}
 Try `{{ adk_agent_dir }}` (Google ADK — requires `GOOGLE_API_KEY`) with `make {{ adkmk }}-up && make {{ adkmk }}-chat`.
@@ -100,10 +100,10 @@ file to start with a single `# Title` line; everything else is body text.
 ## Everyday commands
 
 See the `Makefile` for the full list (
-{%- if primary_chat_agent in ["lg_agent", "both"] %}`corpus-ingest`, `{{ lgmk }}-up`/`{{ lgmk }}-down`/`{{ lgmk }}-chat`, {% endif -%}
+{%- if primary_chat_agent in ["lg_agent", "both"] %}{% if has_corpus_pipeline %}`corpus-ingest`, {% endif %}`{{ lgmk }}-up`/`{{ lgmk }}-down`/`{{ lgmk }}-chat`, {% endif -%}
 {%- if include_rag_agent %}`rag-corpus-ingest`/`rag-up`/`rag-down`/`rag-chat`,{% endif %}
 {%- if primary_chat_agent in ["adk_agent", "both"] %} `{{ adkmk }}-up`/`{{ adkmk }}-down`/`{{ adkmk }}-chat`,{%- endif %}
-`eval-heuristic`/`eval-render`, `nbks-corpus`, `test`/`test-smoke`/`test-integration`,
+`eval-heuristic`/`eval-render`, {% if has_corpus_pipeline %}`nbks-corpus`, {% endif %}`test`/`test-smoke`/`test-integration`,
 `lint`/`typecheck`, `docker-up`/`docker-down`
 {%- if has_typescript and ts_agent_framework == "vercel_ai_sdk" %}, `ts-agent-eval`{% endif %}).
 

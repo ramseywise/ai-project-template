@@ -1,8 +1,8 @@
 {% set lg = lg_agent_dir | replace("_", "-") -%}
 {% set adk = adk_agent_dir | replace("_", "-") -%}
-.PHONY: setup corpus-preprocess \
+.PHONY: setup{% if has_corpus_pipeline %} corpus-preprocess{% endif %} \
 {%- if primary_chat_agent in ["lg_agent", "both"] %}
-        corpus-ingest {{ lg }}-up {{ lg }}-down {{ lg }}-wait {{ lg }}-chat \
+        {% if has_corpus_pipeline %}corpus-ingest {% endif %}{{ lg }}-up {{ lg }}-down {{ lg }}-wait {{ lg }}-chat \
 {%- endif %}
 {%- if include_rag_agent %}
         rag-corpus-ingest rag-up rag-down rag-wait rag-chat \
@@ -17,7 +17,7 @@
 {%- if include_promptfoo %}
         promptfoo-eval \
 {%- endif %}
-        nbks-corpus test test-smoke test-integration \
+        {% if has_corpus_pipeline %}nbks-corpus {% endif %}test test-smoke test-integration \
         lint lint-check typecheck \
 {%- if primary_backend_language in ["typescript", "both"] %}
         ts-install ts-lint ts-typecheck ts-test ts-build ts-dev \
@@ -43,10 +43,12 @@ corpus-preprocess:
 	$(PY) -m core.pipelines.corpus preprocess
 
 {% endif -%}
-{% if primary_chat_agent in ["lg_agent", "both"] -%}
+{% if has_corpus_pipeline and primary_chat_agent in ["lg_agent", "both"] -%}
 corpus-ingest: corpus-preprocess
 	$(PY) -m core.pipelines.corpus ingest
 
+{% endif -%}
+{% if primary_chat_agent in ["lg_agent", "both"] -%}
 # --- Chat agent ({{ py_project_root }}/{{ ai_source_root }}/agents/{{ lg_agent_dir }}, LangGraph) ---
 {{ lg }}-up:
 	$(UVICORN) agents.{{ lg_agent_dir }}.main:app --port $${LG_PORT:-8010} --reload &
