@@ -16,4 +16,6 @@ export const settings = {
   agentModel: process.env.TS_AGENT_MODEL ?? "claude-haiku-4-5-20251001",
   generationTemperature: Number(process.env.TS_AGENT_TEMPERATURE ?? 0.3),
   maxSteps: Number(process.env.TS_AGENT_MAX_STEPS ?? 5),
+  /** Outer retry cap for the verification loop — independent of maxSteps. */
+  maxRetries: Number(process.env.TS_AGENT_MAX_RETRIES ?? 3),
 };
