@@ -12,9 +12,10 @@ from __future__ import annotations
 
 import pytest
 
-from agents.{{ lg_agent_dir }}.verification_loop import run_with_verification
 from evals.graders.judges.base import LLMJudge
 from evals.models import EvalInteraction, GraderResult
+
+from agents.{{ lg_agent_dir }}.verification_loop import run_with_verification
 
 
 class _AlwaysFailGrader(LLMJudge):
@@ -67,7 +68,7 @@ async def test_max_retry_cap_is_respected() -> None:
             call_count += 1
             return {"answer": "bad answer", "message": state.get("message", "")}
 
-    result, attempts = await run_with_verification(
+    _result, attempts = await run_with_verification(
         _CountingGraph(),
         {"message": "test query"},
         {"configurable": {"thread_id": "smoke-1"}},
