@@ -201,6 +201,40 @@ engagement status," you know the actor without asking.
     - Who runs this after the POC — rotating volunteers, a dedicated team, or the org itself?
     - Budget constraints (free tier only, or paid services acceptable)?
 
+11b. **Load, latency, and spend — the trade-off axes:**
+    - Roughly how many users/requests per day at POC, and at the realistic 6-month state?
+    - Is there a response time anyone would actually notice — "under 5 seconds" is a
+      real answer, so is "it's a batch job, minutes are fine"?
+    - Is there a monthly ceiling on API/model spend that must not be crossed?
+
+    **These have tier defaults — offer them rather than forcing a number.** Read the
+    complexity tier from PROJECT-PROFILE.md's `Timeline` field if present, else ask:
+
+    | Tier | Load | Latency | Spend ceiling |
+    |------|------|---------|---------------|
+    | Weekend sprint | demo-scale, <10 users | none — demo tolerance | free tier only |
+    | Multi-sprint | tens of users, <1k req/day | name one target (e.g. p95 < 10s) | a real monthly number |
+    | Semester | name a real projection | p95 target, stated | a real monthly number, with alerting |
+
+    A volunteer accepting the tier default is a **resolved** answer, not an unknown —
+    record it as `<value> (weekend-sprint tier default, unvalidated)` in DESIGN.md's
+    Non-Functional Constraints. Do NOT park these as Open Questions; an accepted
+    default is a decision, and Open Questions block G1 (§Interview conventions).
+    Only park as Open when the user says the number matters *and* they don't know it.
+
+11c. **Observability — what would you need to see when it misbehaves?**
+    The scaffold ships tracing; this asks what it's *for*.
+    - When someone reports "it gave a wrong answer yesterday," what do you need to
+      pull up to diagnose it — the prompt? the retrieved chunks? the tool calls?
+    - **If data classification (Q9) is `restricted` or `secret`:** what must be
+      redacted before it reaches a trace or a log? This one is not optional —
+      DESIGN.md already warns that restricted fields must never be traced raw, and
+      a trace backend is scaffolded by default. Same discipline as `human_approval`:
+      a silent default here has an irreversible failure mode.
+
+    One or two lines into DESIGN.md's Non-Functional Constraints `Observability:`
+    bullet. "Langfuse traces, redact client names and emails" is a complete answer.
+
 ### Step 5 — Tier 5: MVP scope
 
 12. **What's the thinnest slice that demonstrates value?**
@@ -208,6 +242,19 @@ engagement status," you know the actor without asking.
 
 13. **What are the top 2–3 risks this POC should validate?**
     (These become the eval suite's primary grading targets.)
+
+13b. **What breaks first?**
+    Now that the design is stated, read it back adversarially — name the weaknesses
+    before a reviewer does. Two are enough:
+    - Which component fails first as usage grows, and what does the failure look
+      like to a user (slow? wrong answer? error? silent staleness)?
+    - How would you *notice* it — what signal, and who is watching it?
+    - What's the cheap mitigation you'd reach for, and is it in POC scope or after?
+
+    This is a design question, not a product-risk question — Q13 asks what the POC
+    should *prove*, this asks what the architecture will *cost you*. Answers go to
+    DESIGN.md's "What Breaks First" section, not the Evaluation table. "The LLM API
+    rate-limits us and requests queue" is a perfectly good POC-tier answer.
 
 14. **What's explicitly OUT of scope for the POC?**
     (Name it explicitly — prevents scope creep during build.)
@@ -301,12 +348,20 @@ Don't draw what doesn't exist yet. Containers and components come later, when yo
 
 ## Key Decisions
 
-| Decision | Status | Choice | Rationale |
-|----------|--------|--------|-----------|
-| Auth/identity | Resolved / Open / Deferred(<trigger>) | [choice] | [why] |
-| Data model ownership | Resolved / Open / Deferred(<trigger>) | [choice] | [why] |
-| AI approach (retrieval/gen/automation) | Resolved / Open / Deferred(<trigger>) | [choice] | [why] |
+| Decision | Status | Choice | Rationale (chose X over Y, gave up Z) |
+|----------|--------|--------|---------------------------------------|
+| Auth/identity | Resolved / Open / Deferred(<trigger>) | [choice] | [alternative considered] — chose this because [reason]; accepted cost: [what we gave up] |
+| Data model ownership | Resolved / Open / Deferred(<trigger>) | [choice] | [same shape] |
+| AI approach (retrieval/gen/automation) | Resolved / Open / Deferred(<trigger>) | [choice] | [same shape] |
 | [other] | | | |
+
+**Rationale authoring rule.** A rationale that only records *provenance* ("set at
+scaffold time", "from design.yaml") is not a rationale — it says what happened, not
+why. Every hand-authored row names at least one real alternative and the cost of not
+taking it. If no alternative was genuinely considered, write "no alternative
+considered" rather than inventing one; that is itself useful signal at review.
+The generated rows between the `design-table` markers are exempt — they are a
+rendered view of `design.yaml` and provenance is the correct content there.
 
 Status semantics: `Deferred(<trigger>)` records the default choice now and names
 the concrete event that reopens the decision. A Deferred without a real trigger
