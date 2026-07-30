@@ -1263,7 +1263,11 @@ _tasks:
   # the framework name and the tree is removed here. 'none' removes both,
   # leaving rag_agent (shared retrieval infra for the MCP tool, if included)
   # as the sole example agent.
-  - "{{ 'true' if (not scaffold_full_project) or primary_chat_agent in ['lg_agent', 'both'] else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/agents/' ~ lg_agent_dir ~ ' ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/unit/agents' }}"
+  # The verification-loop smoke test imports agents.{{ lg_agent_dir }} directly,
+  # so it goes with the tree — otherwise it ships into lg-agent-less profiles and
+  # fails at import with ModuleNotFoundError (lint hides this: ruff can't resolve
+  # the missing module, so it silently reclassifies the import as third-party).
+  - "{{ 'true' if (not scaffold_full_project) or primary_chat_agent in ['lg_agent', 'both'] else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/agents/' ~ lg_agent_dir ~ ' ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/unit/agents ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/smoke/test_verification_loop.py' }}"
   - "{{ 'true' if (not scaffold_full_project) or primary_chat_agent in ['adk_agent', 'both'] else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/agents/' ~ adk_agent_dir }}"
   # rag_agent ships default-on only for the rag shape (include_rag_agent) —
   # when off, the tree goes; the MCP retrieval tool keeps its RAG_AGENT_URL
