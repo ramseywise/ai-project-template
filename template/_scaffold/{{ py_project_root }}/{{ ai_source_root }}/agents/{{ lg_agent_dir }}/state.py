@@ -21,3 +21,6 @@ class State(TypedDict):
     sources: NotRequired[Annotated[list[Source], _last]]
     context_snippets: NotRequired[Annotated[list[str], _last]]
     answer: NotRequired[Annotated[str, _last]]
+    # Set by the verification loop on retry — nodes may surface this to the LLM
+    # as additional context so subsequent attempts can improve on the prior response.
+    verification_feedback: NotRequired[Annotated[str, _last]]
