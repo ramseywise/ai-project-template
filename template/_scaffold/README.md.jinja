@@ -65,9 +65,11 @@ Try the TS agent (Vercel AI SDK) with `make ts-install && make ts-dev`, then
 {%- if include_ml %}
 ├── ml/                                  Classical ML/stats toolkit (regression, timeseries, stats_testing, feature_engineering, model_comparison, clustering)
 {%- endif %}
+{%- if has_corpus_pipeline %}
 ├── nbks/                                Marimo notebooks — inspection, not production code
+{%- endif %}
 ├── tests/                               unit / smoke / integration
-├── infrastructure/                      docker-compose + Dockerfiles, Terraform skeleton
+├── infrastructure/                      docker-compose + Dockerfiles{% if cloud != 'none' %}, Terraform skeleton{% endif %}
 ├── configs/                             Per-environment config (non-secret)
 ├── .claude/                             Claude Code skills + hooks
 {%- if include_dev_companion %}

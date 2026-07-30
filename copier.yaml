@@ -207,9 +207,10 @@ external_systems:
 deployment_target:
   type: str
   help: >-
-    Expected deployment. Recorded in DESIGN.md's key decisions; the infra/
-    skeleton (Terraform, Dockerfiles) ships with every full scaffold either
-    way. docker/cloud additionally scaffold .github/workflows/cd.yml
+    Expected deployment. Recorded in DESIGN.md's key decisions; Dockerfiles
+    (infrastructure/containers/) ship with every full scaffold, and the
+    terraform/ skeleton ships when a cloud is selected (cloud != none).
+    docker/cloud additionally scaffold .github/workflows/cd.yml
     (build-and-push to GHCR) when the lg_agent image exists to build —
     local/serverless get no CD workflow (serverless deploys via the
     platform's own git integration).
@@ -323,9 +324,25 @@ human_approval:
 # These defaults reproduce the previous single `source_root: backend/src`
 # exactly — py_project_root + ai_source_root == backend/src — so rendered
 # destination paths are unchanged; only the staging layout moved.
+#
+# Flat layout (AIT-33): a python-only backend with no frontend tree has nothing
+# to disambiguate, so py_project_root collapses to '.' and the backend lands at
+# ./src instead of backend/src. ml_source_root stays 'ml' — under flat layout ML
+# is scaffolded as an optional sibling backend to the agentic src/, at ./ml/.
+# The frontend condition is INLINED from _external_data (not `include_frontend`)
+# because that question is declared later in this file — copier renders each
+# default with only the answers collected so far, so referencing it here would
+# be undefined. Existing consumers on `copier update` should pin
+# `-d py_project_root=backend` in .copier-answers.yml to keep the nested shape.
 py_project_root:
   type: str
-  default: backend
+  default: >-
+    {{ '.' if (primary_backend_language == 'python' and not
+    (_external_data.design.web.enabled
+    if (_external_data.design is defined and _external_data.design and
+    _external_data.design.stages is defined and
+    _external_data.design.stages.discovery == 'complete') else false))
+    else 'backend' }}
   when: false
 
 ai_source_root:
@@ -1196,12 +1213,16 @@ _tasks:
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/core/pipelines/corpus '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/data/raw_corpus '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/unit/core '
-    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/nbks/corpus_analysis.py '
+    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/nbks '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ eval_root ~ '/pipelines/run.py '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ eval_root ~ '/graders/citation.py '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ eval_root ~ '/metrics/retrieval.py '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/agents/' ~ lg_agent_dir ~ '/nodes/retrieve.py '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/unit/agents/test_retrieve.py' }}
+  # terraform/ is an AWS IaC skeleton (and carries the VECTORDB_PATH plumbing) —
+  # dead weight for a project with no cloud target. containers/ still ships
+  # (Dockerfiles/compose are useful at cloud=none).
+  - "{{ 'true' if (not scaffold_full_project) or cloud != 'none' else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/infrastructure/terraform' }}"
   # Interaction-eval metrics: per-metric modules (heuristic + judge + metrics
   # aggregator) are independently removable, same pattern as integrations/
   # sub-modules above — staged under _scaffold/<eval_root>, removed from
@@ -1374,13 +1395,17 @@ _tasks:
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/core/. ' ~ _copier_conf.dst_path ~ '/core/'
     ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/' ~ eval_root ~ ' && cp -R '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ eval_root ~ '/. ' ~ _copier_conf.dst_path ~ '/' ~ eval_root ~ '/'
-    ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/nbks && cp -R '
-    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/nbks/. ' ~ _copier_conf.dst_path ~ '/nbks/'
     ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/tests && cp -R '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/. ' ~ _copier_conf.dst_path ~ '/tests/'
     ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/infrastructure && cp -R '
     ~ _copier_conf.dst_path ~ '/_scaffold/infrastructure/. ' ~ _copier_conf.dst_path ~ '/infrastructure/'
     ) if scaffold_full_project else 'true' }}
+  # Separate merge (not part of the block above) — the corpus cleanup task above
+  # rm -rf's the whole staged nbks directory when the project ships no notebooks
+  # (has_corpus_pipeline=false), so it may not exist at all; folding it into the
+  # chained && block would abort the whole chain on a missing source path (same
+  # reasoning as the ml merge below).
+  - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/nbks && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/nbks/. ' ~ _copier_conf.dst_path ~ '/nbks/') if (scaffold_full_project and has_corpus_pipeline) else 'true' }}"
   # Separate merge (not part of the block above) — the Python backend tree only
   # belongs in a project whose backend is Python. Pre-2b′ this rode along in the
   # unconditional block, so a typescript-only project still got a Python src/
