@@ -10,7 +10,7 @@
 {%- if primary_chat_agent in ["adk_agent", "both"] %}
         {{ adk }}-up {{ adk }}-down {{ adk }}-wait {{ adk }}-chat \
 {%- endif %}
-        eval-heuristic eval-gate eval-render \
+        eval-heuristic eval-gate eval-render eval-compare \
 {%- if include_interaction_evals %}
         eval-grade eval-grade-gate eval-interactions-report eval-calibrate \
 {%- endif %}
@@ -131,6 +131,12 @@ eval-gate:
 
 eval-render:
 	$(PY) -m {{ eval_root }}.pipelines.run render
+
+# Baseline-compare: load last run, flag regressions (score dropped >5%).
+# Promotes current results to baseline on --promote.
+# Emits one OTel eval_item span per row (console or OTLP per env).
+eval-compare:
+	$(PY) -m {{ eval_root }}.pipelines.compare
 
 {% endif -%}
 {% if include_interaction_evals -%}

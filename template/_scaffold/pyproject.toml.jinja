@@ -58,6 +58,15 @@ dependencies = [
     "httpx>=0.27.0",
     "anthropic>=0.40.0",
     "python-dotenv>=1.0.0",
+{%- if is_agent_shaped %}
+    # OTel span instrumentation (agent-observability.md) — console exporter by
+    # default, OTLP via OTEL_EXPORTER_OTLP_ENDPOINT for prod.
+    "opentelemetry-api>=1.27.0",
+    "opentelemetry-sdk>=1.27.0",
+    # OTLP exporter is optional — only needed when OTEL_EXPORTER_OTLP_ENDPOINT
+    # is set. Install with: uv add opentelemetry-exporter-otlp-proto-grpc
+    # "opentelemetry-exporter-otlp-proto-grpc>=1.27.0",
+{%- endif %}
 {%- if include_ml %}
     "scikit-learn>=1.5.0",
     "statsmodels>=0.14.0",
