@@ -1186,6 +1186,11 @@ _tasks:
   # files (pipelines/run.py, graders/citation.py, metrics/retrieval.py) are the
   # only eval modules coupled to corpus.models; nothing else imports them, so the
   # remaining eval tree (interaction evals, gated separately) stays intact.
+  # pipelines/compare.py ships on the unmerged AIT-29-otel-spans branch; when it
+  # rebases, AIT-29 must append compare.py to this rm list and gate its
+  # eval-compare Makefile target on has_corpus_pipeline (see issue #29). It is
+  # NOT listed here preemptively — scripts/validate_paths.py rejects _tasks
+  # paths with no matching template entry.
   - >-
     {{ 'true' if (not scaffold_full_project) or has_corpus_pipeline else 'rm -rf '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/core/pipelines/corpus '

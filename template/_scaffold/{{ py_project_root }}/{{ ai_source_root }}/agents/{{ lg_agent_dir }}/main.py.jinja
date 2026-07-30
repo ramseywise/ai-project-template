@@ -11,7 +11,9 @@ from langchain_core.runnables import RunnableConfig
 
 from .graph import build_graph
 from .schema import ChatRequest, ChatResponse
+{%- if has_corpus_pipeline %}
 from .settings import settings
+{%- endif %}
 
 _graph = None
 
