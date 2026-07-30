@@ -1253,6 +1253,10 @@ _tasks:
   # trace). Removed from staging (not the final path); like observability/ it
   # rides the AI source-root merge below, so there is no separate merge task.
   - "{{ 'true' if (not scaffold_full_project) or include_security_guards else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/security' }}"
+  # context_budget/ (step 4a′) is agentic-only — an ml-only or non-agent
+  # project has no LLM calls to budget. Rides the AI source-root merge below
+  # (same as observability/); no separate merge task needed.
+  - "{{ 'true' if (not scaffold_full_project) or is_agent_shaped else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/context_budget' }}"
   # ml/ (classical ML/stats toolkit) is staged under _scaffold/ like the
   # other optional full-project-tier content — removed from staging (not the
   # final path) if not requested, same reasoning as the akira/lg_agent cleanup above.
