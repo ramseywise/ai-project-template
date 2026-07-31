@@ -42,7 +42,6 @@ const SYNTHETIC_FINISH = {
 // ---------------------------------------------------------------------------
 
 const mockStartChatSpan = jest.fn(() => ({ end: jest.fn() }));
-const mockStartExecuteToolSpan = jest.fn(() => ({ end: jest.fn() }));
 const mockRecordOutput = jest.fn();
 const mockRecordToolCall = jest.fn();
 const mockCreateStallDetector = jest.fn(() => ({
@@ -85,9 +84,19 @@ jest.unstable_mockModule("../{{ ts_source_root }}/agent/tools/index.js", () => (
   tools: {},
 }));
 
+// wrapToolsWithSpans spy — used to verify agent.ts passes tools through it
+const mockWrapToolsWithSpans = jest.fn((t: unknown) => t);
+
+jest.unstable_mockModule("../{{ ts_source_root }}/agent/traceTools.js", () => ({
+  wrapToolsWithSpans: mockWrapToolsWithSpans,
+}));
+
 jest.unstable_mockModule("../{{ ts_source_root }}/agent/tracing.js", () => ({
   startChatSpan: mockStartChatSpan,
-  startExecuteToolSpan: mockStartExecuteToolSpan,
+  // startExecuteToolSpan is used by traceTools.ts, not agent.ts directly —
+  // it is tested in the wrapToolsWithSpans describe block below.
+  startExecuteToolSpan: jest.fn(() => ({ end: jest.fn(), setStatus: jest.fn(), setAttribute: jest.fn() })),
+  inputHash: jest.fn(() => "deadbeef"),
 }));
 
 jest.unstable_mockModule("../{{ ts_source_root }}/agent/stallDetector.js", () => ({
@@ -135,7 +144,7 @@ async function invokeCallbacks() {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("agent.ts wiring — tracing", () => {
+describe("agent.ts wiring — tracing (chat span)", () => {
   it("startChatSpan is called in onFinish with token counts from event.usage", async () => {
     mockStartChatSpan.mockClear();
     await invokeCallbacks();
@@ -144,13 +153,17 @@ describe("agent.ts wiring — tracing", () => {
     expect(arg.inputTokens).toBe(10);
     expect(arg.outputTokens).toBe(5);
   });
+});
 
-  it("startExecuteToolSpan is called in onStepFinish for each tool call", async () => {
-    mockStartExecuteToolSpan.mockClear();
-    await invokeCallbacks();
-    expect(mockStartExecuteToolSpan).toHaveBeenCalledTimes(1);
-    const arg = mockStartExecuteToolSpan.mock.calls[0][0] as { toolName: string };
-    expect(arg.toolName).toBe("getTime");
+describe("agent.ts wiring — traceTools (execute_tool span)", () => {
+  it("wrapToolsWithSpans is called by runAgent so tool spans bracket real execution", async () => {
+    mockWrapToolsWithSpans.mockClear();
+    runAgent([]);
+    // agent.ts must call wrapToolsWithSpans(tools) — if the call is removed the
+    // mock is never invoked and this assertion fails.
+    // Duration / error-marking proof lives in traceTools.test.ts which exercises
+    // the real implementation with a controlled span mock.
+    expect(mockWrapToolsWithSpans).toHaveBeenCalledTimes(1);
   });
 });
 

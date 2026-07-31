@@ -8,8 +8,10 @@
  *
  * Modules wired here
  * ------------------
- * - tracing.ts      : startChatSpan in onFinish (token-attributed OTel span)
- *                     startExecuteToolSpan in onStepFinish (per-tool-call span)
+ * - traceTools.ts   : wrapToolsWithSpans() wraps each tool's execute() with an
+ *                     execute_tool OTel span that brackets real execution time
+ *                     and records is_error on throw (via tracing.ts helpers)
+ * - tracing.ts      : startChatSpan in onFinish (token-attributed OTel summary span)
  * - stallDetector.ts: recordOutput + recordToolCall in onStepFinish; throws
  *                     StallDetectedError before maxSteps is exhausted
  * - context-budget.ts (pure parts): trackUsage + shouldCompact in onFinish;
@@ -27,7 +29,8 @@ import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from 
 import { getModel } from "./clients/llm.js";
 import { settings } from "./settings.js";
 import { tools } from "./tools/index.js";
-import { startChatSpan, startExecuteToolSpan } from "./tracing.js";
+import { startChatSpan } from "./tracing.js";
+import { wrapToolsWithSpans } from "./traceTools.js";
 import { createStallDetector } from "./stallDetector.js";
 import { trackUsage, shouldCompact } from "./context-budget.js";
 
@@ -40,21 +43,18 @@ export function runAgent(messages: UIMessage[]) {
     model: getModel(),
     system: SYSTEM_PROMPT,
     messages: convertToModelMessages(messages),
-    tools,
+    // wrapToolsWithSpans brackets each tool's execute() with an execute_tool OTel
+    // span — real start/end times and is_error on throw (see traceTools.ts).
+    tools: wrapToolsWithSpans(tools),
     temperature: settings.generationTemperature,
     stopWhen: stepCountIs(settings.maxSteps),
 
     onStepFinish(step) {
-      // Stall detection — throws StallDetectedError on repeated tool calls or outputs
+      // Stall detection — throws StallDetectedError on repeated tool calls or outputs.
+      // Tool spans are handled by wrapToolsWithSpans (pre-execution), not here.
       stallDetector.recordOutput(step.text);
       for (const tc of step.toolCalls) {
         stallDetector.recordToolCall(tc.toolName, tc.input);
-      }
-
-      // Per-tool-call OTel spans
-      for (const tc of step.toolCalls) {
-        const span = startExecuteToolSpan({ toolName: tc.toolName });
-        span?.end();
       }
     },
 
