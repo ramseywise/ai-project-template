@@ -194,7 +194,8 @@ export async function compactHistory(
     const { text } = await generateText({
       model,
       messages: [{ role: "user", content: summaryPrompt }],
-      maxTokens: 512,
+      // AI SDK v5 renamed maxTokens -> maxOutputTokens (package.json pins ^5.0.0).
+      maxOutputTokens: 512,
     });
 
     console.info("[context-budget] compacted", {
