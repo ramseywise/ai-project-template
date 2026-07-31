@@ -125,9 +125,9 @@ export async function runWithVerification(
     if (attempt < maxRetries) {
       // Feed failure context back so the next attempt can improve.
       const feedbackText =
-        `[verification-loop] Previous response did not meet quality threshold ` +
+        "[verification-loop] Previous response did not meet quality threshold " +
         `(score=${lastGrade.score.toFixed(2)}). Reasoning: ${lastGrade.reasoning}. ` +
-        `Please try again with a more accurate answer.`;
+        "Please try again with a more accurate answer.";
 
       currentMessages = [
         ...messages,
