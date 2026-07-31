@@ -67,7 +67,7 @@ async def test_max_retry_cap_is_respected() -> None:
             call_count += 1
             return {"answer": "bad answer", "message": state.get("message", "")}
 
-    result, attempts = await run_with_verification(
+    _result, attempts = await run_with_verification(
         _CountingGraph(),
         {"message": "test query"},
         {"configurable": {"thread_id": "smoke-1"}},
@@ -75,9 +75,7 @@ async def test_max_retry_cap_is_respected() -> None:
         max_retries=max_retries,
     )
 
-    assert attempts == max_retries, (
-        f"Expected exactly {max_retries} attempts, got {attempts}"
-    )
+    assert attempts == max_retries, f"Expected exactly {max_retries} attempts, got {attempts}"
     assert call_count == max_retries, (
         f"Graph was invoked {call_count} times, expected {max_retries}"
     )

@@ -93,3 +93,19 @@ evals:
     - friction{% endif %}{% if include_metric_intent %}
     - intent{% endif %}{% if include_metric_language %}
     - language{% endif %}{% if not (include_metric_escalation or include_metric_friction or include_metric_intent or include_metric_language) %} []{% endif %}
+
+# ─── Non-functional budgets ────────────────────────────────────────────────
+# The trade-off axes. Seeded null at genesis and filled during /scope-poc's
+# Tier 4 (Q11b) — a value here is a decision, including an accepted tier
+# default. NOT consumed by copier and NOT rendered into DESIGN.md's generated
+# table; DESIGN.md's Non-Functional Constraints section is the human view.
+# Recorded here so tooling can read budgets without parsing prose.
+non_functional:
+  # Expected requests/day at POC. null = not yet decided.
+  load: null
+  # Response-time target a user would notice, e.g. "p95 < 10s". null = no SLA.
+  latency_target: null
+  # Monthly model/API spend ceiling, e.g. "$50". null = free tier only.
+  spend_ceiling: null
+  # What a trace must capture, and what must be redacted first (Q11c).
+  observability: null
