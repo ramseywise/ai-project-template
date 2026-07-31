@@ -77,7 +77,7 @@ make eval-render      # == python -m evals.pipelines.run render
 ```
 
 Both commands loop over every backend in `BACKENDS`. `eval-heuristic` requires
-each backend's vector DB to exist first — run{% if primary_chat_agent in ['lg_agent', 'both'] %} `make corpus-ingest` (`{{ lg_agent_dir }}`){% endif %}{% if include_rag_agent %}{% if primary_chat_agent in ['lg_agent', 'both'] %}
+each backend's vector DB to exist first — run{% if has_corpus_pipeline and primary_chat_agent in ['lg_agent', 'both'] %} `make corpus-ingest` (`{{ lg_agent_dir }}`){% endif %}{% if include_rag_agent %}{% if has_corpus_pipeline and primary_chat_agent in ['lg_agent', 'both'] %}
 and/or{% endif %} `make rag-corpus-ingest` (`rag_agent`){% endif %} if you see a "vector DB not
 found" error. It prints a per-backend summary table to stdout and writes
 `reports/output/heuristic_results_{backend}.json` for each.

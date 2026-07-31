@@ -237,7 +237,13 @@ jobs:
           rm -rf .git || true
           copier copy --overwrite --vcs-ref HEAD --trust --defaults \
             ${{ matrix.args }} -d include_rag_agent=true "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/out"
-          test -d backend/src/agents/rag_agent \
+          # py_project_root (copier.yaml) is '.' for a python-only backend and
+          # 'backend' otherwise, so the agents root is src/agents here but
+          # backend/src/agents for a shape that also ships a TS/web root. It is a
+          # `when: false` answer, so it is not recorded in .copier-answers.yml —
+          # probe both valid locations rather than hardcoding one prefix (every
+          # test-py leg is python-only, and asserting backend/ turned main red).
+          test -d src/agents/rag_agent -o -d backend/src/agents/rag_agent \
             || { echo "add-capability re-entry did not land rag_agent"; exit 1; }
           # rag_agent implies has_corpus_pipeline → the corpus subpackage + its
           # retrieval eval must land on re-entry too (covers the no-corpus shape

@@ -6,7 +6,9 @@ Local Docker Compose setup for the `{{ lg_agent_dir }}` FastAPI chat-agent servi
 
 ```sh
 make setup            # uv sync, creates .env from .env.example
+{%- if has_corpus_pipeline %}
 make corpus-ingest     # builds data/stores/vectordb.duckdb on the HOST (see below)
+{%- endif %}
 make docker-up         # docker compose up --build
 make docker-down       # stop and remove the containers
 ```
@@ -17,6 +19,7 @@ make docker-down       # stop and remove the containers
 docker compose -f infrastructure/containers/docker-compose.yml up --build
 docker compose -f infrastructure/containers/docker-compose.yml down
 ```
+{%- if has_corpus_pipeline %}
 
 ## Why corpus ingestion happens on the host, not in the container
 
@@ -32,13 +35,14 @@ for real: a real deployment would either bake a pre-built index into the image a
 build time (fine for a small, infrequently-changing corpus) or run ingestion as a
 one-off init container / job against a shared volume or object store before the
 service starts (better for a corpus that changes independently of the app image).
+{%- endif %}
 
 ## Configuration
 
 The container reads its environment from the project root `.env` (via
 `env_file: ../../.env` in `docker-compose.yml`) — the same file `make {{ lg_agent_dir | replace('_', '-') }}-up` uses
 outside Docker. See `.env.example` for the full list of variables
-(`ANTHROPIC_API_KEY`, `LG_MODEL`, `LG_PORT`, `VECTORDB_PATH`, `LG_CHECKPOINTER`).
+(`ANTHROPIC_API_KEY`, `LG_MODEL`, `LG_PORT`, {% if has_corpus_pipeline %}`VECTORDB_PATH`, {% endif %}`LG_CHECKPOINTER`).
 
 **Known limitation — changing `LG_PORT`:** the container's *listening* port always
 follows `LG_PORT` from your root `.env` correctly (via `env_file`). However, the

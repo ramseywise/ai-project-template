@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+{%- if has_corpus_pipeline %}
 from pathlib import Path
+{%- endif %}
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -9,7 +11,9 @@ from langchain_core.runnables import RunnableConfig
 
 from .graph import build_graph
 from .schema import ChatRequest, ChatResponse
+{%- if has_corpus_pipeline %}
 from .settings import settings
+{%- endif %}
 
 _graph = None
 
@@ -17,11 +21,13 @@ _graph = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _graph
+{%- if has_corpus_pipeline %}
     if settings.vectordb_path != ":memory:" and not Path(settings.vectordb_path).exists():
         print(
             f"Warning: {settings.vectordb_path} does not exist yet — "
             "run `make corpus-ingest` before sending chat requests."
         )
+{%- endif %}
     _graph = build_graph()
     yield
 

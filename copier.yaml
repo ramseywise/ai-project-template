@@ -207,9 +207,10 @@ external_systems:
 deployment_target:
   type: str
   help: >-
-    Expected deployment. Recorded in DESIGN.md's key decisions; the infra/
-    skeleton (Terraform, Dockerfiles) ships with every full scaffold either
-    way. docker/cloud additionally scaffold .github/workflows/cd.yml
+    Expected deployment. Recorded in DESIGN.md's key decisions; Dockerfiles
+    (infrastructure/containers/) ship with every full scaffold, and the
+    terraform/ skeleton ships when a cloud is selected (cloud != none).
+    docker/cloud additionally scaffold .github/workflows/cd.yml
     (build-and-push to GHCR) when the lg_agent image exists to build —
     local/serverless get no CD workflow (serverless deploys via the
     platform's own git integration).
@@ -323,9 +324,25 @@ human_approval:
 # These defaults reproduce the previous single `source_root: backend/src`
 # exactly — py_project_root + ai_source_root == backend/src — so rendered
 # destination paths are unchanged; only the staging layout moved.
+#
+# Flat layout (AIT-33): a python-only backend with no frontend tree has nothing
+# to disambiguate, so py_project_root collapses to '.' and the backend lands at
+# ./src instead of backend/src. ml_source_root stays 'ml' — under flat layout ML
+# is scaffolded as an optional sibling backend to the agentic src/, at ./ml/.
+# The frontend condition is INLINED from _external_data (not `include_frontend`)
+# because that question is declared later in this file — copier renders each
+# default with only the answers collected so far, so referencing it here would
+# be undefined. Existing consumers on `copier update` should pin
+# `-d py_project_root=backend` in .copier-answers.yml to keep the nested shape.
 py_project_root:
   type: str
-  default: backend
+  default: >-
+    {{ '.' if (primary_backend_language == 'python' and not
+    (_external_data.design.web.enabled
+    if (_external_data.design is defined and _external_data.design and
+    _external_data.design.stages is defined and
+    _external_data.design.stages.discovery == 'complete') else false))
+    else 'backend' }}
   when: false
 
 ai_source_root:
@@ -440,10 +457,11 @@ include_rag_agent:
 
 # Derived: does this render ship the corpus data pipeline
 # (core/pipelines/corpus/ — markdown → JSONL → DuckDB FTS index) and the
-# retrieval golden-QA eval that grades against it? True whenever a retrieval
-# example agent is present: the LangGraph chat agent (BM25 over the FTS index,
-# core.pipelines.corpus.index.search) or rag_agent (embedding retrieval over
-# the same preprocessed corpus). core/ itself is the general ETL home and
+# retrieval golden-QA eval that grades against it? True when RAG is on
+# (rag_agent present — embedding retrieval over the preprocessed corpus).
+# The LangGraph chat agent is corpus-free by default; its retrieve node and
+# BM25 wiring are the additive corpus demo layer, rendered only when this
+# flag is true. core/ itself is the general ETL home and
 # always ships in a full scaffold; only the corpus SUBpackage + its golden-QA
 # eval, tests, fixtures, and Makefile targets are gated here — a non-retrieval
 # shape (mcp_server / eval_suite / ai_backend / adk-only / none) gets an empty
@@ -458,9 +476,9 @@ has_corpus_pipeline:
     if (_external_data.design is defined and _external_data.design and
     _external_data.design.stages is defined and
     _external_data.design.stages.discovery == 'complete') else
-    (scaffold_full_project and (primary_chat_agent in ['lg_agent', 'both'] or include_rag_agent)) }}
-  # Q5 row 3 (has_corpus_pipeline keeps its `or lg_agent` clause in the A3-derived
-  # else branch). design.yaml branch additionally requires
+    (scaffold_full_project and include_rag_agent) }}
+  # AIT-32: the A3-derived else branch dropped its `or lg_agent` clause —
+  # lg_agent no longer implies the corpus demo. design.yaml branch additionally requires
   # rag.corpus_pipeline == 'markdown_jsonl' (Q4): only that rag_impl ships the
   # markdown->JSONL->DuckDB pipeline; bedrock_kb/vertex_rag/ts_vectorstore don't.
   when: false
@@ -549,12 +567,12 @@ include_ts_rag:
 # "memory" either way — checkpointer construction happens eagerly at
 # graph-compile time (unlike vector_backend, which is lazy per-call), so
 # defaulting straight to postgres would make `make test`/import fail hard
-# without a live database reachable. Seeded on when vectors already live in
-# postgres or the agent declared long-term memory; independent of
-# vector_backend otherwise (override with -d enable_postgres_checkpointer=…).
+# without a live database reachable. Seeded on when the agent declared
+# long-term memory; independent of vector_backend
+# (override with -d enable_postgres_checkpointer=…).
 enable_postgres_checkpointer:
   type: bool
-  default: "{{ vector_backend == 'postgres' or agent_memory == 'long_term' }}"
+  default: "{{ agent_memory == 'long_term' }}"
   when: false
 
 # Derived TS layout — 99% of projects answer src / <project_slug>; override
@@ -1176,8 +1194,8 @@ _tasks:
   - "{{ 'true' if (not scaffold_full_project) or include_n8n_webhook or include_calendar_integration or include_marketing_integrations or include_meeting_intelligence or include_composio or include_web_research else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/integrations' }}"
   - "{{ 'true' if (not scaffold_full_project) or include_ragas_grader else 'rm -f ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ eval_root ~ '/graders/ragas_grader.py' }}"
   # Corpus data pipeline (core/pipelines/corpus/) + its retrieval golden-QA eval,
-  # tests, example corpus, and analysis notebook — shipped only when a retrieval
-  # example agent is present (has_corpus_pipeline: lg_agent BM25 or rag_agent).
+  # tests, example corpus, analysis notebook, and lg_agent's retrieve node +
+  # test — shipped only when the corpus demo layer is on (has_corpus_pipeline).
   # core/ itself (the general ETL home) always ships in a full scaffold; only the
   # corpus SUBpackage and everything welded to it is removed here for a
   # non-retrieval shape. Staged under _scaffold/, removed before the big mv —
@@ -1185,15 +1203,26 @@ _tasks:
   # files (pipelines/run.py, graders/citation.py, metrics/retrieval.py) are the
   # only eval modules coupled to corpus.models; nothing else imports them, so the
   # remaining eval tree (interaction evals, gated separately) stays intact.
+  # pipelines/compare.py ships on the unmerged AIT-29-otel-spans branch; when it
+  # rebases, AIT-29 must append compare.py to this rm list and gate its
+  # eval-compare Makefile target on has_corpus_pipeline (see issue #29). It is
+  # NOT listed here preemptively — scripts/validate_paths.py rejects _tasks
+  # paths with no matching template entry.
   - >-
     {{ 'true' if (not scaffold_full_project) or has_corpus_pipeline else 'rm -rf '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/core/pipelines/corpus '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/data/raw_corpus '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/unit/core '
-    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/nbks/corpus_analysis.py '
+    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/nbks '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ eval_root ~ '/pipelines/run.py '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ eval_root ~ '/graders/citation.py '
-    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ eval_root ~ '/metrics/retrieval.py' }}
+    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ eval_root ~ '/metrics/retrieval.py '
+    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/agents/' ~ lg_agent_dir ~ '/nodes/retrieve.py '
+    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/unit/agents/test_retrieve.py' }}
+  # terraform/ is an AWS IaC skeleton (and carries the VECTORDB_PATH plumbing) —
+  # dead weight for a project with no cloud target. containers/ still ships
+  # (Dockerfiles/compose are useful at cloud=none).
+  - "{{ 'true' if (not scaffold_full_project) or cloud != 'none' else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/infrastructure/terraform' }}"
   # Interaction-eval metrics: per-metric modules (heuristic + judge + metrics
   # aggregator) are independently removable, same pattern as integrations/
   # sub-modules above — staged under _scaffold/<eval_root>, removed from
@@ -1234,7 +1263,11 @@ _tasks:
   # the framework name and the tree is removed here. 'none' removes both,
   # leaving rag_agent (shared retrieval infra for the MCP tool, if included)
   # as the sole example agent.
-  - "{{ 'true' if (not scaffold_full_project) or primary_chat_agent in ['lg_agent', 'both'] else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/agents/' ~ lg_agent_dir ~ ' ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/unit/agents' }}"
+  # The verification-loop smoke test imports agents.{{ lg_agent_dir }} directly,
+  # so it goes with the tree — otherwise it ships into lg-agent-less profiles and
+  # fails at import with ModuleNotFoundError (lint hides this: ruff can't resolve
+  # the missing module, so it silently reclassifies the import as third-party).
+  - "{{ 'true' if (not scaffold_full_project) or primary_chat_agent in ['lg_agent', 'both'] else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/agents/' ~ lg_agent_dir ~ ' ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/unit/agents ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/smoke/test_verification_loop.py' }}"
   - "{{ 'true' if (not scaffold_full_project) or primary_chat_agent in ['adk_agent', 'both'] else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/agents/' ~ adk_agent_dir }}"
   # rag_agent ships default-on only for the rag shape (include_rag_agent) —
   # when off, the tree goes; the MCP retrieval tool keeps its RAG_AGENT_URL
@@ -1338,9 +1371,15 @@ _tasks:
     ~ _copier_conf.dst_path ~ '/_scaffold/.pre-commit-config.yaml '
     ~ _copier_conf.dst_path ~ '/_scaffold/renovate.json '
     ~ _copier_conf.dst_path ~ '/_scaffold/.env.example '
-    ~ _copier_conf.dst_path ~ '/_scaffold/README.md '
     ~ _copier_conf.dst_path ~ '/_scaffold/SANYI.md '
     ~ _copier_conf.dst_path ~ '/_scaffold/project_init.sh '
+    ~ _copier_conf.dst_path ~ '/') if scaffold_full_project else 'true' }}
+  # README.md is the project's own doc — never clobber an existing one on
+  # re-render (copier --skip semantics don't reach post-task mv).
+  - >-
+    {{ ('[ -f ' ~ _copier_conf.dst_path ~ '/README.md ] && rm -f '
+    ~ _copier_conf.dst_path ~ '/_scaffold/README.md || mv '
+    ~ _copier_conf.dst_path ~ '/_scaffold/README.md '
     ~ _copier_conf.dst_path ~ '/') if scaffold_full_project else 'true' }}
   # Directory merges (idempotent on re-render — see note above). Each: create the
   # target if absent, copy staged contents in (merging with any existing files).
@@ -1360,13 +1399,17 @@ _tasks:
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/core/. ' ~ _copier_conf.dst_path ~ '/core/'
     ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/' ~ eval_root ~ ' && cp -R '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ eval_root ~ '/. ' ~ _copier_conf.dst_path ~ '/' ~ eval_root ~ '/'
-    ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/nbks && cp -R '
-    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/nbks/. ' ~ _copier_conf.dst_path ~ '/nbks/'
     ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/tests && cp -R '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/. ' ~ _copier_conf.dst_path ~ '/tests/'
     ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/infrastructure && cp -R '
     ~ _copier_conf.dst_path ~ '/_scaffold/infrastructure/. ' ~ _copier_conf.dst_path ~ '/infrastructure/'
     ) if scaffold_full_project else 'true' }}
+  # Separate merge (not part of the block above) — the corpus cleanup task above
+  # rm -rf's the whole staged nbks directory when the project ships no notebooks
+  # (has_corpus_pipeline=false), so it may not exist at all; folding it into the
+  # chained && block would abort the whole chain on a missing source path (same
+  # reasoning as the ml merge below).
+  - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/nbks && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/nbks/. ' ~ _copier_conf.dst_path ~ '/nbks/') if (scaffold_full_project and has_corpus_pipeline) else 'true' }}"
   # Separate merge (not part of the block above) — the Python backend tree only
   # belongs in a project whose backend is Python. Pre-2b′ this rode along in the
   # unconditional block, so a typescript-only project still got a Python src/

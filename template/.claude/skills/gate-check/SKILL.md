@@ -30,6 +30,7 @@ contract; offer to create it from the template). Note the current `phase`.
 |---|---|
 | `design_no_blocking_open_questions` | Read DESIGN.md. Every Open Questions entry and every `Open` Key Decision is either resolved or marked `Deferred(<trigger>)` with a real trigger. Count blockers. |
 | `eval_targets_defined` | DESIGN.md Evaluation table has ≥1 real row AND `evals/targets.yaml` exists with matching metrics. |
+| `non_functionals_and_breakage_stated` | Read DESIGN.md. Non-Functional Constraints' Load / Latency target / Spend ceiling / Observability bullets each carry a real answer — **an accepted tier default ("free tier only (weekend-sprint default)") counts, an unreplaced `<!-- comment -->` does not** — AND the What Breaks First table has ≥1 non-placeholder row. This checks that the decisions were *made*, never that a particular number was chosen; a POC that consciously accepts demo-tier everything passes. |
 | `base_scaffold_ci_green` | The project renders/builds: latest CI run green (`gh run list`), or locally `make test` + `make lint-check` pass. |
 | `milestones_and_m1_tasks_reviewed` | Milestone doc(s) exist (`.claude/docs/milestones/` or DESIGN.md roadmap section) AND a TASKS.md/first-sprint plan exists AND a `/plan-review` artifact or review note covers them. |
 | `rfc_approved` | RFC.md exists and contains a human-set `Status: APPROVED` line. **Never write that line yourself** — mirror it only. |

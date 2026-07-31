@@ -9,7 +9,9 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     lg_model: str = "claude-haiku-4-5-20251001"
     lg_port: int = 8010
+{%- if has_corpus_pipeline %}
     vectordb_path: str = "data/stores/vectordb.duckdb"
+{%- endif %}
     # Always defaults to "memory" — checkpointer construction happens eagerly at
     # graph-compile time (unlike vector_backend, which is lazy per-call), so
     # defaulting this to "postgres" would make `make test`/import fail hard
@@ -17,8 +19,10 @@ class Settings(BaseSettings):
     # POSTGRES_DSN actually points at a reachable database.
     lg_checkpointer: str = "memory"  # memory | postgres
     postgres_dsn: str = ""  # used by the postgres checkpointer
+{%- if has_corpus_pipeline %}
 
     retrieval_top_k: int = 5
+{%- endif %}
     generation_temperature: float = 0.3
 
     mcp_enabled: bool = {{ include_mcp_server }}

@@ -109,13 +109,36 @@ Deferred items don't.
 
 ## Non-Functional Constraints
 
+These are the trade-off axes — every architecture decision above is a choice made
+*against* these numbers. An accepted POC-tier default is a real answer; write it down
+as one ("free tier only (weekend-sprint default, unvalidated)"), not as a blank.
+
 - **Data classification:** {{ data_sensitivity }}
 {%- if data_sensitivity in ["restricted", "secret"] %}
   (RESTRICTED: never log, print, or trace raw field values — redact before stdout/observability)
 {%- endif %}
 - **Multi-tenancy:** <!-- required / not required; if required: enforcement mechanism -->
 - **Operator model:** <!-- who runs this after POC, budget, volunteer vs. dedicated team -->
-- **Scale:** <!-- expected load, any SLA -->
+- **Load:** <!-- requests/day at POC, and at the realistic 6-month state -->
+- **Latency target:** <!-- a response time someone would notice, e.g. "p95 < 10s", or "batch — minutes fine" -->
+- **Spend ceiling:** <!-- monthly model/API budget that must not be crossed, or "free tier only" -->
+- **Observability:** <!-- what a trace must capture to diagnose a bad answer{% if data_sensitivity in ["restricted", "secret"] %}, and what is redacted before it gets there — required at this classification{% endif %} -->
+
+<!-- These four mirror design.yaml's `non_functional:` block. /scope-poc Tier 4
+     (Q11b, Q11c) fills them; tier defaults are listed there. -->
+
+---
+
+## What Breaks First
+
+<!-- Name your design's weaknesses before a reviewer does. Two rows is the bar for a
+     POC — this is a design record, not a full bottleneck analysis. Product risks
+     (what the POC must prove) belong in MVP Scope and the Evaluation table; this
+     section is about what the architecture costs you. -->
+
+| Component | Failure mode | How you'd notice | Cheap mitigation | In POC scope? |
+|-----------|--------------|------------------|------------------|---------------|
+| <!-- e.g. LLM API --> | <!-- rate-limited, requests queue --> | <!-- p95 latency spike / 429s in traces --> | <!-- retry with backoff + cache --> | <!-- yes / after POC --> |
 
 ---
 
