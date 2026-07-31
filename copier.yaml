@@ -75,10 +75,10 @@ _message_after_copy: >+
   {%- endif %}
 
 _message_after_update: >+
-  Layout note: use_flat_layout defaults to false on update, so python-only
-  projects that pre-date AIT-40 (no use_flat_layout in .copier-answers.yml)
-  will keep their existing backend/ tree.  If you intentionally want the flat
-  layout (src/ at the repo root), re-run with -d use_flat_layout=true.
+  Layout note: use_flat_layout defaults to false (nested, backend/src).
+  Projects that recorded use_flat_layout: true will keep their flat layout;
+  projects without the key get backend/.  To switch, re-run with
+  -d use_flat_layout=true (flat) or -d use_flat_layout=false (nested).
 
 _exclude:
   - __pycache__
@@ -359,10 +359,9 @@ human_approval:
 use_flat_layout:
   type: bool
   help: >-
-    Put the Python backend at the repo root (flat layout) instead of under
-    backend/?  Flat layout (src/ at ./src) is the default for new python-only
-    projects; nested layout (backend/src) is the default on update so existing
-    projects keep their current tree.
+    Put the Python backend at the repo root (flat layout, src/ at ./src) instead
+    of under backend/ (nested layout, backend/src)?  The default is nested.
+    Answer yes only if you want src/ directly at the repo root.
   default: false
   when: >-
     {{ primary_backend_language == 'python' and not
