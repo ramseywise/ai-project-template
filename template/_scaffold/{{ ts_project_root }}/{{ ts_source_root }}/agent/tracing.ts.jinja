@@ -23,10 +23,11 @@ import {
   BasicTracerProvider,
   BatchSpanProcessor,
   ConsoleSpanExporter,
-  type Span,
 } from "@opentelemetry/sdk-trace-base";
 import { trace, SpanStatusCode } from "@opentelemetry/api";
-import type { Attributes } from "@opentelemetry/api";
+// Span comes from the API, not sdk-trace-base: tracer.startSpan() returns the API
+// interface, and the SDK's concrete Span class is not assignable to it.
+import type { Attributes, Span } from "@opentelemetry/api";
 
 const TRACER_NAME = "{{ project_slug }}.agent";
 
@@ -95,7 +96,7 @@ export async function withSpan<T>(
 
 /** Start a span manually. Caller must call span.end(). */
 export function startSpan(spanName: string, attributes: Attributes): Span | null {
-  if (!_tracer) return null;
+  if (!_tracer) { return null; }
   return _tracer.startSpan(spanName, { attributes });
 }
 
@@ -118,9 +119,9 @@ export function startInvokeAgentSpan(attrs: InvokeAgentAttrs): Span | null {
     session_id: attrs.sessionId,
     "gen_ai.system": "anthropic",
   };
-  if (attrs.userId) attributes["user_id"] = attrs.userId;
-  if (attrs.model) attributes["gen_ai.request.model"] = attrs.model;
-  if (attrs.promptVersion) attributes["prompt_version"] = attrs.promptVersion;
+  if (attrs.userId) { attributes["user_id"] = attrs.userId; }
+  if (attrs.model) { attributes["gen_ai.request.model"] = attrs.model; }
+  if (attrs.promptVersion) { attributes["prompt_version"] = attrs.promptVersion; }
   return startSpan("invoke_agent", attributes);
 }
 
@@ -138,11 +139,10 @@ export function startChatSpan(attrs: ChatAttrs): Span | null {
     operation_name: "chat",
     "gen_ai.request.model": attrs.model,
   };
-  if (attrs.inputTokens !== undefined) attributes["gen_ai.usage.input_tokens"] = attrs.inputTokens;
-  if (attrs.outputTokens !== undefined)
-    attributes["gen_ai.usage.output_tokens"] = attrs.outputTokens;
-  if (attrs.maxTokens !== undefined) attributes["gen_ai.request.max_tokens"] = attrs.maxTokens;
-  if (attrs.temperature !== undefined) attributes["gen_ai.request.temperature"] = attrs.temperature;
+  if (attrs.inputTokens !== undefined) { attributes["gen_ai.usage.input_tokens"] = attrs.inputTokens; }
+  if (attrs.outputTokens !== undefined) { attributes["gen_ai.usage.output_tokens"] = attrs.outputTokens; }
+  if (attrs.maxTokens !== undefined) { attributes["gen_ai.request.max_tokens"] = attrs.maxTokens; }
+  if (attrs.temperature !== undefined) { attributes["gen_ai.request.temperature"] = attrs.temperature; }
   if (attrs.finishReason) {
     attributes["gen_ai.response.finish_reasons"] = attrs.finishReason;
     if (attrs.finishReason === "max_tokens") {
@@ -166,8 +166,8 @@ export function startExecuteToolSpan(attrs: ExecuteToolAttrs): Span | null {
     "tool.version": attrs.toolVersion ?? "1",
     is_error: false,
   };
-  if (attrs.inputHash) attributes["input_hash"] = attrs.inputHash;
-  if (attrs.retryCount !== undefined) attributes["retry_count"] = attrs.retryCount;
+  if (attrs.inputHash) { attributes["input_hash"] = attrs.inputHash; }
+  if (attrs.retryCount !== undefined) { attributes["retry_count"] = attrs.retryCount; }
   return startSpan("execute_tool", attributes);
 }
 
@@ -184,9 +184,9 @@ export function startRetrieveSpan(attrs: RetrieveAttrs): Span | null {
     operation_name: "retrieve",
     query: attrs.query, // redact before passing if data_sensitivity is high
   };
-  if (attrs.backend) attributes["retrieval.backend"] = attrs.backend;
-  if (attrs.topK !== undefined) attributes["retrieval.top_k"] = attrs.topK;
-  if (attrs.resultCount !== undefined) attributes["retrieval.result_count"] = attrs.resultCount;
+  if (attrs.backend) { attributes["retrieval.backend"] = attrs.backend; }
+  if (attrs.topK !== undefined) { attributes["retrieval.top_k"] = attrs.topK; }
+  if (attrs.resultCount !== undefined) { attributes["retrieval.result_count"] = attrs.resultCount; }
   return startSpan("retrieve", attributes);
 }
 
@@ -206,12 +206,11 @@ export function startEvalItemSpan(attrs: EvalItemAttrs): Span | null {
     "eval.id": attrs.evalId,
     "eval.query": attrs.query,
   };
-  if (attrs.backend) attributes["eval.backend"] = attrs.backend;
-  if (attrs.model) attributes["gen_ai.request.model"] = attrs.model;
-  if (attrs.score !== undefined) attributes["eval.score"] = attrs.score;
-  if (attrs.inputTokens !== undefined) attributes["gen_ai.usage.input_tokens"] = attrs.inputTokens;
-  if (attrs.outputTokens !== undefined)
-    attributes["gen_ai.usage.output_tokens"] = attrs.outputTokens;
+  if (attrs.backend) { attributes["eval.backend"] = attrs.backend; }
+  if (attrs.model) { attributes["gen_ai.request.model"] = attrs.model; }
+  if (attrs.score !== undefined) { attributes["eval.score"] = attrs.score; }
+  if (attrs.inputTokens !== undefined) { attributes["gen_ai.usage.input_tokens"] = attrs.inputTokens; }
+  if (attrs.outputTokens !== undefined) { attributes["gen_ai.usage.output_tokens"] = attrs.outputTokens; }
   return startSpan("eval_item", attributes);
 }
 

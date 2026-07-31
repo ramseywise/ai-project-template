@@ -83,7 +83,7 @@ export interface AIUsage {
  */
 export function trackUsage(
   usage: AIUsage,
-  categories: TokenCategoryBreakdown = {}
+  categories: TokenCategoryBreakdown = {},
 ): TokenUsage {
   const totalInput = usage.promptTokens;
   const totalOutput = usage.completionTokens;
@@ -136,7 +136,7 @@ export function trackUsage(
  * ```
  */
 export function shouldCompact(usage: AIUsage): boolean {
-  if (budgetSettings.maxContextTokens <= 0) return false;
+  if (budgetSettings.maxContextTokens <= 0) { return false; }
   const utilisation = usage.promptTokens / budgetSettings.maxContextTokens;
   const triggered = utilisation >= budgetSettings.compactionThreshold;
   if (triggered) {
@@ -173,10 +173,10 @@ export interface ChatMessage {
 export async function compactHistory(
   history: ChatMessage[],
   model: LanguageModel,
-  keepLastN = 2
+  keepLastN = 2,
 ): Promise<ChatMessage[]> {
   const keep = Math.max(1, keepLastN);
-  if (history.length <= keep) return history;
+  if (history.length <= keep) { return history; }
 
   const toSummarise = history.slice(0, history.length - keep);
   const tail = history.slice(history.length - keep);
@@ -194,7 +194,8 @@ export async function compactHistory(
     const { text } = await generateText({
       model,
       messages: [{ role: "user", content: summaryPrompt }],
-      maxTokens: 512,
+      // AI SDK v5 renamed maxTokens -> maxOutputTokens (package.json pins ^5.0.0).
+      maxOutputTokens: 512,
     });
 
     console.info("[context-budget] compacted", {
