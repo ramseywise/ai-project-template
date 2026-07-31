@@ -150,6 +150,19 @@ export function shouldCompact(usage: AIUsage): boolean {
 }
 
 // ── Conversation compaction ────────────────────────────────────────────────
+//
+// NOT wired into agent.ts (stateless handler — intentional)
+// ----------------------------------------------------------
+// `compactHistory` requires a mutable, retained message array that persists
+// across turns so old turns can be replaced with a summary.  `handler.ts` is
+// stateless: it rebuilds history from the request body on every call and
+// discards it when the response closes.  Wiring compactHistory here would
+// require introducing session state the template deliberately does not carry.
+//
+// Wire it in your own session-aware layer (e.g. a database-backed conversation
+// store) once you have persistent history.  `trackUsage` + `shouldCompact` in
+// agent.ts's `onFinish` callback tell you *when* to compact; the actual
+// compaction happens in whatever layer owns the history.
 
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
