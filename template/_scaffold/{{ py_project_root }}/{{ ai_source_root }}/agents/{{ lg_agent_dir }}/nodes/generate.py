@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from langchain_core.tools import BaseTool
 
-from ..clients.llm import agenerate
+from context_budget.context_budget import compact_history, should_compact, track_usage
+from observability.spans import chat_span, execute_tool_span
+
+from ..clients.llm import agenerate, get_client
 from ..clients.mcp import get_mcp_tools
+from ..settings import settings
+from ..stall_detector import StallDetectedError, StallDetector
 from ..state import State
 
 _SYSTEM_PROMPT = """You are a support assistant answering questions using the provided \
@@ -44,11 +50,26 @@ async def generate_node(state: State) -> dict:
     anthropic_tools = [_to_anthropic_tool(tool) for tool in mcp_tools]
 
     messages: list[dict[str, Any]] = [{"role": "user", "content": state["message"]}]
+    stall = StallDetector()
 
     for _ in range(_MAX_TOOL_TURNS):
-        response = await agenerate(system_prompt, messages, tools=anthropic_tools)
+        with chat_span(model=settings.lg_model):
+            response = await agenerate(system_prompt, messages, tools=anthropic_tools)
+
+        track_usage(response)
+        if should_compact(response):
+            # compact_history calls client.messages.create synchronously; run in a
+            # thread pool so the blocking call does not stall the async event loop.
+            messages = await asyncio.to_thread(
+                compact_history, messages, get_client(), model=settings.lg_model
+            )
+
         if response.stop_reason != "tool_use":
             text = "".join(block.text for block in response.content if block.type == "text")
+            try:
+                stall.record_output(text)
+            except StallDetectedError as exc:
+                return {"answer": f"Stall detected in LLM output: {exc}"}
             return {"answer": text}
 
         messages.append({"role": "assistant", "content": response.content})
@@ -61,7 +82,11 @@ async def generate_node(state: State) -> dict:
                 result_text = f"Unknown tool: {block.name}"
             else:
                 try:
-                    result_text = str(await tool.ainvoke(block.input))
+                    stall.record_tool_call(block.name, block.input)
+                    with execute_tool_span(tool_name=block.name, inputs=block.input):
+                        result_text = str(await tool.ainvoke(block.input))
+                except StallDetectedError as exc:
+                    return {"answer": f"Stall detected in tool loop: {exc}"}
                 except Exception as exc:
                     result_text = f"Tool error: {exc}"
             tool_results.append(

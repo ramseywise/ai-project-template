@@ -9,11 +9,12 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from langchain_core.runnables import RunnableConfig
 
+from observability.spans import invoke_agent_span
+
 from .graph import build_graph
 from .schema import ChatRequest, ChatResponse
-{%- if has_corpus_pipeline %}
 from .settings import settings
-{%- endif %}
+from .verification_loop import run_with_verification
 
 _graph = None
 
@@ -66,7 +67,14 @@ async def health() -> dict:
 async def chat(request: ChatRequest) -> ChatResponse:
     assert _graph is not None
     config: RunnableConfig = {"configurable": {"thread_id": request.thread_id}}
-    result = await _graph.ainvoke({"message": request.message}, config)
+    with invoke_agent_span(
+        agent_id=settings.lg_model,
+        session_id=request.thread_id,
+        model=settings.lg_model,
+    ):
+        result, _attempts = await run_with_verification(
+            _graph, {"message": request.message}, config
+        )
     return ChatResponse(
         message=result["answer"],
         sources=result.get("sources", []),

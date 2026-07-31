@@ -139,3 +139,147 @@ async def test_generate_node_executes_real_tool_use_loop(monkeypatch: pytest.Mon
 
     assert result == {"answer": "final answer"}
     assert calls["n"] == 2
+
+
+# ---------------------------------------------------------------------------
+# Wiring tests — each fails if the named module is removed from generate.py
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_stall_detector_wired_into_tool_loop(monkeypatch: pytest.MonkeyPatch) -> None:
+    """StallDetector.record_tool_call must be reached for every tool call.
+
+    Remove the ``stall.record_tool_call(...)`` line from generate.py and this
+    test fails: record_tool_call will never be called and the assertion trips.
+    """
+    record_calls: list[tuple[str, object]] = []
+
+    real_StallDetector = generate_module.StallDetector
+
+    class _SpyStallDetector(real_StallDetector):
+        def record_tool_call(self, tool_name: str, tool_input: object) -> None:
+            record_calls.append((tool_name, tool_input))
+            super().record_tool_call(tool_name, tool_input)
+
+    monkeypatch.setattr(generate_module, "StallDetector", _SpyStallDetector)
+
+    call_n = {"n": 0}
+
+    async def _fake_agenerate(system_prompt: str, messages: list[dict], tools=None):
+        call_n["n"] += 1
+        if call_n["n"] == 1:
+            return SimpleNamespace(
+                stop_reason="tool_use",
+                usage=SimpleNamespace(input_tokens=10, output_tokens=5),
+                content=[
+                    SimpleNamespace(type="tool_use", name="lookup", input={"q": "x"}, id="t1")
+                ],
+            )
+        return SimpleNamespace(
+            stop_reason="end_turn",
+            usage=SimpleNamespace(input_tokens=10, output_tokens=5),
+            content=[SimpleNamespace(type="text", text="done")],
+        )
+
+    class _FakeTool:
+        name = "lookup"
+        description = "fake"
+        args_schema: ClassVar[dict] = {"type": "object", "properties": {}}
+
+        async def ainvoke(self, args: dict) -> str:
+            return "result"
+
+    async def _one_fake_tool():
+        return [_FakeTool()]
+
+    monkeypatch.setattr(generate_module, "agenerate", _fake_agenerate)
+    monkeypatch.setattr(generate_module, "get_mcp_tools", _one_fake_tool)
+
+    state: State = {"message": "needs a tool", "blocked": False, "context_snippets": []}
+    await generate_node(state)
+
+    assert len(record_calls) >= 1, (
+        "record_tool_call was never invoked — stall_detector is not wired into the tool loop"
+    )
+    assert record_calls[0][0] == "lookup"
+
+
+@pytest.mark.asyncio
+async def test_context_budget_track_usage_wired(monkeypatch: pytest.MonkeyPatch) -> None:
+    """track_usage must be called after every agenerate response.
+
+    Remove the ``track_usage(response)`` line from generate.py and this test
+    fails: track_usage_calls stays 0.
+    """
+    track_usage_calls: list[object] = []
+
+    real_track_usage = generate_module.track_usage
+
+    def _spy_track_usage(response, **kwargs):
+        track_usage_calls.append(response)
+        return real_track_usage(response, **kwargs)
+
+    monkeypatch.setattr(generate_module, "track_usage", _spy_track_usage)
+
+    async def _fake_agenerate(system_prompt: str, messages: list[dict], tools=None):
+        return SimpleNamespace(
+            stop_reason="end_turn",
+            usage=SimpleNamespace(input_tokens=100, output_tokens=20),
+            content=[SimpleNamespace(type="text", text="answer")],
+        )
+
+    async def _no_tools():
+        return []
+
+    monkeypatch.setattr(generate_module, "agenerate", _fake_agenerate)
+    monkeypatch.setattr(generate_module, "get_mcp_tools", _no_tools)
+
+    state: State = {"message": "hello", "blocked": False, "context_snippets": []}
+    await generate_node(state)
+
+    assert len(track_usage_calls) >= 1, (
+        "track_usage was never called — context_budget is not wired into generate_node"
+    )
+
+
+@pytest.mark.asyncio
+async def test_chat_span_wired_around_agenerate(monkeypatch: pytest.MonkeyPatch) -> None:
+    """chat_span context manager must be entered for each LLM call.
+
+    Remove the ``with chat_span(...)`` block from generate.py and this test
+    fails: enter_count stays 0.
+    """
+    enter_count: list[int] = []
+
+    real_chat_span = generate_module.chat_span
+
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _spy_chat_span(**kwargs):
+        enter_count.append(1)
+        with real_chat_span(**kwargs) as span:
+            yield span
+
+    monkeypatch.setattr(generate_module, "chat_span", _spy_chat_span)
+
+    async def _fake_agenerate(system_prompt: str, messages: list[dict], tools=None):
+        return SimpleNamespace(
+            stop_reason="end_turn",
+            usage=SimpleNamespace(input_tokens=50, output_tokens=10),
+            content=[SimpleNamespace(type="text", text="spanned")],
+        )
+
+    async def _no_tools():
+        return []
+
+    monkeypatch.setattr(generate_module, "agenerate", _fake_agenerate)
+    monkeypatch.setattr(generate_module, "get_mcp_tools", _no_tools)
+
+    state: State = {"message": "hello", "blocked": False, "context_snippets": []}
+    await generate_node(state)
+
+    assert len(enter_count) >= 1, (
+        "chat_span was never entered — spans are not wired into generate_node"
+    )
