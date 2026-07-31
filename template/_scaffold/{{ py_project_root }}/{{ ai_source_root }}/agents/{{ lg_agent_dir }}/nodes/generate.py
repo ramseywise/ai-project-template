@@ -55,12 +55,14 @@ async def generate_node(state: State) -> dict:
     for _ in range(_MAX_TOOL_TURNS):
         with chat_span(model=settings.lg_model) as _span:
             response = await agenerate(system_prompt, messages, tools=anthropic_tools)
-        # Set real token counts and finish reason now that response is in hand.
-        # _span is None when OTel is unavailable — guard so the node stays safe.
-        if _span is not None:
-            _span.set_attribute("gen_ai.usage.input_tokens", response.usage.input_tokens)
-            _span.set_attribute("gen_ai.usage.output_tokens", response.usage.output_tokens)
-            _span.set_attribute("gen_ai.response.finish_reasons", response.stop_reason)
+            # Set real token counts inside the with-block so the span is still
+            # open. Dedenting past the with exits start_as_current_span, which
+            # ends the span — set_attribute on an ended span is a no-op in the
+            # OTel Python SDK. _span is None when OTel is unavailable.
+            if _span is not None:
+                _span.set_attribute("gen_ai.usage.input_tokens", response.usage.input_tokens)
+                _span.set_attribute("gen_ai.usage.output_tokens", response.usage.output_tokens)
+                _span.set_attribute("gen_ai.response.finish_reasons", response.stop_reason)
 
         track_usage(response)
         if should_compact(response):

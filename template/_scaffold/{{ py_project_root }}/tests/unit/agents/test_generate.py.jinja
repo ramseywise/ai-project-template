@@ -246,70 +246,85 @@ async def test_context_budget_track_usage_wired(monkeypatch: pytest.MonkeyPatch)
 
 
 @pytest.mark.asyncio
-async def test_chat_span_wired_with_real_token_attributes(
+async def test_chat_span_token_attributes_reach_exported_span(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """chat_span must be entered AND the span must carry real token counts.
+    """Token counts and finish_reason must appear in the *exported* span, not just
+    be passed to set_attribute on an already-ended span.
 
-    Two things are verified:
-    1. The span is entered (entry_count >= 1).
-    2. After agenerate returns, generate_node calls span.set_attribute with the
-       response's actual input/output token counts and stop_reason — not zeros.
+    The OTel Python SDK silently ignores set_attribute calls on ended spans
+    (the span exits start_as_current_span on __exit__), so a Mock-based
+    assertion that intercepts set_attribute call sites cannot distinguish
+    between attributes that land and attributes that are dropped.
 
-    Remove the ``with chat_span(...) as _span:`` block entirely and (1) fails.
-    Remove or skip the ``_span.set_attribute(...)`` calls and (2) fails.
+    This test injects an InMemorySpanExporter into the live TracerProvider
+    that spans.py built at import time (using add_span_processor — the
+    provider is already bound to the module-level _tracer, so new processors
+    receive spans from all subsequent tracer.start_as_current_span calls).
+    After generate_node returns the exporter holds the finished chat span;
+    asserting on its .attributes proves the write landed while the span was
+    still open.
+
+    Failing modes:
+    - Remove the ``with chat_span(...)`` block: no "chat" span exported → fails.
+    - Dedent the ``if _span is not None:`` block outside the with: span ends
+      before set_attribute is called → SDK drops the write → attributes stay
+      at their creation-time values (0 / absent) → fails.
+    - Remove the set_attribute calls entirely: same result → fails.
     """
-    from contextlib import contextmanager
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-    entry_count: list[int] = []
-    # Collect (attr_name, value) pairs set on the spy span after the call.
-    set_attrs: dict[str, object] = {}
+    import observability.spans as spans_module
 
-    class _SpySpan:
-        """Minimal span stand-in that records set_attribute calls."""
+    exporter = InMemorySpanExporter()
+    processor = SimpleSpanProcessor(exporter)
 
-        def set_attribute(self, key: str, value: object) -> None:
-            set_attrs[key] = value
+    # spans_module._provider is the TracerProvider bound at import. Adding a
+    # processor here is safe: processors are invoked in registration order, and
+    # the console processor already installed continues to work.
+    spans_module._provider.add_span_processor(processor)
+    try:
+        _INPUT_TOKENS = 123
+        _OUTPUT_TOKENS = 45
+        _FINISH_REASON = "end_turn"
 
-    @contextmanager
-    def _spy_chat_span(**kwargs):
-        entry_count.append(1)
-        yield _SpySpan()
+        async def _fake_agenerate(system_prompt: str, messages: list[dict], tools=None):
+            return SimpleNamespace(
+                stop_reason=_FINISH_REASON,
+                usage=SimpleNamespace(input_tokens=_INPUT_TOKENS, output_tokens=_OUTPUT_TOKENS),
+                content=[SimpleNamespace(type="text", text="spanned answer")],
+            )
 
-    monkeypatch.setattr(generate_module, "chat_span", _spy_chat_span)
+        async def _no_tools():
+            return []
 
-    _INPUT_TOKENS = 123
-    _OUTPUT_TOKENS = 45
-    _FINISH_REASON = "end_turn"
+        monkeypatch.setattr(generate_module, "agenerate", _fake_agenerate)
+        monkeypatch.setattr(generate_module, "get_mcp_tools", _no_tools)
 
-    async def _fake_agenerate(system_prompt: str, messages: list[dict], tools=None):
-        return SimpleNamespace(
-            stop_reason=_FINISH_REASON,
-            usage=SimpleNamespace(input_tokens=_INPUT_TOKENS, output_tokens=_OUTPUT_TOKENS),
-            content=[SimpleNamespace(type="text", text="spanned answer")],
-        )
+        state: State = {"message": "hello", "blocked": False, "context_snippets": []}
+        await generate_node(state)
+    finally:
+        # Remove the processor so it does not bleed into subsequent tests.
+        # TracerProvider has no remove_span_processor; shutdown flushes and
+        # prevents further exports from this processor only.
+        processor.shutdown()
 
-    async def _no_tools():
-        return []
-
-    monkeypatch.setattr(generate_module, "agenerate", _fake_agenerate)
-    monkeypatch.setattr(generate_module, "get_mcp_tools", _no_tools)
-
-    state: State = {"message": "hello", "blocked": False, "context_snippets": []}
-    await generate_node(state)
-
-    assert len(entry_count) >= 1, (
-        "chat_span was never entered — spans are not wired into generate_node"
+    finished = exporter.get_finished_spans()
+    chat_spans = [s for s in finished if s.name == "chat"]
+    assert chat_spans, (
+        "No 'chat' span exported — chat_span is not wired into generate_node"
     )
-    assert set_attrs.get("gen_ai.usage.input_tokens") == _INPUT_TOKENS, (
-        f"span.set_attribute('gen_ai.usage.input_tokens', ...) not called with {_INPUT_TOKENS}; "
-        f"got {set_attrs} — token attributes not wired into the span"
+    attrs = chat_spans[0].attributes
+    assert attrs.get("gen_ai.usage.input_tokens") == _INPUT_TOKENS, (
+        f"exported chat span has gen_ai.usage.input_tokens={attrs.get('gen_ai.usage.input_tokens')!r}, "
+        f"expected {_INPUT_TOKENS} — set_attribute ran on an ended span (no-op) or was omitted"
     )
-    assert set_attrs.get("gen_ai.usage.output_tokens") == _OUTPUT_TOKENS, (
-        f"span.set_attribute('gen_ai.usage.output_tokens', ...) not called with {_OUTPUT_TOKENS}; "
-        f"got {set_attrs} — token attributes not wired into the span"
+    assert attrs.get("gen_ai.usage.output_tokens") == _OUTPUT_TOKENS, (
+        f"exported chat span has gen_ai.usage.output_tokens={attrs.get('gen_ai.usage.output_tokens')!r}, "
+        f"expected {_OUTPUT_TOKENS} — set_attribute ran on an ended span (no-op) or was omitted"
     )
-    assert set_attrs.get("gen_ai.response.finish_reasons") == _FINISH_REASON, (
-        f"span.set_attribute('gen_ai.response.finish_reasons', ...) not called with {_FINISH_REASON!r}; "
-        f"got {set_attrs} — finish_reason not wired into the span"
+    assert attrs.get("gen_ai.response.finish_reasons") == _FINISH_REASON, (
+        f"exported chat span has gen_ai.response.finish_reasons={attrs.get('gen_ai.response.finish_reasons')!r}, "
+        f"expected {_FINISH_REASON!r} — set_attribute ran on an ended span (no-op) or was omitted"
     )
