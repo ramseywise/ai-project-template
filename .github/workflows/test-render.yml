@@ -96,6 +96,18 @@ jobs:
           - name: agent-slug
             args: "-d agent_slug=helpdesk"
             tier: test-py
+          # AIT-40: use_flat_layout=true keeps AIT-33's flat-by-default ergonomics
+          # verified. Answers use_flat_layout=true → py_project_root=. → src/ at
+          # repo root (same as the pre-AIT-40 default for python-only projects).
+          - name: flat-layout
+            args: "-d use_flat_layout=true"
+            tier: test-py
+          # AIT-40 persistence: a nested-layout render (use_flat_layout=false)
+          # records the answer, then `copier update` re-applies it without -d.
+          # The assertion tier is handled by the "Layout persistence" step below.
+          - name: layout-persistence
+            args: "-d use_flat_layout=false"
+            tier: test-persistence
           # Eval-in-CI gate (Phase 4b): an agentic+docker profile must render
           # BOTH the informational ci.yml eval-report job AND the hard cd.yml
           # build-canary gate (before docker/login). assert_gate=present drives
@@ -237,12 +249,12 @@ jobs:
           rm -rf .git || true
           copier copy --overwrite --vcs-ref HEAD --trust --defaults \
             ${{ matrix.args }} -d include_rag_agent=true "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/out"
-          # py_project_root (copier.yaml) is '.' for a python-only backend and
-          # 'backend' otherwise, so the agents root is src/agents here but
-          # backend/src/agents for a shape that also ships a TS/web root. It is a
-          # `when: false` answer, so it is not recorded in .copier-answers.yml —
-          # probe both valid locations rather than hardcoding one prefix (every
-          # test-py leg is python-only, and asserting backend/ turned main red).
+          # py_project_root derives from use_flat_layout (AIT-40): '.' when true
+          # (agents at src/agents), 'backend' when false (agents at
+          # backend/src/agents). py_project_root itself is `when: false` and not
+          # recorded, but use_flat_layout IS recorded in .copier-answers.yml.
+          # Probe both valid locations to handle all test-py rows regardless of
+          # their use_flat_layout setting.
           test -d src/agents/rag_agent -o -d backend/src/agents/rag_agent \
             || { echo "add-capability re-entry did not land rag_agent"; exit 1; }
           # rag_agent implies has_corpus_pipeline → the corpus subpackage + its
@@ -255,6 +267,30 @@ jobs:
           test ! -e _scaffold \
             || { echo "staging dir survived re-render (mv/cp task not idempotent)"; exit 1; }
           uv run pytest tests/unit -q
+
+      # AIT-40 layout persistence: render with use_flat_layout=false (nested),
+      # commit, then run `copier update` without -d and assert backend/ survives.
+      # This proves use_flat_layout is recorded in .copier-answers.yml and
+      # honoured on re-render without the caller re-passing -d.
+      # copier update needs a tagged commit in the template repo — use HEAD.
+      - name: Layout persistence — update keeps nested layout
+        if: matrix.tier == 'test-persistence'
+        working-directory: out
+        run: |
+          git init -q && git add -A
+          git -c user.email=ci@ci -c user.name=ci commit -qm "genesis render"
+          grep 'use_flat_layout: false' .copier-answers.yml \
+            || { echo "FAIL: use_flat_layout not recorded in .copier-answers.yml"; exit 1; }
+          grep 'py_project_root' .copier-answers.yml \
+            && { echo "FAIL: py_project_root (when:false) must NOT be in .copier-answers.yml"; exit 1; }
+          test -d backend/src \
+            || { echo "FAIL: backend/src did not render for use_flat_layout=false"; exit 1; }
+          copier update --trust --defaults --vcs-ref HEAD "$GITHUB_WORKSPACE"
+          test -d backend/src \
+            || { echo "FAIL: backend/src was lost after copier update (layout not persisted)"; exit 1; }
+          test ! -d src \
+            || { echo "FAIL: flat-layout src/ appeared after update on a nested-layout project"; exit 1; }
+          echo "OK: nested layout persisted across copier update without re-passing -d"
 
       # ts_project_root defaults to project_slug — "Render Test" → render-test.
       - name: TS backend — install/lint/typecheck/test/build
