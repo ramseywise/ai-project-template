@@ -53,8 +53,14 @@ async def generate_node(state: State) -> dict:
     stall = StallDetector()
 
     for _ in range(_MAX_TOOL_TURNS):
-        with chat_span(model=settings.lg_model):
+        with chat_span(model=settings.lg_model) as _span:
             response = await agenerate(system_prompt, messages, tools=anthropic_tools)
+        # Set real token counts and finish reason now that response is in hand.
+        # _span is None when OTel is unavailable — guard so the node stays safe.
+        if _span is not None:
+            _span.set_attribute("gen_ai.usage.input_tokens", response.usage.input_tokens)
+            _span.set_attribute("gen_ai.usage.output_tokens", response.usage.output_tokens)
+            _span.set_attribute("gen_ai.response.finish_reasons", response.stop_reason)
 
         track_usage(response)
         if should_compact(response):
@@ -64,12 +70,15 @@ async def generate_node(state: State) -> dict:
                 compact_history, messages, get_client(), model=settings.lg_model
             )
 
+        # Record the assistant's text on every turn so repeated identical outputs
+        # across turns accumulate toward the stall threshold.
+        text = "".join(block.text for block in response.content if block.type == "text")
+        try:
+            stall.record_output(text)
+        except StallDetectedError as exc:
+            return {"answer": f"Stall detected in LLM output: {exc}"}
+
         if response.stop_reason != "tool_use":
-            text = "".join(block.text for block in response.content if block.type == "text")
-            try:
-                stall.record_output(text)
-            except StallDetectedError as exc:
-                return {"answer": f"Stall detected in LLM output: {exc}"}
             return {"answer": text}
 
         messages.append({"role": "assistant", "content": response.content})

@@ -68,7 +68,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
     assert _graph is not None
     config: RunnableConfig = {"configurable": {"thread_id": request.thread_id}}
     with invoke_agent_span(
-        agent_id=settings.lg_model,
+        agent_id="{{ lg_agent_dir }}",
         session_id=request.thread_id,
         model=settings.lg_model,
     ):
