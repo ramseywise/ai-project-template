@@ -1340,7 +1340,11 @@ _tasks:
   # (same staging convention as the Python agents above) — remove it before the
   # big ts_project_root mv below if not requested, so ts_agent_framework=none
   # renders the plain TS backend with no agent/LLM code at all.
-  - "{{ 'true' if (not scaffold_full_project) or (not has_typescript) or ts_project_root == '' or ts_agent_framework == 'vercel_ai_sdk' else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ ts_project_root ~ '/' ~ ts_source_root ~ '/agent ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ ts_project_root ~ '/tests/agent.test.ts' }}"
+  # Every test importing src/agent/* goes with the subtree. agent-wiring and
+  # traceTools were left behind before AIT-44 — a test importing a removed
+  # module is an unconditional suite failure, and ts_agent_framework=none has
+  # no matrix row to catch it.
+  - "{{ 'true' if (not scaffold_full_project) or (not has_typescript) or ts_project_root == '' or ts_agent_framework == 'vercel_ai_sdk' else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ ts_project_root ~ '/' ~ ts_source_root ~ '/agent ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ ts_project_root ~ '/tests/agent.test.ts ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ ts_project_root ~ '/tests/agent-wiring.test.ts ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ ts_project_root ~ '/tests/traceTools.test.ts ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ ts_project_root ~ '/tests/verificationLoop.test.ts' }}"
   # TS backend service (package.json/tsconfig/eslint/jest/src/tests) is staged
   # under _scaffold/<ts_project_root> — only relevant when has_typescript is true
   # (short-circuited below, so ts_project_root is safe to reference) AND
