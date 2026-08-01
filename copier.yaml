@@ -74,6 +74,12 @@ _message_after_copy: >+
   - Run `/sanyi init` to define this project's change-contract (变易/简易/不易 layers) now that its shape is set.
   {%- endif %}
 
+_message_after_update: >+
+  Layout note: use_flat_layout defaults to false (nested, backend/src).
+  Projects that recorded use_flat_layout: true will keep their flat layout;
+  projects without the key get backend/.  To switch, re-run with
+  -d use_flat_layout=true (flat) or -d use_flat_layout=false (nested).
+
 _exclude:
   - __pycache__
   - .git
@@ -299,8 +305,10 @@ human_approval:
 
 # Inferred directory layout — computed here (before Phase 2) because later
 # question help-strings interpolate it; copier renders each question with only
-# the answers collected so far. Never asked; override with -d py_project_root=…
-# / -d ai_source_root=… / -d ml_source_root=… if yours differs.
+# the answers collected so far. use_flat_layout is asked (recorded in
+# .copier-answers.yml) and py_project_root derives from it; ai_source_root and
+# ml_source_root are never asked — override with -d ai_source_root=… /
+# -d ml_source_root=… if yours differs.
 #
 # Two-root scaffold (2026-07-19): the staging tree under _scaffold/ now mirrors
 # the destination layout instead of staying flat. _scaffold/ itself is the
@@ -332,17 +340,39 @@ human_approval:
 # The frontend condition is INLINED from _external_data (not `include_frontend`)
 # because that question is declared later in this file — copier renders each
 # default with only the answers collected so far, so referencing it here would
-# be undefined. Existing consumers on `copier update` should pin
-# `-d py_project_root=backend` in .copier-answers.yml to keep the nested shape.
-py_project_root:
-  type: str
-  default: >-
-    {{ '.' if (primary_backend_language == 'python' and not
+# be undefined.
+#
+# use_flat_layout (AIT-40): the layout choice is surfaced as a recorded answer
+# so it survives `copier update` without re-passing -d.  It is only asked for
+# python-only projects with no frontend (same guard as py_project_root's old
+# default condition).  The default is false so that pre-4eac907 projects
+# (which have no use_flat_layout in their .copier-answers.yml) keep their
+# existing backend/ tree intact on the next `copier update`.  New python-only
+# renders wanting the flat layout must pass -d use_flat_layout=true (or answer
+# the question interactively).
+#
+# Note: _copier_operation is NOT available in default: expressions in copier
+# 9.17.0 — it is only injected into the task-execution context, not the
+# question-rendering context (_render_context()).  Verified empirically:
+# `{{ _copier_operation == 'copy' }}` evaluates to False for both copy and
+# update, so it cannot be used to give new renders a different default.
+use_flat_layout:
+  type: bool
+  help: >-
+    Put the Python backend at the repo root (flat layout, src/ at ./src) instead
+    of under backend/ (nested layout, backend/src)?  The default is nested.
+    Answer yes only if you want src/ directly at the repo root.
+  default: false
+  when: >-
+    {{ primary_backend_language == 'python' and not
     (_external_data.design.web.enabled
     if (_external_data.design is defined and _external_data.design and
     _external_data.design.stages is defined and
-    _external_data.design.stages.discovery == 'complete') else false))
-    else 'backend' }}
+    _external_data.design.stages.discovery == 'complete') else false) }}
+
+py_project_root:
+  type: str
+  default: "{{ '.' if use_flat_layout else 'backend' }}"
   when: false
 
 ai_source_root:

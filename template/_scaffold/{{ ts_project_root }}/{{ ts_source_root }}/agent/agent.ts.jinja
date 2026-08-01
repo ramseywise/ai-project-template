@@ -5,22 +5,82 @@
  * streamText() call with a tool registry and automatic multi-step tool-calling
  * (stopWhen: stepCountIs(settings.maxSteps)), returning a UIMessageStream
  * response the caller (handler.ts) turns into an HTTP Response.
+ *
+ * Modules wired here
+ * ------------------
+ * - traceTools.ts   : wrapToolsWithSpans() wraps each tool's execute() with an
+ *                     execute_tool OTel span that brackets real execution time
+ *                     and records is_error on throw (via tracing.ts helpers)
+ * - tracing.ts      : startChatSpan in onFinish (token-attributed OTel summary span)
+ * - stallDetector.ts: recordOutput + recordToolCall in onStepFinish; throws
+ *                     StallDetectedError before maxSteps is exhausted
+ * - context-budget.ts (pure parts): trackUsage + shouldCompact in onFinish;
+ *                     logs utilisation and warns when the context window is near full
+ *
+ * Modules intentionally NOT wired here (see their module-level comments)
+ * -----------------------------------------------------------------------
+ * - verificationLoop.ts : consumes the stream internally — incompatible with
+ *                         the streaming HTTP response that handler.ts requires
+ * - compactHistory()    : needs retained mutable history; handler.ts is
+ *                         stateless per request (see context-budget.ts comment)
  */
 
 import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from "ai";
 import { getModel } from "./clients/llm.js";
 import { settings } from "./settings.js";
 import { tools } from "./tools/index.js";
+import { startChatSpan } from "./tracing.js";
+import { wrapToolsWithSpans } from "./traceTools.js";
+import { createStallDetector } from "./stallDetector.js";
+import { trackUsage, shouldCompact } from "./context-budget.js";
 
 const SYSTEM_PROMPT = "You are a helpful assistant for {{ project_name }}.";
 
 export function runAgent(messages: UIMessage[]) {
+  const stallDetector = createStallDetector();
+
   return streamText({
     model: getModel(),
     system: SYSTEM_PROMPT,
     messages: convertToModelMessages(messages),
-    tools,
+    // wrapToolsWithSpans brackets each tool's execute() with an execute_tool OTel
+    // span — real start/end times and is_error on throw (see traceTools.ts).
+    tools: wrapToolsWithSpans(tools),
     temperature: settings.generationTemperature,
     stopWhen: stepCountIs(settings.maxSteps),
+
+    onStepFinish(step) {
+      // Stall detection — throws StallDetectedError on repeated tool calls or outputs.
+      // Tool spans are handled by wrapToolsWithSpans (pre-execution), not here.
+      stallDetector.recordOutput(step.text);
+      for (const tc of step.toolCalls) {
+        stallDetector.recordToolCall(tc.toolName, tc.input);
+      }
+    },
+
+    onFinish(event) {
+      // Token-attributed chat span
+      const span = startChatSpan({
+        model: getModel().modelId,
+        inputTokens: event.usage.inputTokens ?? undefined,
+        outputTokens: event.usage.outputTokens ?? undefined,
+        finishReason: event.finishReason,
+      });
+      span?.end();
+
+      // Context-budget tracking (pure — logs utilisation, warns near threshold)
+      const usage = {
+        promptTokens: event.usage.inputTokens ?? 0,
+        completionTokens: event.usage.outputTokens ?? 0,
+      };
+      trackUsage(usage);
+      if (shouldCompact(usage)) {
+        // History compaction requires persistent session state — not available
+        // in this stateless handler.  Log so the caller can act if needed.
+        console.warn(
+          "[agent] context budget threshold reached; compact history in your session layer",
+        );
+      }
+    },
   });
 }
