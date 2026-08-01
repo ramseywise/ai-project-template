@@ -11,6 +11,7 @@
     "clean": "rm -rf dist",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "check:unimported": "node scripts/check-unimported.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-vm-modules node_modules/.bin/jest"{% if ts_agent_framework == "vercel_ai_sdk" %},
     "eval": "tsx {{ ts_source_root }}/agent/eval/run.ts"{% endif %}

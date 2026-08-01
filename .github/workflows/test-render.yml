@@ -302,6 +302,10 @@ jobs:
         run: |
           npm install
           npm run lint
+          # Runs before typecheck/test so an orphaned module is reported as
+          # "nothing imports this" rather than surfacing later as a type error
+          # in a file no code path reaches (AIT-44).
+          npm run check:unimported
           npm run typecheck
           npm test
           npm run build
