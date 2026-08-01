@@ -312,9 +312,7 @@ async def test_chat_span_token_attributes_reach_exported_span(
 
     finished = exporter.get_finished_spans()
     chat_spans = [s for s in finished if s.name == "chat"]
-    assert chat_spans, (
-        "No 'chat' span exported — chat_span is not wired into generate_node"
-    )
+    assert chat_spans, "No 'chat' span exported — chat_span is not wired into generate_node"
     attrs = chat_spans[0].attributes
     assert attrs.get("gen_ai.usage.input_tokens") == _INPUT_TOKENS, (
         f"exported chat span has gen_ai.usage.input_tokens={attrs.get('gen_ai.usage.input_tokens')!r}, "
