@@ -124,13 +124,17 @@ select = ["E", "W", "F", "I", "N", "UP", "B", "C4", "SIM", "RUF"]
 # RUF001-003: typographic unicode in prose; N803/N806: ML naming (X, y, X_train)
 ignore = ["E501", "RUF001", "RUF002", "RUF003", "N803", "N806"]
 
-# middleware/ only exists in split_service renders — pin it first-party so the
-# agents' try/except import blocks sort identically whether or not it's present
-# (ruff otherwise classifies it by directory existence, flipping I001 per config).
-# agents/ lives under {{ py_project_root }}/{{ ai_source_root }}/, not the project root, so ruff's src-based
-# resolution misses it and sorts it as third-party — same failure mode, same fix.
+# Every package under {{ py_project_root }}/{{ ai_source_root }}/ is pinned first-party. Two reasons,
+# both of which otherwise flip I001 between render configs:
+#   - Conditional presence: middleware/ (split_service) and integrations/
+#     (n8n webhook) only exist in some renders, and ruff classifies an absent
+#     directory as third-party.
+#   - Nested source root: these live under {{ py_project_root }}/{{ ai_source_root }}/, not the project
+#     root, so ruff's src-based resolution misses them whenever py_project_root
+#     is a real directory (e.g. 'backend') rather than '.'.
+# Pinning the whole set makes import order identical across every layout.
 [tool.ruff.lint.isort]
-known-first-party = ["agents", "middleware"{% if include_ml %}, "{{ ml_source_root }}"{% endif %}]
+known-first-party = ["agents", "context_budget", "integrations", "middleware", "observability", "security"{% if include_ml %}, "{{ ml_source_root }}"{% endif %}]
 
 [tool.pyright]
 include = ["{{ py_project_root }}/{{ ai_source_root }}", "core", "{{ eval_root }}", "tests"{% if include_ml %}, "{{ py_project_root }}/{{ ml_source_root }}"{% endif %}]

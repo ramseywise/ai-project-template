@@ -55,6 +55,7 @@ _TRACER_NAME = "{{ project_slug }}.agent"
 
 def _build_provider() -> TracerProvider:
     import os
+    import sys
 
     provider = TracerProvider()
 
@@ -72,6 +73,15 @@ def _build_provider() -> TracerProvider:
                 "otel.exporter.otlp.sdk_missing",
                 extra={"hint": "pip install opentelemetry-exporter-otlp-proto-grpc"},
             )
+    elif "pytest" in sys.modules:
+        # ConsoleSpanExporter binds sys.stdout at construction, and
+        # BatchSpanProcessor's final flush runs at interpreter shutdown — by which
+        # point pytest has already closed the stdout it captured. The flush then
+        # raises "ValueError: I/O operation on closed file" after the test summary:
+        # alarming output that no scaffolded project should inherit, and which no
+        # test depends on (tests needing spans install their own in-memory
+        # exporter). Emitting nothing under pytest is the whole fix.
+        log.debug("otel.exporter.console.skipped_under_pytest")
     else:
         provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
         log.debug("otel.exporter.console.ready")
