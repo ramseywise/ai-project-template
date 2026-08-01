@@ -1,0 +1,199 @@
+/**
+ * Wiring integration tests for agent.ts.
+ *
+ * Each test below verifies that agent.ts actually imports and invokes a
+ * support module.  The test FAILS if the corresponding import or callback
+ * wiring is removed from agent.ts — a passing test with the import deleted
+ * does not satisfy the acceptance criterion.
+ *
+ * Strategy: mock `streamText` from the `ai` package to capture the options
+ * object passed by runAgent (which contains the onStepFinish / onFinish
+ * callbacks), then fire those callbacks with synthetic data and assert the
+ * wired module functions were called.
+ *
+ * ESM note: jest.unstable_mockModule must appear BEFORE any dynamic import of
+ * the module under test.  All subject imports are therefore done dynamically
+ * inside beforeAll() after the mock registry is populated.  This file runs in
+ * its own jest worker (separate from agent.test.ts) so there is no shared
+ * module-registry state to worry about.
+ */
+
+import { jest, describe, it, expect, beforeAll } from "@jest/globals";
+
+// ---------------------------------------------------------------------------
+// Synthetic events used to fire the streamText callbacks
+// ---------------------------------------------------------------------------
+
+const SYNTHETIC_STEP = {
+  text: "hello",
+  toolCalls: [{ toolName: "getTime", input: {} }],
+  toolResults: [],
+  finishReason: "stop",
+  usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+};
+const SYNTHETIC_FINISH = {
+  ...SYNTHETIC_STEP,
+  steps: [SYNTHETIC_STEP],
+  totalUsage: SYNTHETIC_STEP.usage,
+};
+
+// ---------------------------------------------------------------------------
+// Mock functions — declared before unstable_mockModule calls
+// ---------------------------------------------------------------------------
+
+const mockStartChatSpan = jest.fn(() => ({ end: jest.fn() }));
+const mockRecordOutput = jest.fn();
+const mockRecordToolCall = jest.fn();
+const mockCreateStallDetector = jest.fn(() => ({
+  recordOutput: mockRecordOutput,
+  recordToolCall: mockRecordToolCall,
+  reset: jest.fn(),
+}));
+const mockTrackUsage = jest.fn(() => ({
+  totalInput: 10, totalOutput: 5, system: 0, history: 0, tools: 0, scratch: 10, utilisationPct: 0.1,
+}));
+const mockShouldCompact = jest.fn(() => false);
+
+// Captures the options object passed to streamText on each runAgent() call
+let capturedOpts: Record<string, unknown> = {};
+const mockStreamText = jest.fn((opts: Record<string, unknown>) => {
+  capturedOpts = opts;
+  return { toUIMessageStreamResponse: jest.fn() };
+});
+
+// ---------------------------------------------------------------------------
+// Module mocks — must be set up before any import of the mocked modules
+// ---------------------------------------------------------------------------
+
+jest.unstable_mockModule("ai", () => ({
+  // Only stub the symbols agent.ts imports from "ai"
+  streamText: mockStreamText,
+  convertToModelMessages: jest.fn(() => []),
+  stepCountIs: jest.fn(() => () => false),
+}));
+
+jest.unstable_mockModule("../{{ ts_source_root }}/agent/clients/llm.js", () => ({
+  getModel: jest.fn(() => ({ modelId: "stub-model" })),
+}));
+
+jest.unstable_mockModule("../{{ ts_source_root }}/agent/settings.js", () => ({
+  settings: { generationTemperature: 0.3, maxSteps: 5, maxRetries: 3 },
+}));
+
+jest.unstable_mockModule("../{{ ts_source_root }}/agent/tools/index.js", () => ({
+  tools: {},
+}));
+
+// wrapToolsWithSpans spy — used to verify agent.ts passes tools through it
+const mockWrapToolsWithSpans = jest.fn((t: unknown) => t);
+
+jest.unstable_mockModule("../{{ ts_source_root }}/agent/traceTools.js", () => ({
+  wrapToolsWithSpans: mockWrapToolsWithSpans,
+}));
+
+jest.unstable_mockModule("../{{ ts_source_root }}/agent/tracing.js", () => ({
+  startChatSpan: mockStartChatSpan,
+  // startExecuteToolSpan is used by traceTools.ts, not agent.ts directly —
+  // it is tested in the wrapToolsWithSpans describe block below.
+  startExecuteToolSpan: jest.fn(() => ({ end: jest.fn(), setStatus: jest.fn(), setAttribute: jest.fn() })),
+  inputHash: jest.fn(() => "deadbeef"),
+}));
+
+jest.unstable_mockModule("../{{ ts_source_root }}/agent/stallDetector.js", () => ({
+  createStallDetector: mockCreateStallDetector,
+  StallDetectedError: class StallDetectedError extends Error {},
+}));
+
+jest.unstable_mockModule("../{{ ts_source_root }}/agent/context-budget.js", () => ({
+  trackUsage: mockTrackUsage,
+  shouldCompact: mockShouldCompact,
+  budgetSettings: {
+    maxContextTokens: 180_000,
+    compactionThreshold: 0.8,
+    logTokenCategories: false,
+  },
+}));
+
+// ---------------------------------------------------------------------------
+// Subject import — dynamic, after mocks are registered
+// ---------------------------------------------------------------------------
+
+let runAgent: (messages: unknown[]) => unknown;
+
+beforeAll(async () => {
+  const mod = await import("../{{ ts_source_root }}/agent/agent.js");
+  runAgent = mod.runAgent as (messages: unknown[]) => unknown;
+});
+
+// ---------------------------------------------------------------------------
+// Helper: call runAgent and fire both callbacks with synthetic data
+// ---------------------------------------------------------------------------
+
+async function invokeCallbacks() {
+  capturedOpts = {};
+  runAgent([]);
+  if (typeof capturedOpts["onStepFinish"] === "function") {
+    await (capturedOpts["onStepFinish"] as (s: unknown) => Promise<void>)(SYNTHETIC_STEP);
+  }
+  if (typeof capturedOpts["onFinish"] === "function") {
+    await (capturedOpts["onFinish"] as (e: unknown) => Promise<void>)(SYNTHETIC_FINISH);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("agent.ts wiring — tracing (chat span)", () => {
+  it("startChatSpan is called in onFinish with token counts from event.usage", async () => {
+    mockStartChatSpan.mockClear();
+    await invokeCallbacks();
+    expect(mockStartChatSpan).toHaveBeenCalledTimes(1);
+    const arg = mockStartChatSpan.mock.calls[0][0] as { inputTokens: number; outputTokens: number };
+    expect(arg.inputTokens).toBe(10);
+    expect(arg.outputTokens).toBe(5);
+  });
+});
+
+describe("agent.ts wiring — traceTools (execute_tool span)", () => {
+  it("wrapToolsWithSpans is called by runAgent so tool spans bracket real execution", async () => {
+    mockWrapToolsWithSpans.mockClear();
+    runAgent([]);
+    // agent.ts must call wrapToolsWithSpans(tools) — if the call is removed the
+    // mock is never invoked and this assertion fails.
+    // Duration / error-marking proof lives in traceTools.test.ts which exercises
+    // the real implementation with a controlled span mock.
+    expect(mockWrapToolsWithSpans).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("agent.ts wiring — stall detector", () => {
+  it("recordOutput is called in onStepFinish with step.text", async () => {
+    mockRecordOutput.mockClear();
+    await invokeCallbacks();
+    expect(mockRecordOutput).toHaveBeenCalledWith("hello");
+  });
+
+  it("recordToolCall is called in onStepFinish for each tool call", async () => {
+    mockRecordToolCall.mockClear();
+    await invokeCallbacks();
+    expect(mockRecordToolCall).toHaveBeenCalledWith("getTime", {});
+  });
+});
+
+describe("agent.ts wiring — context budget", () => {
+  it("trackUsage is called in onFinish with adapted promptTokens / completionTokens", async () => {
+    mockTrackUsage.mockClear();
+    await invokeCallbacks();
+    expect(mockTrackUsage).toHaveBeenCalledTimes(1);
+    const arg = mockTrackUsage.mock.calls[0][0] as { promptTokens: number; completionTokens: number };
+    expect(arg.promptTokens).toBe(10);
+    expect(arg.completionTokens).toBe(5);
+  });
+
+  it("shouldCompact is called in onFinish", async () => {
+    mockShouldCompact.mockClear();
+    await invokeCallbacks();
+    expect(mockShouldCompact).toHaveBeenCalledTimes(1);
+  });
+});

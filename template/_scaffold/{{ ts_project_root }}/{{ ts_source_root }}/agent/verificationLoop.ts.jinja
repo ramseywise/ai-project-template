@@ -10,12 +10,24 @@
  * The grader interface mirrors the Python eval pillar's GraderResult shape
  * (score: number, isCorrect: boolean, reasoning: string) so cross-stack
  * eval tooling stays aligned — no duplication of the contract.
+ *
+ * NOT wired into agent.ts (streaming incompatibility — intentional)
+ * ---------------------------------------------------------------
+ * `runWithVerification` calls `collectStream()` which fully consumes the
+ * `streamText` result's async iterator and returns a plain `string`.
+ * `handler.ts` needs the raw `StreamTextResult` object so it can call
+ * `.toUIMessageStreamResponse()` and return a live HTTP stream to the client.
+ * Consuming the stream here would convert the streaming response to a batch
+ * response — a regression in a streaming-first template.
+ *
+ * Use this module in eval/batch contexts where the caller does not need a
+ * streaming HTTP response (e.g. agent/eval/run.ts, test harnesses, scripts).
  */
 
 import { type UIMessage } from "ai";
 import { runAgent } from "./agent.js";
 import { settings } from "./settings.js";
-import { detectStall, type StallDetector } from "./stallDetector.js";
+import { type StallDetector } from "./stallDetector.js";
 
 // ---------------------------------------------------------------------------
 // Grader interface — mirrors evals/models.py GraderResult (Python side)
