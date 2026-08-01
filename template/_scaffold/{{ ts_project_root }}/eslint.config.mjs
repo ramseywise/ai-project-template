@@ -46,6 +46,20 @@ export default tseslint.config(
     },
   },
   {
+    // Build/CI scripts are plain Node ESM, not TypeScript — the TS configs
+    // above bring no environment with them, so Node's own globals have to be
+    // declared or every `console`/`process` use is a no-undef error.
+    files: ["scripts/**/*.mjs"],
+    languageOptions: {
+      sourceType: "module",
+      globals: {
+        console: "readonly",
+        process: "readonly",
+        URL: "readonly",
+      },
+    },
+  },
+  {
     ignores: ["dist/**", "node_modules/**"],
   },
 );
