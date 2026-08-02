@@ -983,7 +983,12 @@ observability_provider:
 # never reaches the tracing backend (CLAUDE.md.jinja, DESIGN.md.jinja).
 include_security_guards:
   type: bool
-  default: "{{ is_agent_shaped }}"
+  # Narrower than is_agent_shaped: guards.py's only importers are the lg_agent
+  # nodes (guardrail/generate/retrieve). An agent-shaped project with
+  # primary_chat_agent=none — project_type=rag is the live case — renders no
+  # such nodes, so is_agent_shaped alone shipped the whole security/ layer with
+  # nothing able to call it. Caught by scripts/check_imports.py (AIT-51).
+  default: "{{ is_agent_shaped and primary_chat_agent in ['lg_agent', 'both'] }}"
   # A3 invariant: derived, never asked — drive it with
   # -d include_security_guards=false.
   when: false
@@ -1238,12 +1243,18 @@ _tasks:
   # eval-compare Makefile target on has_corpus_pipeline (see issue #29). It is
   # NOT listed here preemptively — scripts/validate_paths.py rejects _tasks
   # paths with no matching template entry.
+  # graders/custom/ goes with run.py: `from evals.graders.custom import all_graders`
+  # in run.py is its ONLY importer, so without run.py the custom-grader registry
+  # ships into every non-retrieval render with nothing able to invoke it — the
+  # plugin hook is documented in its docstring but unreachable. Caught by
+  # scripts/check_imports.py (AIT-51) on its first run.
   - >-
     {{ 'true' if (not scaffold_full_project) or has_corpus_pipeline else 'rm -rf '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/core/pipelines/corpus '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/data/raw_corpus '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/unit/core '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/nbks '
+    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ eval_root ~ '/graders/custom '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ eval_root ~ '/pipelines/run.py '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ eval_root ~ '/graders/citation.py '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ eval_root ~ '/metrics/retrieval.py '
@@ -1319,7 +1330,14 @@ _tasks:
   # context_budget/ (step 4a′) is agentic-only — an ml-only or non-agent
   # project has no LLM calls to budget. Rides the AI source-root merge below
   # (same as observability/); no separate merge task needed.
-  - "{{ 'true' if (not scaffold_full_project) or is_agent_shaped else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/context_budget' }}"
+  #
+  # Gated on primary_chat_agent, not is_agent_shaped, for the same reason as
+  # security/ above: `from context_budget.context_budget import ...` in
+  # nodes/generate.py is its ONLY importer, and those nodes are themselves
+  # gated on primary_chat_agent in ['lg_agent', 'both']. Under project_type=rag
+  # (agent-shaped, primary_chat_agent=none) the looser gate shipped the budget
+  # tracker unreachable. Caught by scripts/check_imports.py (AIT-51).
+  - "{{ 'true' if (not scaffold_full_project) or (is_agent_shaped and primary_chat_agent in ['lg_agent', 'both']) else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/context_budget' }}"
   # ml/ (classical ML/stats toolkit) is staged under _scaffold/ like the
   # other optional full-project-tier content — removed from staging (not the
   # final path) if not requested, same reasoning as the akira/lg_agent cleanup above.
@@ -1458,6 +1476,12 @@ _tasks:
   # lands beside the AI source root (backend/ml/ by default) — a sibling of
   # <ai_source_root>, not nested inside it.
   - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/' ~ py_project_root ~ '/' ~ ml_source_root ~ ' && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ml_source_root ~ '/. ' ~ _copier_conf.dst_path ~ '/' ~ py_project_root ~ '/' ~ ml_source_root ~ '/') if (scaffold_full_project and include_ml and py_project_root != '' and primary_backend_language in ['python', 'both']) else 'true' }}"
+  # scripts/ — Python repo tooling (check_imports.py, the AIT-51 unimported-module
+  # guard). Separate merge, not part of the block above: it only belongs in a render
+  # with a Python backend, mirroring the ai_source_root merge's own condition. A
+  # typescript-only project gets the TS twin (check-unimported.mjs) under its own
+  # project root instead. Directory → merge (idempotent on re-render).
+  - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/scripts && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/scripts/. ' ~ _copier_conf.dst_path ~ '/scripts/') if (scaffold_full_project and primary_backend_language in ['python', 'both']) else 'true' }}"
   # Same reasoning — railway.toml is rm -f'd above when split_service isn't chosen.
   # (bare file → mv, overwrites fine on re-render)
   - "{{ ('mv ' ~ _copier_conf.dst_path ~ '/_scaffold/railway.toml ' ~ _copier_conf.dst_path ~ '/') if (scaffold_full_project and frontend_backend_topology == 'split_service') else 'true' }}"

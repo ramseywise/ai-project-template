@@ -35,7 +35,6 @@ class Settings(BaseSettings):
 
     retrieval_top_k: int = 5
 {%- endif %}
-    generation_temperature: float = 0.3
 
     mcp_enabled: bool = {{ include_mcp_server }}
     mcp_server_dir: str = "mcp_servers/{{ mcp_server_slug | default(project_slug) }}"
