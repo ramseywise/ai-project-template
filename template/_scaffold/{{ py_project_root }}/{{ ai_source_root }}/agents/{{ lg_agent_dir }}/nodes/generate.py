@@ -6,7 +6,7 @@ from typing import Any
 from langchain_core.tools import BaseTool
 
 from context_budget.context_budget import compact_history, should_compact, track_usage
-from observability.spans import chat_span, execute_tool_span
+from observability.spans import chat_span, execute_tool_span, record_finish_reason
 
 from ..clients.llm import agenerate, get_client
 from ..clients.mcp import get_mcp_tools
@@ -62,7 +62,9 @@ async def generate_node(state: State) -> dict:
             if _span is not None:
                 _span.set_attribute("gen_ai.usage.input_tokens", response.usage.input_tokens)
                 _span.set_attribute("gen_ai.usage.output_tokens", response.usage.output_tokens)
-                _span.set_attribute("gen_ai.response.finish_reasons", response.stop_reason)
+            # Not span.set_attribute — record_finish_reason also arms chat_span's
+            # truncation warning, and it must run even when _span is None.
+            record_finish_reason(_span, response.stop_reason)
 
         track_usage(response)
         if should_compact(response):

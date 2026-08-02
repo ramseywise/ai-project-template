@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from types import SimpleNamespace
 from typing import ClassVar
 
@@ -325,4 +326,64 @@ async def test_chat_span_token_attributes_reach_exported_span(
     assert attrs.get("gen_ai.response.finish_reasons") == _FINISH_REASON, (
         f"exported chat span has gen_ai.response.finish_reasons={attrs.get('gen_ai.response.finish_reasons')!r}, "
         f"expected {_FINISH_REASON!r} — set_attribute ran on an ended span (no-op) or was omitted"
+    )
+
+
+@pytest.mark.asyncio
+async def test_truncated_response_logs_a_warning(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """stop_reason="max_tokens" must reach chat_span's truncation warning.
+
+    chat_span decides the warning in its ``finally``, but the real finish reason
+    is only known inside the block. Replace generate.py's
+    ``record_finish_reason(_span, ...)`` with a bare ``_span.set_attribute(...)``
+    and this test fails: the trace still gets the attribute, the log stays silent.
+    """
+
+    async def _fake_agenerate(system_prompt: str, messages: list[dict], tools=None):
+        return SimpleNamespace(
+            stop_reason="max_tokens",
+            usage=SimpleNamespace(input_tokens=99, output_tokens=1024),
+            content=[SimpleNamespace(type="text", text="a truncated ans")],
+        )
+
+    async def _no_tools():
+        return []
+
+    monkeypatch.setattr(generate_module, "agenerate", _fake_agenerate)
+    monkeypatch.setattr(generate_module, "get_mcp_tools", _no_tools)
+
+    state: State = {"message": "write me an essay", "blocked": False, "context_snippets": []}
+    with caplog.at_level(logging.WARNING, logger="observability.spans"):
+        await generate_node(state)
+
+    assert "otel.chat.truncated" in caplog.text, (
+        "a max_tokens stop_reason produced no truncation warning — the finish "
+        "reason is not reaching chat_span's finally"
+    )
+
+
+@pytest.mark.asyncio
+async def test_untruncated_response_logs_no_warning(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The counterpart to the truncation test: end_turn must stay quiet."""
+
+    async def _fake_agenerate(system_prompt: str, messages: list[dict], tools=None):
+        return _text_response("a complete answer")
+
+    async def _no_tools():
+        return []
+
+    monkeypatch.setattr(generate_module, "agenerate", _fake_agenerate)
+    monkeypatch.setattr(generate_module, "get_mcp_tools", _no_tools)
+
+    state: State = {"message": "hello", "blocked": False, "context_snippets": []}
+    with caplog.at_level(logging.WARNING, logger="observability.spans"):
+        await generate_node(state)
+
+    assert "otel.chat.truncated" not in caplog.text, (
+        "end_turn produced a truncation warning — the finish reason is leaking "
+        "between calls or the comparison is wrong"
     )
