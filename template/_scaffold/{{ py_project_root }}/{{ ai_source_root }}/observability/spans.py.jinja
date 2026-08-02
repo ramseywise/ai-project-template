@@ -30,6 +30,7 @@ Usage::
 
 from __future__ import annotations
 
+import contextvars
 import hashlib
 import logging
 import time
@@ -110,6 +111,29 @@ def _input_hash(payload: Any) -> str:
     return hashlib.sha256(str(payload).encode()).hexdigest()[:16]
 
 
+# Carries the finish reason recorded *inside* an open chat_span back out to that
+# span's ``finally``, which is where the truncation warning is decided. A
+# ContextVar rather than a module global so concurrent agenerate() calls — each
+# in its own asyncio task, each with its own context copy — cannot see each
+# other's value. chat_span sets a token on entry and resets it on exit.
+_recorded_finish_reason: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "recorded_finish_reason", default=""
+)
+
+
+def record_finish_reason(span: Any, reason: str) -> None:
+    """Set the finish-reason attribute AND arm chat_span's truncation warning.
+
+    Callers must use this rather than ``span.set_attribute`` directly — a bare
+    set_attribute records the trace but leaves the log warning unarmed, which is
+    the exact defect this helper exists to prevent. Safe to call with
+    ``span=None`` (OTel unavailable): the warning still arms.
+    """
+    if span is not None:
+        span.set_attribute("gen_ai.response.finish_reasons", reason)
+    _recorded_finish_reason.set(reason)
+
+
 @contextmanager
 def _span(name: str, attributes: dict[str, Any]) -> Generator[Any, None, None]:
     """Inner span wrapper — absorbs tracing errors so callers never crash."""
@@ -175,6 +199,12 @@ def chat_span(
 
     finish_reason=max_tokens is treated as a warning — truncated outputs are
     wasted spend and should surface in cost dashboards.
+
+    The real finish reason is usually not known at entry (it arrives with the
+    response, inside the block). Record it with ``record_finish_reason(span,
+    reason)`` rather than ``span.set_attribute`` — the ``finish_reason``
+    parameter here only covers callers that somehow know it up front, and a bare
+    set_attribute leaves the warning below unarmed.
     """
     attrs: dict[str, Any] = {
         "operation_name": "chat",
@@ -190,6 +220,7 @@ def chat_span(
         attrs["gen_ai.response.finish_reasons"] = finish_reason
 
     start = time.monotonic()
+    token = _recorded_finish_reason.set(finish_reason)
     with _span("chat", attrs) as span:
         try:
             yield span
@@ -197,7 +228,11 @@ def chat_span(
             duration_ms = int((time.monotonic() - start) * 1000)
             if span is not None:
                 span.set_attribute("duration_ms", duration_ms)
-            if finish_reason == "max_tokens":
+            # Prefer what the caller recorded inside the block over the
+            # entry-time parameter, which is "" for every real caller.
+            recorded = _recorded_finish_reason.get() or finish_reason
+            _recorded_finish_reason.reset(token)
+            if recorded == "max_tokens":
                 log.warning(
                     "otel.chat.truncated",
                     extra={"model": model, "input_tokens": input_tokens},

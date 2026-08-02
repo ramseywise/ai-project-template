@@ -4,10 +4,38 @@
  * (see ../app.ts.jinja's POST /agent/chat route) or drop it straight into a
  * Next.js App Router route handler (`export const POST = chatHandler;`) in a
  * Vercel-hosted project — same function either way.
+ *
+ * Guard layers wired here (see ../security/guards.ts)
+ * ---------------------------------------------------
+ * - checkInput      : on the last user turn, BEFORE runAgent — a blocked turn
+ *                     returns the refusal without ever reaching the model, so
+ *                     it costs no tokens
+ * - guardTextStream : layer 3 in its streaming form, piped over the response
+ *                     body so scrubbed bytes are the only bytes the caller sees
+ *
+ * Layer 2 (filterContent) is wired at the tool boundary in agent/tools/index.ts,
+ * not here — tool output re-enters the prompt inside the agent loop, which this
+ * handler never sees.
  */
 
 import type { UIMessage } from "ai";
 import { runAgent } from "./agent.js";
+import { checkInput, guardTextStream } from "../security/guards.js";
+
+/** Last user turn's text — what checkInput screens. */
+function lastUserText(messages: UIMessage[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg?.role !== "user") {
+      continue;
+    }
+    return (msg.parts ?? [])
+      .filter((p): p is { type: "text"; text: string } => p.type === "text")
+      .map((p) => p.text)
+      .join("\n");
+  }
+  return "";
+}
 
 export async function chatHandler(req: Request): Promise<Response> {
   const body = (await req.json()) as { messages?: UIMessage[] };
@@ -15,6 +43,29 @@ export async function chatHandler(req: Request): Promise<Response> {
     return Response.json({ error: "messages must be an array" }, { status: 400 });
   }
 
+  // Layer 1 — before the model call. Returns the refusal message, never the
+  // reasons: surfacing those teaches a probing caller what tripped.
+  const inbound = checkInput(lastUserText(body.messages));
+  if (inbound.blocked) {
+    return Response.json({ error: inbound.text }, { status: 400 });
+  }
+
   const result = runAgent(body.messages);
-  return result.toUIMessageStreamResponse();
+  const response = result.toUIMessageStreamResponse();
+
+  // Layer 3 — scrub in transit. A null body (never expected here) is passed
+  // through as-is rather than being turned into a crash on the response path.
+  if (response.body === null) {
+    return response;
+  }
+  const guarded = response.body
+    .pipeThrough(new TextDecoderStream())
+    .pipeThrough(guardTextStream())
+    .pipeThrough(new TextEncoderStream());
+
+  return new Response(guarded, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
 }
