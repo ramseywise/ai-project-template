@@ -25,8 +25,8 @@ the session's — so that repo's own sessions and /wake find them (pointers, not
 
 ## Before starting
 
-1. Find the active doc: `grep -l 'Status: IN PROGRESS' .claude/docs/plans/*.md`; if none, take the most recent `Status: PLANNED` file and confirm with the user
-2. Read the active doc fully; set its `Status:` line to `IN PROGRESS` before starting
+1. Find the active doc: `grep -lE '^Status:[[:space:]]*IN_PROGRESS' .claude/docs/plans/*.md`; if none, take the most recent `Status: PLANNED` file and confirm with the user
+2. Read the active doc fully; set its `Status:` line to `IN_PROGRESS` before starting (one token, no suffix — extra detail goes in `Outstanding:` on the next line)
 3. `git status` + `uv run pytest --tb=no -q` — if baseline tests fail, stop and report
 
 ## Worktree agent dispatch

@@ -92,6 +92,27 @@ Deferred items don't.
 
 ---
 
+## Behavioral Cases
+
+| Given | Agent must | Must not | Source risk |
+|-------|-----------|----------|-------------|
+| <!-- e.g. user asks about a topic outside the corpus --> | <!-- e.g. say it does not know --> | <!-- e.g. invent a plausible answer --> | <!-- e.g. MVP Scope In: "answers only from the indexed corpus" --> |
+
+<!-- The executable spec: what the agent must do, written BEFORE it exists.
+     /workflow-plan turns these rows into data/evals/cases.jsonl; `make eval-grade`
+     runs them. Rules:
+       - 20–50 rows, not hundreds. Over-speccing at discovery is the known failure
+         mode; early cases have large effect size, so small sets are fine.
+       - Balance positive and negative: the `Must not` column is not optional. A suite
+         with no refusal cases does not measure safety.
+       - Every row's `Source risk` quotes an MVP Scope `In:` or `Open:` bullet verbatim.
+         A row that traces to nothing is a row nobody asked for.
+       - Unambiguous: two readers must agree on pass/fail without arguing.
+     SANYI layer note: the case ROWS are 简易 Jianyi (add cases freely as you learn);
+     "the golden set is authored before implementation" is 不易 Buyi. -->
+
+---
+
 ## Evaluation
 
 | Metric | Target | How measured |

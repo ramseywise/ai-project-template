@@ -106,7 +106,9 @@ SKILLS=(
 
   # cross-cutting
   akira             # interactive quality scanner (scan/wander/dao/all)
-  review-shared     # evidence model, finding schema, merge logic — consumed by code-review/workflow-review/akira
+  # review-shared is NOT synced — it is template-owned, with no reservoir copy.
+  # Listing it here hard-failed the script (2026-08-02, AIT-89). It stays in
+  # template/.claude/skills/ and in copier.yaml's cleanup list.
   docs-check        # structural drift detection (README/DESIGN.md vs codebase)
   github-projects   # Projects V2 GraphQL templates
   mcp-builder       # build MCP servers (Python FastMCP or Node SDK)

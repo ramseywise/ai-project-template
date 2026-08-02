@@ -72,7 +72,7 @@ Read what exists; skip gracefully what doesn't. Note which sources you actually 
    - `unknown` → flag as a taxonomy gap (lookup table needs expansion)
    Never attribute an `env` error to a code or spec cause. Do not generate findings
    from `unknown` — surface the gap count instead.
-2. **Growth-entry graduation**: `guacamayo/.sounding/growth.md` — entries tagged
+2. **Growth-entry graduation**: `guacamayo/.sounding/growth/growth.md` — entries tagged
    `[discovered]` that are *process* learnings (about workflow/tooling, not identity).
    These die in the accumulator unless promoted. Flag each as a graduation candidate with
    a proposed target (rule/skill/hook). Do NOT edit `.sounding/` — flag only; /reflect
