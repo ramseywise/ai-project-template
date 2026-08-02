@@ -92,9 +92,7 @@ def test_generate_sends_no_sampling_params(monkeypatch: pytest.MonkeyPatch) -> N
     be checked where it actually leaves the process.
     """
     sink: dict = {}
-    monkeypatch.setattr(
-        llm_module, "get_client", lambda: _capturing_client(_ok_response(), sink)
-    )
+    monkeypatch.setattr(llm_module, "get_client", lambda: _capturing_client(_ok_response(), sink))
 
     llm_module.generate("system", "hello")
 
@@ -139,9 +137,7 @@ def test_rag_agent_generate_sends_no_sampling_params(
     )
 
     sink: dict = {}
-    monkeypatch.setattr(
-        rag_llm, "get_client", lambda: _capturing_client(_ok_response(), sink)
-    )
+    monkeypatch.setattr(rag_llm, "get_client", lambda: _capturing_client(_ok_response(), sink))
 
     rag_llm.generate("system", "hello")
 
