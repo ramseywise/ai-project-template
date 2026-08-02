@@ -23,8 +23,10 @@ class Settings(BaseSettings):
 
     retrieval_top_k: int = 5
 {%- endif %}
-    generation_temperature: float = 0.3
 
+    # No generation_temperature: thinking-by-default models (Opus 5, Fable 5,
+    # Opus 4.8/4.7, Sonnet 5) reject temperature/top_p/top_k with a 400, and the
+    # reject list grows with each release. Steer with the prompt instead.
     mcp_enabled: bool = {{ include_mcp_server }}
     mcp_server_dir: str = "mcp_servers/{{ mcp_server_slug | default(project_slug) }}"
 

@@ -25,11 +25,18 @@ def get_async_client() -> anthropic.AsyncAnthropic:
 
 
 def generate(system_prompt: str, user_message: str) -> str:
+    """One synchronous turn.
+
+    Note there is no ``temperature``. Claude Opus 5 and the other
+    thinking-by-default models reject ``temperature``/``top_p``/``top_k`` with a
+    400, and the reject list grows with each release — a model-id gate would go
+    stale. Steer with the prompt instead; add a sampling param here only if you
+    have checked that your ``lg_model`` accepts one.
+    """
     client = get_client()
     response = client.messages.create(
         model=settings.lg_model,
         max_tokens=1024,
-        temperature=settings.generation_temperature,
         system=system_prompt,
         messages=[{"role": "user", "content": user_message}],
     )
@@ -51,12 +58,13 @@ async def agenerate(
     Returns the raw Message so the caller can inspect `.stop_reason` and handle
     `tool_use` blocks — loop policy (max turns, what counts as "done") is
     agent-specific and belongs in the node, not this factory.
+
+    No ``temperature`` here either — see :func:`generate`.
     """
     client = get_async_client()
     response = await client.messages.create(
         model=settings.lg_model,
         max_tokens=1024,
-        temperature=settings.generation_temperature,
         system=system_prompt,
         messages=messages,
         tools=tools or [],
