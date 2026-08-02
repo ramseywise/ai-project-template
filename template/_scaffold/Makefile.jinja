@@ -18,7 +18,7 @@
         promptfoo-eval \
 {%- endif %}
         {% if has_corpus_pipeline %}nbks-corpus {% endif %}test test-smoke test-integration \
-        lint lint-check typecheck \
+        lint lint-check check-imports typecheck \
 {%- if primary_backend_language in ["typescript", "both"] %}
         ts-install ts-lint ts-typecheck ts-test ts-build ts-dev \
 {%- endif %}
@@ -194,6 +194,12 @@ lint-check:
 	uv run ruff check $(LINT_PATHS)
 	uv run ruff format --check $(LINT_PATHS)
 
+# Fails when a module under a source root is imported by nothing (AIT-51). Runs
+# before typecheck so an orphaned module is reported as "nothing imports this"
+# rather than surfacing later as a type error in a file no code path reaches.
+check-imports:
+	uv run python scripts/check_imports.py
+
 typecheck:
 	uv run pyright
 {% else -%}
@@ -202,6 +208,9 @@ lint:
 
 lint-check:
 	@echo "Python lint-check skipped (primary_backend_language={{ primary_backend_language }})"
+
+check-imports:
+	@echo "Python check-imports skipped (primary_backend_language={{ primary_backend_language }})"
 
 typecheck:
 	@echo "Python typecheck skipped (primary_backend_language={{ primary_backend_language }})"

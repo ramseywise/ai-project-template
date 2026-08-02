@@ -168,7 +168,6 @@ def test_retrieve_node_leaves_clean_snippets_untouched(
     snippet = retrieve_node({"message": "q"})["context_snippets"][0]
 
     assert snippet == "# Descaling\nDescale every 2-3 months."
-
 {% endif %}
 
 @pytest.mark.asyncio
