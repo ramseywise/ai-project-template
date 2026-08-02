@@ -12,7 +12,7 @@ multi-reporter orchestration. Primary use: pre-commit quality gate after `/workf
 `$ARGUMENTS` — one of:
 - A PR number or URL (`42`, `#42`, `https://...`) → PR review mode
 - A work-item slug (`my-feature`) → plan-doc review mode
-- Empty → discover: check for `Status: IN PROGRESS` plan doc, else `gh pr list`
+- Empty → discover: match `^Status:[[:space:]]*IN_PROGRESS`, else `gh pr list`
 
 ## Target repo
 
@@ -90,42 +90,42 @@ Deviations become findings with `merge_impact: important` (justified deviation) 
 
 ## Stage 3: Dispatch Reporters
 
-Run these in parallel where possible:
+### Dimension scan (quality + contracts + wander)
 
-### akira-scan (quality)
-Split changed files into batches of ~5. Spawn `akira-scan` agent on each batch
-(model: haiku, pass context brief summary + file paths). Agent outputs canonical schema
-with evidence tags (see `~/.claude/refs/finding-schema.md`).
+Delegate to the deterministic driver for reporter dispatch, validation, deduplication,
+fingerprinting, and report rendering:
 
-### SANYI (contracts)
-If SANYI.md exists at repo root: run `/sanyi review` protocol on the diff.
-Map severities: BY-* → **[Blocking]**, JY-* → **[Non-blocking]**, BN-1/notices → **[Nit]**.
-Report-only — never auto-fix a contract violation inside a review.
-If no SANYI.md: skip, note in dispatch summary.
+```bash
+uv run --project ~/workspace/guacamayo review-cli run \
+  --repo <target-repo> \
+  --files <changed-file1> <file2> ... \
+  --reviews-dir <target-repo>/.claude/docs/reviews
+```
+
+The driver spawns all active dimension agents (correctness, safety, structure,
+agent-quality if agent code, contracts if SANYI.md exists, wander), validates every
+finding through the Pydantic gate (one repair round-trip then hard fail), deduplicates
+via union-find, fingerprints, and persists a sweep record. Capture stdout as the
+dimension report for Stage 7. The driver's exit code surfaces any validation failure.
+
+Plan-fidelity findings (Stage 2) are NOT passed to the driver — they remain in-session.
+In Stage 4, merge them into the report by hand.
 
 ### Lint and tests
 Run `make lint` / `make test` if available; fallback to stack-specific commands
 (`uv run pytest --tb=short -q`, `npx tsc --noEmit`, etc.).
 Record pass/fail. Test failures become findings with `merge_impact: blocker`.
 
-### Dimension coverage
-For agent-system PRs: akira-scan already checks conditional dimensions 6-7 from
-`review-dimensions.md`. No separate dispatch needed.
+## Stage 4: Merge plan-fidelity + lint findings
 
-## Stage 4: Merge and Deduplicate
+The driver has already merged and deduped the dimension findings. In this stage:
+1. Take the driver's rendered findings section.
+2. Prepend any plan-fidelity findings from Stage 2 (they have no dimension agent).
+3. Prepend any lint/test failure findings.
+4. Re-rank the combined list: blockers first, then important, suggestion, nit.
 
-Collect all findings (plan fidelity + reporters) in canonical schema format. Apply
-merge/dedup logic from review-shared — see its "Merge and deduplication" section.
-
-## Stage 4b: Persist Findings
-
-After merging findings from all reporters, append each merged finding as one JSON
-line to `~/workspace/guacamayo/.claude/docs/review-findings.jsonl` (create if
-missing). Same persistence format as `/code-review` step 6b (see
-`~/.claude/refs/finding-schema.md`), with `review_type: "workflow-review"`.
-Include plan-fidelity findings if they exist.
-
-Skip if there are zero findings.
+Sweep persistence (fingerprint + sweep record) is handled by the driver automatically.
+No separate Stage 4b persistence step is needed.
 
 ## Stage 5: DoD Assessment
 
@@ -198,7 +198,8 @@ Produce the unified report:
 ```
 
 If plan doc exists, append the review section to the plan doc and set `Status: EXECUTED`
-on approval.
+on approval, plus `Review: pending` on the next line (`Review: passed` once the verdict is
+a pass). `Status:` carries exactly one enum member — no suffix.
 
 ## Stage 8: Action (read-only default)
 
@@ -211,7 +212,9 @@ If authorized:
 - `request_changes` → `gh pr review <number> --request-changes -b "<summary>"`
 - `comment` → `gh pr review <number> --comment -b "<summary>"`
 
-For plan-doc mode (no PR): append `## Review` section to plan doc, update Status.
+For plan-doc mode (no PR): append `## Review` section to plan doc, and set `Status:` to a
+canonical enum member — `EXECUTED` + `Review: passed` when the verdict is `approve`,
+`EXECUTED` + `Review: pending` otherwise. Never write a free-text status.
 
 ## Boundaries
 

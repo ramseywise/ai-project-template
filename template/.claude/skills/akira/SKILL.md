@@ -63,24 +63,37 @@ Scope: whole-repo (47 tracked files in listen-wiseer)
 
 ## scan (Kaneda)
 
-Split the changed set into batches of ~5 files. Spawn the global **`akira-scan`** agent
-on each batch **in parallel** (pass file paths + one-line repo context; restate
-`model: haiku` on the Agent call). Agent outputs canonical schema with evidence tags
-(see `~/.claude/refs/finding-schema.md`). **Confirm each finding against the source
-before it enters the report** (see `~/.claude/refs/models.md`).
+Delegate to the deterministic driver:
 
-**Merge** parallel batch results using canonical schema: group findings by file+lines
-overlap (within 5 lines) AND category similarity, judge if same underlying issue, merge
-duplicates preserving all source IDs, dedupe against linter findings, rank blockers first.
-This is the same scan `/code-review` runs; `/akira scan` and `/code-review`'s quality-scan
-section produce the same findings on the same diff.
+```bash
+uv run --project ~/workspace/guacamayo review-cli run \
+  --repo <target-repo> \
+  [--files <file1> <file2> ...] \
+  [--reviews-dir <repo>/.claude/docs/reviews] \
+  [--no-save]
+```
+
+The driver spawns all active dimension agents concurrently via the Claude Agent SDK
+(haiku, read-only tools), validates every finding through the Pydantic gate (one repair
+round-trip then hard fail), deduplicates via union-find, fingerprints, and renders a
+deterministic Markdown report. No LLM can skip or reorder these gates.
+
+After the driver completes, present the rendered report from stdout. The sweep record is
+written to `<repo>/.claude/docs/reviews/` automatically when `--no-save` is not passed.
+
+**For `/akira all`**: loop over each included repo and call the driver once per repo.
+Results are aggregated into the cross-repo summary table.
 
 ## wander (Kiyoko)
 
-Spawn the global **`akira-wander`** agent (haiku) on the diff + one-line repo context. It
-returns 3–5 pointed questions. In interactive mode, present them in chat and stop — the
-questions are the deliverable, akira edits nothing. In `headless` mode, put them under a
-`### Needs input` section of the report.
+Wander is included in the driver run when there is a diff scope (the driver activates the
+`wander` dimension via `active_dimensions`). Wander findings carry `reporter: wander`,
+`evidence_state: question`, `merge_impact: question` and appear under "Open Questions"
+in the rendered report.
+
+In interactive mode, present the wander questions from the report in chat and invite
+discussion — they are the deliverable, akira edits nothing. In `headless` mode, they
+appear in the report's "Open Questions (Wander)" section.
 
 ## dao (the path)
 
@@ -131,25 +144,17 @@ The sweep report opens with a table:
 Each repo section follows the standard akira report format. dao's test gate still applies
 per-repo — repos without test harnesses get surface-only (no code mutation).
 
-## Review log (persistent record)
+## Sweep persistence (persistent record)
 
-After every scan or sweep completes, write the findings to guacamayo's review log:
-`~/workspace/guacamayo/.reviews/`
+The driver persists sweep records automatically to `<repo>/.claude/docs/reviews/`
+(naming: `{repo}-{YYYY-MM-DD}.json`, counter suffix if same-day). The driver also
+renders a trend diff when a previous sweep exists — see the "Dimension trends" section
+of the report.
 
-**Naming**:
-- `/akira all` sweep → `YYYY-MM-DD-sweep.md`
-- Single-repo run → `YYYY-MM-DD-<repo>.md`
+For cross-repo trend analysis: `uv run --project ~/workspace/guacamayo review-cli trends --repo <name>`.
 
-If a file for today already exists, append a time suffix: `YYYY-MM-DD-sweep-HH-MM.md`.
-
-**Content**: the summary table + per-repo findings in canonical schema format. Include:
-- Scope (diff or whole-repo) per repo
-- All findings with severity, evidence state, file:line, description
-- Issues created (if any, with `repo#number`)
-- Findings resolved since last sweep (diff against most recent prior log if one exists)
-
-The log is machine-generated, append-only (one file per run, never overwrite prior logs).
-Trend analysis reads these files to detect recurring patterns and quality trajectory.
+Note: the old `~/workspace/guacamayo/.reviews/` path is retired. All sweep records live
+under `<repo>/.claude/docs/reviews/` as JSON (not Markdown) for machine-readable trending.
 
 ## Boundaries
 

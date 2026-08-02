@@ -79,9 +79,9 @@ Drop findings the linter already caught in step 2.
   but still flag obviously broken references caught by the `docs_hygiene` hook.
 
 ### 6. Report
-If the repo has a plan doc with `Status: IN PROGRESS` whose scope covers this diff,
-append there; otherwise write `<repo>/.claude/docs/plans/YYYY-MM-DD-review-sweep.md`
-(`Status: EXECUTED` once written).
+If the repo has a plan doc matching `^Status:[[:space:]]*IN_PROGRESS` whose scope covers
+this diff, append there; otherwise write `<repo>/.claude/docs/plans/YYYY-MM-DD-review-sweep.md`
+(`Status: EXECUTED` plus `Review: pending` on the next line, once written).
 
 ### 6b. Persist findings
 

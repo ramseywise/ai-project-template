@@ -22,3 +22,10 @@ later steps:
   pre-push hooks fail with "git-lfs not found." Fix: global template
   (`~/.git-templates/hooks/pre-push`) prepends Homebrew PATH. If a new repo has the
   error, copy the template hook or run `git init` to pick it up.
+
+## Quota masquerade
+
+Account usage exhaustion surfaces as `error_max_turns` or silent empty results from the
+Agent SDK — indistinguishable from agent logic failures at the API level. Before
+debugging agent behavior, check quota state. SDK-level `error_max_turns` in a low-turn
+session is a quota signal, not a turns signal.
