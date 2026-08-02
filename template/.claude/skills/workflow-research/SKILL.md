@@ -97,8 +97,10 @@ multiple angles explored simultaneously rather than deep sequential research.
 
 1. **Recon** — quick WebSearch or Grep to gauge scope.
 2. **Propose agents** — suggest N agents (2–10) with one angle each. Wait for confirmation.
-3. **Deploy** — spawn each as a haiku Agent (`model: haiku`) writing to
-   `.claude/docs/research/{date}_{topic}_{angle}.md` in the target repo.
+3. **Deploy** — spawn each as the named `plan-research-scout` agent
+   (`subagent_type: plan-research-scout`), one per angle, in parallel. Pass the angle
+   assignment and the exact output path
+   (`.claude/docs/research/{date}_{topic}_{angle}.md` in the target repo) in the prompt.
 4. **Synthesize** — after all complete, read reports and write a unified synthesis to
    the plan doc's `## Research` section (same output as Start mode).
 
