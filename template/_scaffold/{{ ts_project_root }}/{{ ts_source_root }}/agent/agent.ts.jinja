@@ -16,6 +16,9 @@
  *                     StallDetectedError before maxSteps is exhausted
  * - context-budget.ts (pure parts): trackUsage + shouldCompact in onFinish;
  *                     logs utilisation and warns when the context window is near full
+ * - guardTools.ts   : wrapToolsWithContentFilter() runs guard layer 2 over every
+ *                     tool result before it re-enters the prompt (indirect
+ *                     injection). Layers 1 and 3 live in handler.ts.
  *
  * Modules intentionally NOT wired here (see their module-level comments)
  * -----------------------------------------------------------------------
@@ -31,6 +34,7 @@ import { settings } from "./settings.js";
 import { tools } from "./tools/index.js";
 import { startChatSpan } from "./tracing.js";
 import { wrapToolsWithSpans } from "./traceTools.js";
+import { wrapToolsWithContentFilter } from "./guardTools.js";
 import { createStallDetector } from "./stallDetector.js";
 import { trackUsage, shouldCompact } from "./context-budget.js";
 
@@ -43,9 +47,11 @@ export function runAgent(messages: UIMessage[]) {
     model: getModel(),
     system: SYSTEM_PROMPT,
     messages: convertToModelMessages(messages),
-    // wrapToolsWithSpans brackets each tool's execute() with an execute_tool OTel
-    // span — real start/end times and is_error on throw (see traceTools.ts).
-    tools: wrapToolsWithSpans(tools),
+    // Inner: guard layer 2 filters each tool result before it re-enters the
+    // prompt. Outer: wrapToolsWithSpans brackets execute() with an execute_tool
+    // OTel span — real start/end times and is_error on throw. This nesting puts
+    // the filtering inside the traced region, not outside it.
+    tools: wrapToolsWithSpans(wrapToolsWithContentFilter(tools)),
     temperature: settings.generationTemperature,
     stopWhen: stepCountIs(settings.maxSteps),
 

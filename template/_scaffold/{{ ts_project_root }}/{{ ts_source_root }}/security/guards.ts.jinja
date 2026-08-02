@@ -10,6 +10,32 @@
  *   checkInput(userText)        -- before the generateText/streamText call
  *   filterContent(toolOutput)   -- before untrusted text enters the prompt
  *   checkOutput(modelText)      -- after the model call, BEFORE tracing
+ *
+ * Layer 3 and the stream (AIT-50 decision)
+ * ----------------------------------------
+ * `chatHandler` returns a streaming response, so layer 3 had three possible
+ * seams. The choice, and why the other two lost:
+ *
+ *   1. Poison the stream -- abort mid-flight when a chunk trips a pattern.
+ *      Rejected: by the time the scrubber sees the offending chunk the client
+ *      has already rendered the preceding tokens. Scrubbing after display is
+ *      theater, and it turns one bad token into a dropped response.
+ *   2. Buffer the whole response, scrub once, then send. Correct but deletes
+ *      streaming -- the entire reason toUIMessageStreamResponse() exists.
+ *   3. CHOSEN -- transform in transit. `guardTextStream()` scrubs each chunk as
+ *      it passes through a TransformStream, so scrubbed bytes are the only
+ *      bytes the caller ever sees, and the response still streams.
+ *
+ * What makes (3) sound rather than merely convenient: every shape in
+ * SECRET_PATTERNS is a bounded-length token. Bounded length means a carry
+ * window works -- hold back the last CARRY_CHARS characters of each chunk and
+ * prepend them to the next, and a match shorter than the window is caught no
+ * matter where the chunk boundary falls.
+ *
+ * The bound is a real limitation, so it is stated rather than hidden: a
+ * credential LONGER than CARRY_CHARS that straddles a boundary can slip
+ * through. CARRY_CHARS is therefore sized above the longest pattern this module
+ * can match, and must be raised alongside any longer pattern added below.
  * {% if data_sensitivity in ["restricted", "secret"] %}
  * Ordering contract (data_sensitivity={{ data_sensitivity }}): `checkOutput()` runs
  * BEFORE any observability/tracing call — the scrubbed text is what gets
@@ -229,6 +255,76 @@ export function checkOutput(text: string): GuardResult {
       reasons: ["output.filter_error"],
     };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Layer 3, streaming form
+// ---------------------------------------------------------------------------
+
+/**
+ * Characters held back at each chunk boundary so a pattern split across two
+ * chunks still matches. Must exceed the longest string SECRET_PATTERNS (and
+ * PII_PATTERNS, when enabled) can match — raise it when adding a longer
+ * pattern above. Current longest is the GitHub token shape at ~44 chars.
+ */
+const CARRY_CHARS = 128;
+
+/**
+ * Scrub a text stream in transit — the streaming form of `checkOutput`.
+ *
+ * See the module header for why this is a TransformStream rather than a buffer
+ * or a mid-stream abort. Emits only scrubbed text: each chunk is scrubbed with
+ * the last CARRY_CHARS characters withheld, so a credential straddling a chunk
+ * boundary is still caught on the next pass. The carry is flushed (scrubbed)
+ * when the source stream closes.
+ *
+ * Off-switch and failure behaviour match `checkOutput`: disabled passes text
+ * through untouched, and an internal error drops the offending chunk rather
+ * than emitting unscrubbed text.
+ */
+export function guardTextStream(): TransformStream<string, string> {
+  let carry = "";
+
+  return new TransformStream<string, string>({
+    transform(chunk, controller) {
+      if (!settings.outputFilterEnabled) {
+        controller.enqueue(chunk);
+        return;
+      }
+      try {
+        const pending = carry + chunk;
+        // Withhold the tail so a pattern spanning this boundary is matched on
+        // the next chunk instead of being emitted half-scrubbed.
+        const cut = Math.max(0, pending.length - CARRY_CHARS);
+        const emit = pending.slice(0, cut);
+        carry = pending.slice(cut);
+        if (emit.length > 0) {
+          controller.enqueue(checkOutput(emit).text);
+        }
+      } catch (err) {
+        // Fail closed — drop the chunk rather than emit unscrubbed text.
+        console.error("security.stream.failed", { error: String(err) });
+        carry = "";
+      }
+    },
+
+    flush(controller) {
+      if (carry.length === 0) {
+        return;
+      }
+      if (!settings.outputFilterEnabled) {
+        controller.enqueue(carry);
+        carry = "";
+        return;
+      }
+      try {
+        controller.enqueue(checkOutput(carry).text);
+      } catch (err) {
+        console.error("security.stream.failed", { error: String(err) });
+      }
+      carry = "";
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------

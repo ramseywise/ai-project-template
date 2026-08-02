@@ -1,27 +1,26 @@
+"""Guard layer 1 — screens the untrusted user turn before any model call.
+
+This node delegates to `security.guards.check_input` rather than carrying its
+own pattern list. It previously held a four-entry substring check that
+duplicated, less well, what `security/guards.py` already did — and left the
+real module called by nothing (AIT-50). One implementation, one place to extend.
+
+The node still owns the graph-shaped decision: `check_input` returns a verdict,
+and translating that verdict into `blocked` / `block_reason` state that
+generate_node reads is this node's job, not the guard's.
+"""
+
 from __future__ import annotations
+
+from security.guards import check_input
 
 from ..state import State
 
-# Minimal heuristic guardrail — a real project should layer in PII detection,
-# a proper prompt-injection classifier, and an LLM-based judge. This is deliberately
-# small: it exists to show WHERE guardrails plug into the graph, not to be complete.
-_BLOCKED_PATTERNS = (
-    "ignore previous instructions",
-    "ignore all previous instructions",
-    "reveal your system prompt",
-    "you are now",
-)
-
-
-_BLOCK_REASON = (
-    "This request can't be processed — it looks like an attempt to override "
-    "the assistant's instructions."
-)
-
 
 def guardrail_node(state: State) -> dict:
-    lowered = state["message"].lower()
-    for pattern in _BLOCKED_PATTERNS:
-        if pattern in lowered:
-            return {"blocked": True, "block_reason": _BLOCK_REASON}
+    verdict = check_input(state["message"])
+    if verdict.blocked:
+        # verdict.text is the refusal message, never the reasons -- surfacing
+        # rule ids teaches a probing caller what tripped.
+        return {"blocked": True, "block_reason": verdict.text}
     return {"blocked": False, "block_reason": ""}
