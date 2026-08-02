@@ -38,9 +38,7 @@ def test_max_tokens_default_is_above_the_truncation_cliff() -> None:
 
 
 def _fake_client(response: SimpleNamespace) -> SimpleNamespace:
-    return SimpleNamespace(
-        messages=SimpleNamespace(create=lambda **_kwargs: response)
-    )
+    return SimpleNamespace(messages=SimpleNamespace(create=lambda **_kwargs: response))
 
 
 def test_empty_content_logs_a_warning_carrying_stop_reason(

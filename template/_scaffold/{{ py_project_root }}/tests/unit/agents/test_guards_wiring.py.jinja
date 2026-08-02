@@ -170,6 +170,7 @@ def test_retrieve_node_leaves_clean_snippets_untouched(
     assert snippet == "# Descaling\nDescale every 2-3 months."
 
 {% endif %}
+
 @pytest.mark.asyncio
 async def test_generate_node_filters_mcp_tool_results(
     monkeypatch: pytest.MonkeyPatch,

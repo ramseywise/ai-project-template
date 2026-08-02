@@ -26,7 +26,9 @@ import { checkInput, guardTextStream } from "../security/guards.js";
 function lastUserText(messages: UIMessage[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
-    if (msg?.role !== "user") continue;
+    if (msg?.role !== "user") {
+      continue;
+    }
     return (msg.parts ?? [])
       .filter((p): p is { type: "text"; text: string } => p.type === "text")
       .map((p) => p.text)
