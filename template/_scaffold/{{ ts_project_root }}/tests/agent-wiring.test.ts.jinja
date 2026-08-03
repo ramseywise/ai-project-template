@@ -77,7 +77,7 @@ jest.unstable_mockModule("../{{ ts_source_root }}/agent/clients/llm.js", () => (
 }));
 
 jest.unstable_mockModule("../{{ ts_source_root }}/agent/settings.js", () => ({
-  settings: { generationTemperature: 0.3, maxSteps: 5, maxRetries: 3 },
+  settings: { maxSteps: 5, maxRetries: 3 },
 }));
 
 jest.unstable_mockModule("../{{ ts_source_root }}/agent/tools/index.js", () => ({
@@ -143,6 +143,19 @@ async function invokeCallbacks() {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+describe("agent.ts wiring — sampling params", () => {
+  it("streamText receives no temperature/topP/topK", async () => {
+    // Thinking-by-default models (Opus 5, Fable 5, Opus 4.8/4.7, Sonnet 5) reject
+    // sampling params with a 400. This asserts on the captured streamText options
+    // — the outgoing payload — rather than on settings, because a knob removed
+    // from settings while a literal stays in agent.ts still ships the 400.
+    runAgent([]);
+    expect(capturedOpts).not.toHaveProperty("temperature");
+    expect(capturedOpts).not.toHaveProperty("topP");
+    expect(capturedOpts).not.toHaveProperty("topK");
+  });
+});
 
 describe("agent.ts wiring — tracing (chat span)", () => {
   it("startChatSpan is called in onFinish with token counts from event.usage", async () => {

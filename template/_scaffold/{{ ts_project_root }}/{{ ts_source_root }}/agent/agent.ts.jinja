@@ -52,7 +52,10 @@ export function runAgent(messages: UIMessage[]) {
     // OTel span — real start/end times and is_error on throw. This nesting puts
     // the filtering inside the traced region, not outside it.
     tools: wrapToolsWithSpans(wrapToolsWithContentFilter(tools)),
-    temperature: settings.generationTemperature,
+    // No temperature/topP/topK. Thinking-by-default models (Opus 5, Fable 5,
+    // Opus 4.8/4.7, Sonnet 5) reject sampling params with a 400 — the same
+    // Messages API constraint applies underneath streamText. The reject list
+    // grows with every launch, so gating on model id would go stale on its own.
     stopWhen: stepCountIs(settings.maxSteps),
 
     onStepFinish(step) {

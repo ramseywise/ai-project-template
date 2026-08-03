@@ -34,7 +34,6 @@ class Settings(BaseSettings):
 
     retrieval_top_k: int = 5
     confidence_threshold: float = 0.25
-    generation_temperature: float = 0.3
 
     vector_backend: str = "{{ vector_backend }}"
 {%- if vector_backend == "opensearch" %}

@@ -39,11 +39,15 @@ def get_async_client() -> anthropic.AsyncAnthropic:
 
 
 def generate(system_prompt: str, user_message: str) -> str:
+    # No temperature/top_p/top_k here. Thinking-by-default models (Opus 5,
+    # Fable 5, Opus 4.8/4.7, Sonnet 5) reject them with a 400, and the set of
+    # models that reject them grows with every launch — a model -> capability
+    # table would go stale on its own. Pass one explicitly at the call site
+    # only if you know the model you configured accepts it.
     client = get_client()
     response = client.messages.create(
         model=settings.lg_model,
         max_tokens=settings.llm_max_tokens,
-        temperature=settings.generation_temperature,
         system=system_prompt,
         messages=[{"role": "user", "content": user_message}],
     )
@@ -86,10 +90,10 @@ async def agenerate(
     agent-specific and belongs in the node, not this factory.
     """
     client = get_async_client()
+    # See generate() — no sampling params, thinking-by-default models 400 on them.
     response = await client.messages.create(
         model=settings.lg_model,
         max_tokens=settings.llm_max_tokens,
-        temperature=settings.generation_temperature,
         system=system_prompt,
         messages=messages,
         tools=tools or [],
