@@ -224,6 +224,14 @@ jobs:
             UV_NO_SYNC=1 make lint-check
           fi
 
+      # Runs before the tests so an orphaned module is reported as "nothing
+      # imports this" rather than surfacing later as a type error in a file no
+      # code path reaches (AIT-51; the TS twin is the check:unimported step below).
+      - name: Python — no unimported modules
+        if: matrix.tier == 'test-py' || matrix.tier == 'test-split'
+        working-directory: out
+        run: uv run python scripts/check_imports.py
+
       - name: Run Python tests
         if: matrix.tier == 'test-py' || matrix.tier == 'test-split'
         working-directory: out

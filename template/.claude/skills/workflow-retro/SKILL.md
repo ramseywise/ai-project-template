@@ -57,7 +57,7 @@ frontmatter matches the directory name. Mismatches break `/slash` dispatch silen
 
 Read what exists; skip gracefully what doesn't. Note which sources you actually used.
 
-1. **Insights summary**: read `~/workspace/guacamayo/.sounding/insights-log.md` first
+1. **Insights summary**: read `~/workspace/guacamayo/.sounding/insights/insights-log.md` first
    (written by `/workflow-insights` — contains experiment verdicts, recommendations, model/skill/tool
    economics, and trends). If it doesn't exist or is stale (>7 days), fall back to running
    `python3 ~/.claude/scripts/insights.py --dry-run` for fresh mechanical stats, or read

@@ -1,3 +1,15 @@
+"""Generation node — also guard layer 3, the output filter.
+
+`check_output` runs on the model's text before it becomes `state["answer"]`,
+which is what the caller receives. Non-streaming, so layer 3 is the simple
+case here: the whole answer exists before anything is returned. (The
+TypeScript twin streams, and pays for that with a carry-window transform —
+see security/guards.ts's AIT-50 decision block.)
+
+Tool results are filtered by layer 2 at `retrieve_node` for retrieval and here
+for MCP tool output, before either re-enters the prompt.
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -6,7 +18,8 @@ from typing import Any
 from langchain_core.tools import BaseTool
 
 from context_budget.context_budget import compact_history, should_compact, track_usage
-from observability.spans import chat_span, execute_tool_span
+from observability.spans import chat_span, execute_tool_span, record_finish_reason
+from security.guards import check_output, filter_content
 
 from ..clients.llm import agenerate, get_client
 from ..clients.mcp import get_mcp_tools
@@ -62,7 +75,9 @@ async def generate_node(state: State) -> dict:
             if _span is not None:
                 _span.set_attribute("gen_ai.usage.input_tokens", response.usage.input_tokens)
                 _span.set_attribute("gen_ai.usage.output_tokens", response.usage.output_tokens)
-                _span.set_attribute("gen_ai.response.finish_reasons", response.stop_reason)
+            # Not span.set_attribute — record_finish_reason also arms chat_span's
+            # truncation warning, and it must run even when _span is None.
+            record_finish_reason(_span, response.stop_reason)
 
         track_usage(response)
         if should_compact(response):
@@ -81,7 +96,9 @@ async def generate_node(state: State) -> dict:
             return {"answer": f"Stall detected in LLM output: {exc}"}
 
         if response.stop_reason != "tool_use":
-            return {"answer": text}
+            # Guard layer 3 -- scrub before the answer leaves the graph. .text is
+            # the safe value either way, so the verdict needs no branch here.
+            return {"answer": check_output(text).text}
 
         messages.append({"role": "assistant", "content": response.content})
         tool_results = []
@@ -100,6 +117,9 @@ async def generate_node(state: State) -> dict:
                     return {"answer": f"Stall detected in tool loop: {exc}"}
                 except Exception as exc:
                     result_text = f"Tool error: {exc}"
+            # Guard layer 2 -- an MCP tool reaches servers this graph does not
+            # own, so its result is untrusted text about to re-enter the prompt.
+            result_text = filter_content(result_text, source=f"tool:{block.name}").text
             tool_results.append(
                 {"type": "tool_result", "tool_use_id": block.id, "content": result_text}
             )

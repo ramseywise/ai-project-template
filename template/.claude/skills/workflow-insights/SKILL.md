@@ -239,7 +239,7 @@ The engine is `librarian/tools/cartographer/parser.py` (canonical since 2026-07-
     Rank by cost-weighted impact. The single biggest lever goes first.
 
 12. **Persist summary** — write the machine-readable output to
-    `~/workspace/guacamayo/.sounding/insights-log.md` (append a new dated section at the top — do NOT overwrite):
+    `~/workspace/guacamayo/.sounding/insights/insights-log.md` (append a new dated section at the top — do NOT overwrite):
 
     ```markdown
     # Insights Summary — [date]
@@ -261,7 +261,8 @@ The engine is `librarian/tools/cartographer/parser.py` (canonical since 2026-07-
     [the experiment table from step 10]
 
     ## Failure Attribution
-    [category table from Step 9 — counts, %, top example per category]
+    [category table from Step 9 — counts and %, summed from the errors_* columns;
+     example per category only where the run's tool_errors breakdown supplies one]
     [remediation notes per non-zero non-unknown category]
     [flag: transient vs code indistinguishable until parser emits retry sequences]
 

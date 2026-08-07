@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 
 import anthropic
 
 from ..settings import settings
+
+log = logging.getLogger(__name__)
 
 # The agent package name ("agents.<name>.clients" -> "<name>") — survives renames.
 _AGENT_NAME = __name__.split(".")[1]
@@ -14,14 +17,25 @@ _AGENT_NAME = __name__.split(".")[1]
 def get_client() -> anthropic.Anthropic:
     """The only place allowed to instantiate the Anthropic client directly —
     see .claude/hooks/sdk_lint.sh's sdk-factory check."""
-    return anthropic.Anthropic(api_key=settings.anthropic_api_key)
+    return anthropic.Anthropic(
+        api_key=settings.anthropic_api_key,
+        timeout=settings.llm_timeout_seconds,
+        # SDK retries 408/409/429/5xx + connection errors with exponential
+        # backoff. Worst-case wall-clock is timeout * (max_retries + 1) — 90s
+        # at these defaults. Do not add a retry loop on top of this.
+        max_retries=settings.llm_max_retries,
+    )
 
 
 @lru_cache(maxsize=1)
 def get_async_client() -> anthropic.AsyncAnthropic:
     """The only place allowed to instantiate the async Anthropic client —
     see .claude/hooks/sdk_lint.sh's sdk-factory check."""
-    return anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+    return anthropic.AsyncAnthropic(
+        api_key=settings.anthropic_api_key,
+        timeout=settings.llm_timeout_seconds,
+        max_retries=settings.llm_max_retries,
+    )
 
 
 def generate(system_prompt: str, user_message: str) -> str:
@@ -41,10 +55,29 @@ def generate(system_prompt: str, user_message: str) -> str:
         messages=[{"role": "user", "content": user_message}],
     )
     usage = response.usage
-    print(f"[{_AGENT_NAME}] tokens in={usage.input_tokens} out={usage.output_tokens}")
+    log.info(
+        "llm.usage",
+        extra={
+            "agent": _AGENT_NAME,
+            "input_tokens": usage.input_tokens,
+            "output_tokens": usage.output_tokens,
+            "stop_reason": response.stop_reason,
+        },
+    )
     for block in response.content:
         if block.type == "text":
             return block.text
+    # No text block at all — indistinguishable from a legitimately empty answer
+    # at the call site, so say so here. stop_reason usually explains it
+    # ("max_tokens" means the budget ran out before any text was emitted).
+    log.warning(
+        "llm.no_text_block",
+        extra={
+            "agent": _AGENT_NAME,
+            "stop_reason": response.stop_reason,
+            "block_types": [block.type for block in response.content],
+        },
+    )
     return ""
 
 
@@ -62,6 +95,7 @@ async def agenerate(
     No ``temperature`` here either — see :func:`generate`.
     """
     client = get_async_client()
+    # See generate() — no sampling params, thinking-by-default models 400 on them.
     response = await client.messages.create(
         model=settings.lg_model,
         max_tokens=1024,
@@ -70,5 +104,13 @@ async def agenerate(
         tools=tools or [],
     )
     usage = response.usage
-    print(f"[{_AGENT_NAME}] tokens in={usage.input_tokens} out={usage.output_tokens}")
+    log.info(
+        "llm.usage",
+        extra={
+            "agent": _AGENT_NAME,
+            "input_tokens": usage.input_tokens,
+            "output_tokens": usage.output_tokens,
+            "stop_reason": response.stop_reason,
+        },
+    )
     return response
