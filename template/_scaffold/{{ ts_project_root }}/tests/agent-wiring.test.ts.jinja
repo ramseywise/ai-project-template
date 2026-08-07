@@ -144,16 +144,19 @@ async function invokeCallbacks() {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("agent.ts wiring — sampling params", () => {
-  it("streamText receives no temperature/topP/topK", async () => {
-    // Thinking-by-default models (Opus 5, Fable 5, Opus 4.8/4.7, Sonnet 5) reject
-    // sampling params with a 400. This asserts on the captured streamText options
-    // — the outgoing payload — rather than on settings, because a knob removed
-    // from settings while a literal stays in agent.ts still ships the 400.
+describe("agent.ts — request params", () => {
+  it("sends no sampling params: they 400 on thinking-by-default models", () => {
+    // Claude Opus 5, Fable 5, Opus 4.8/4.7 and Sonnet 5 reject
+    // temperature/top_p/top_k with a 400. The default model (Haiku 4.5) still
+    // accepts them, so this only breaks once TS_AGENT_MODEL points at a current
+    // model — a runtime-only failure no linter catches. Re-add
+    // `temperature: settings.generationTemperature` to agent.ts and this fails.
+    capturedOpts = {};
     runAgent([]);
-    expect(capturedOpts).not.toHaveProperty("temperature");
-    expect(capturedOpts).not.toHaveProperty("topP");
-    expect(capturedOpts).not.toHaveProperty("topK");
+
+    for (const param of ["temperature", "topP", "topK"]) {
+      expect(capturedOpts).not.toHaveProperty(param);
+    }
   });
 });
 

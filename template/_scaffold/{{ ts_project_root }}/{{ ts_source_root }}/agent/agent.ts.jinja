@@ -47,15 +47,12 @@ export function runAgent(messages: UIMessage[]) {
     model: getModel(),
     system: SYSTEM_PROMPT,
     messages: convertToModelMessages(messages),
-    // Inner: guard layer 2 filters each tool result before it re-enters the
-    // prompt. Outer: wrapToolsWithSpans brackets execute() with an execute_tool
-    // OTel span — real start/end times and is_error on throw. This nesting puts
-    // the filtering inside the traced region, not outside it.
-    tools: wrapToolsWithSpans(wrapToolsWithContentFilter(tools)),
-    // No temperature/topP/topK. Thinking-by-default models (Opus 5, Fable 5,
-    // Opus 4.8/4.7, Sonnet 5) reject sampling params with a 400 — the same
-    // Messages API constraint applies underneath streamText. The reject list
-    // grows with every launch, so gating on model id would go stale on its own.
+    // wrapToolsWithSpans brackets each tool's execute() with an execute_tool OTel
+    // span — real start/end times and is_error on throw (see traceTools.ts).
+    tools: wrapToolsWithSpans(tools),
+    // No temperature: Claude Opus 5 and the other thinking-by-default models
+    // reject temperature/top_p/top_k with a 400, and the reject list grows with
+    // each release. Steer with SYSTEM_PROMPT instead.
     stopWhen: stepCountIs(settings.maxSteps),
 
     onStepFinish(step) {

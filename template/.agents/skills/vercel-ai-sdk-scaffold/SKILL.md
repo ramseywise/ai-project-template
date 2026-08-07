@@ -39,8 +39,8 @@ Always ask before scaffolding:
 5. **Deployment target** — Vercel (zero-config Express deployment, no `vercel.json`
    needed unless custom routing), or standalone Node service?
 6. **Max steps** — Accept the default (`TS_AGENT_MAX_STEPS=5`) or override in
-   `.env.example`. There is deliberately no temperature knob: thinking-by-default
-   models reject sampling params with a 400 (see `agent/agent.ts`).
+   `.env.example`. There is deliberately no temperature setting: thinking-by-default
+   models reject `temperature`/`top_p`/`top_k` with a 400.
 
 ---
 
@@ -131,7 +131,7 @@ export function runAgent(messages: UIMessage[]) {
     system: SYSTEM_PROMPT,
     messages: convertToModelMessages(messages),
     tools,
-    // No temperature/topP/topK — thinking-by-default models 400 on them.
+    // No temperature — thinking-by-default models 400 on it.
     stopWhen: stepCountIs(settings.maxSteps),
   });
 }

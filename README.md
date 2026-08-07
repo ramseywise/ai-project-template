@@ -232,7 +232,7 @@ template-maintainer material.
 ## Design notes
 
 - Everything here was extracted from `playground/.claude/`, stripped of client- and domain-specific
-  content (no client names, no music-KB domain logic, no VA-project package paths).
+  content (no client names, no music-KB domain logic, no project package paths).
 - Unlike `ds-python-project-template`, there's no `git init`/initial-commit task — this template is meant
   to be layered onto a project that may already exist and already have its own git history.
 - All Python-stack assumptions (`uv`, `pytest`, `ruff`, `pyright`) are load-bearing defaults, not yet

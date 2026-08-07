@@ -25,15 +25,18 @@ def get_client() -> anthropic.Anthropic:
 
 
 def generate(system_prompt: str, user_message: str) -> str:
-    # No temperature/top_p/top_k here. Thinking-by-default models (Opus 5,
-    # Fable 5, Opus 4.8/4.7, Sonnet 5) reject them with a 400, and the set of
-    # models that reject them grows with every launch — a model -> capability
-    # table would go stale on its own. Pass one explicitly at the call site
-    # only if you know the model you configured accepts it.
+    """One synchronous turn.
+
+    Note there is no ``temperature``. Claude Opus 5 and the other
+    thinking-by-default models reject ``temperature``/``top_p``/``top_k`` with a
+    400, and the reject list grows with each release — a model-id gate would go
+    stale. Steer with the prompt instead; add a sampling param here only if you
+    have checked that your ``rag_model`` accepts one.
+    """
     client = get_client()
     response = client.messages.create(
         model=settings.rag_model,
-        max_tokens=settings.llm_max_tokens,
+        max_tokens=1024,
         system=system_prompt,
         messages=[{"role": "user", "content": user_message}],
     )
