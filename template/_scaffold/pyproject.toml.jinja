@@ -81,6 +81,12 @@ dependencies = [
     "matplotlib>=3.9.0",
     "lightgbm>=4.5.0",
     "statsforecast>=1.7.0",
+    # CatBoost — native categorical handling; the registry's default boosting
+    # candidate on mixed-type data. imbalanced-learn — SMOTE/SMOTENC and the
+    # under/over samplers. Both are imported behind try/except and degrade with
+    # a logged warning, so a stripped install still runs.
+    "catboost>=1.2.5",
+    "imbalanced-learn>=0.12.0",
 {%- endif %}
 ]
 
