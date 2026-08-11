@@ -1485,6 +1485,23 @@ _tasks:
   # boundary split_service needs. split vs. single is a deploy-config
   # difference, not a tree difference.
   - "{{ 'true' if (scaffold_full_project and include_frontend) else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/frontend' }}"
+  # AIT-70: the Vite SPA is staged in a SECOND tree, _scaffold/frontend-vite/,
+  # rather than branching inside the Next.js one. The two share almost no files
+  # — different entrypoint (index.html + main.tsx vs. app/layout.tsx), different
+  # env convention (import.meta.env.VITE_* vs. process.env.NEXT_PUBLIC_*),
+  # different Supabase client (createClient vs. createBrowserClient), different
+  # test runner setup — so a per-file {% if %} would leave every file a
+  # two-branch conditional. Whichever bundler is not chosen is pruned here; the
+  # survivor is promoted to frontend/ by the copy task below, so the rendered
+  # project has one plain frontend/ either way and no bundler in its path.
+  - "{{ 'true' if (scaffold_full_project and include_frontend and frontend_bundler == 'vite') else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/frontend-vite' }}"
+  - "{{ ('rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/frontend') if (scaffold_full_project and include_frontend and frontend_bundler == 'vite') else 'true' }}"
+  # AIT-70: supabase/ (migrations + RLS pgTAP suite + local stack config) is
+  # staged and pruned when include_supabase_db is false. Independent of the
+  # Supabase *auth* touchpoints (frontend client, split_service JWT middleware)
+  # and of vector_backend=postgres — a project can use Supabase for identity or
+  # for pgvector without Postgres being its application database.
+  - "{{ 'true' if (scaffold_full_project and include_supabase_db) else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/supabase' }}"
   # middleware/auth.py lives inside the normal
 # _scaffold/<py_project_root>/<ai_source_root> Python
   # tree (moved by the big unconditional mv above, same as every other Python
@@ -1604,11 +1621,21 @@ _tasks:
   - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/' ~ ts_project_root ~ ' && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ ts_project_root ~ '/. ' ~ _copier_conf.dst_path ~ '/' ~ ts_project_root ~ '/') if (scaffold_full_project and has_typescript and ts_project_root != '' and primary_backend_language in ['typescript', 'both'] and frontend_backend_topology != 'split_service') else 'true' }}"
   # frontend/ promotion — MUST run before the _scaffold cleanup below, which is
   # why it sits here rather than with the other TS tasks. Promotes atomically
-  # (a self-contained Next.js tree), same class as the two backend roots.
+  # (a self-contained frontend tree), same class as the two backend roots.
   # Lands at frontend/ in every topology: split_service differs from single by
   # deploy config (vercel.json, the Supabase-JWT middleware.ts already in the
   # tree), not by which files render.
-  - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/frontend && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/frontend/. ' ~ _copier_conf.dst_path ~ '/frontend/') if (scaffold_full_project and include_frontend) else 'true' }}"
+  #
+  # AIT-70: one task per bundler rather than an inline conditional on the source
+  # path — validate_paths.py resolves `_scaffold/...` literals statically, and a
+  # ternary inside the path reads to it as a directory named "('frontend-vite".
+  # Both destinations are plain frontend/, so nothing downstream can tell which
+  # bundler was chosen from the path alone.
+  - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/frontend && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/frontend/. ' ~ _copier_conf.dst_path ~ '/frontend/') if (scaffold_full_project and include_frontend and frontend_bundler != 'vite') else 'true' }}"
+  - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/frontend && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/frontend-vite/. ' ~ _copier_conf.dst_path ~ '/frontend/') if (scaffold_full_project and include_frontend and frontend_bundler == 'vite') else 'true' }}"
+  # supabase/ promotion — same class as frontend/: a self-contained tree that
+  # lands at the repo root, where the Supabase CLI expects to find it.
+  - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/supabase && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/supabase/. ' ~ _copier_conf.dst_path ~ '/supabase/') if (scaffold_full_project and include_supabase_db) else 'true' }}"
   - "rm -rf {{ _copier_conf.dst_path }}/_scaffold"
   # MCP server language: python (FastMCP) and typescript (official MCP TS SDK)
   # are disjoint file trees rendered side by side, then the unchosen one is

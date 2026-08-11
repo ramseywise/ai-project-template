@@ -70,6 +70,7 @@ VAR_DEFAULTS: dict[str, str] = {
     "ts_source_root": "src",
     "lg_agent_dir": "lg_agent",
     "adk_agent_dir": "adk_agent",
+    "ts_agent_dir": "chat_agent",
     "mcp_server_slug": "my-mcp-server",
     # py_mcp_server_slug/ts_mcp_server_slug default to mcp_server_slug when the
     # matching language is chosen, else mcp_server_slug + '__unchosen_*'.

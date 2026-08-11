@@ -161,8 +161,8 @@ def module_name(path: Path, roots: list[Path]) -> str | None:
     """Dotted module name for a file, as the render's PYTHONPATH would see it.
 
     Longest matching root wins: with `backend/src` and `.` both on the path,
-    backend/src/security/guards.py is `security.guards`, not
-    `backend.src.security.guards`.
+    backend/src/guardrails/guards.py is `guardrails.guards`, not
+    `backend.src.guardrails.guards`.
     """
     best: str | None = None
     best_len = -1

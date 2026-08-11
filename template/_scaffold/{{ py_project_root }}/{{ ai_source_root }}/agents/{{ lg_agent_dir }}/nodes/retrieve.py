@@ -14,8 +14,8 @@ bug (see guardrails/README.md).
 from __future__ import annotations
 
 from core.pipelines.corpus.index import search
-from observability.spans import retrieve_span
 from guardrails.guards import filter_content
+from observability.spans import retrieve_span
 
 from ..schema import Source
 from ..settings import settings

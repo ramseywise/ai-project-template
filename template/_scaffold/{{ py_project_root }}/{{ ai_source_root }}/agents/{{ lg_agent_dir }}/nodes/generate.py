@@ -18,8 +18,8 @@ from typing import Any
 from langchain_core.tools import BaseTool
 
 from context_budget.context_budget import compact_history, should_compact, track_usage
-from observability.spans import chat_span, execute_tool_span, record_finish_reason
 from guardrails.guards import check_output, filter_content
+from observability.spans import chat_span, execute_tool_span, record_finish_reason
 
 from ..model.gateway import agenerate, get_client
 from ..model.mcp import get_mcp_tools

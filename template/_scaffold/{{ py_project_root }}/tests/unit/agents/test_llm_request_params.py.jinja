@@ -19,9 +19,9 @@ from typing import Any
 
 import pytest
 
-from agents.{{ lg_agent_dir }}.clients import llm as lg_llm
+from agents.{{ lg_agent_dir }}.model import gateway as lg_llm
 {%- if include_rag_agent %}
-from agents.rag_agent.clients import llm as rag_llm
+from agents.rag_agent.model import gateway as rag_llm
 {%- endif %}
 
 # Every sampling parameter the thinking-by-default models reject.
