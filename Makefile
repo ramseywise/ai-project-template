@@ -1,6 +1,6 @@
 include ~/.claude/Makefile.common
 
-.PHONY: help lint test new_project new_project_dev run_copier check_tools preview_defaults project
+.PHONY: help lint test test_render new_project new_project_dev run_copier check_tools preview_defaults project
 
 input_dir := .
 
@@ -14,6 +14,31 @@ lint:  ## Validate template paths, copier config, and Python lint
 test:  ## Validate paths + catalog check
 	@python3 scripts/validate_paths.py
 	@python3 scripts/validate_paths.py --catalog-check
+
+## Render the ML matrix entry to a real directory and run its pytest suite.
+## validate_paths.py's run_render_tests() renders this same combination but only
+## greps for unrendered Jinja before discarding the tree — the tests never run.
+## Every ML step's Done-when command needs a rendered tree to run inside, so this
+## target keeps the output and runs pytest in it.
+## Usage: make test_render                 (renders to a temp dir, removes it after)
+##        make test_render KEEP=1          (prints the path, leaves it in place)
+##        make test_render DST=/some/path  (renders to a path you choose, keeps it)
+##        make test_render PYTEST_ARGS="tests/unit/ml/test_transform.py -v"
+##                                         (replaces the default pytest target)
+test_render: check_tools
+	@dst="$${DST:-$$(mktemp -d -t ait_render)}"; \
+	keep="$${KEEP:-}"; [ -n "$${DST:-}" ] && keep=1; \
+	echo "rendering to $$dst"; \
+	copier copy --overwrite --defaults --trust \
+	  -d project_name=TestProject -d scaffold_full_project=true \
+	  -d primary_backend_language=python -d primary_chat_agent=lg_agent \
+	  -d include_ml=true -d include_agent_reference_library=false \
+	  -d global_skills_source=none -d enable_macos_notifications=false \
+	  $(input_dir) "$$dst" >/dev/null || { echo "render FAILED"; rm -rf "$$dst"; exit 1; }; \
+	( cd "$$dst" && uv sync --quiet && uv run pytest $${PYTEST_ARGS:-tests/unit/ml} ); \
+	rc=$$?; \
+	if [ -n "$$keep" ]; then echo "rendered tree kept at: $$dst"; else rm -rf "$$dst"; fi; \
+	exit $$rc
 
 check_tools:
 	@command -v copier >/dev/null 2>&1 || { echo "copier not found — install with: uv tool install copier"; exit 1; }
