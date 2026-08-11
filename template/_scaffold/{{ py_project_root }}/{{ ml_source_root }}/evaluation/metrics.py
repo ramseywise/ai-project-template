@@ -75,6 +75,12 @@ class ClassificationMetrics:
     prevalence: float | None = None
     n_samples: int = 0
 
+    @property
+    def brier_score(self) -> float | None:
+        """Alias for `brier`. Reports reach for the full name, and a `getattr`
+        miss returns `None` — which is indistinguishable from "not computed"."""
+        return self.brier
+
     def headline(self, imbalanced: bool = True) -> tuple[str, float | None]:
         """The metric to lead a report with. PR-AUC under imbalance, else ROC-AUC."""
         if imbalanced and self.average_precision is not None:
