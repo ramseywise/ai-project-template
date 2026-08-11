@@ -54,7 +54,14 @@ const mocks = vi.hoisted(() => {
   const captured: { opts: Record<string, unknown> } = { opts: {} };
   return {
     captured,
-    startChatSpan: vi.fn(() => ({ end: vi.fn() })),
+    // The parameter lists here are not decoration: vi.fn(() => …) types its
+    // `mock.calls` as `[]`, so the argument assertions below cannot index into
+    // call[0]. Declaring what agent.ts actually passes is what makes
+    // `calls[0][0]` well-typed — and it documents the call contract each of
+    // these wiring tests exists to pin.
+    startChatSpan: vi.fn((_usage: { inputTokens: number; outputTokens: number }) => ({
+      end: vi.fn(),
+    })),
     recordOutput,
     recordToolCall,
     createStallDetector: vi.fn(() => ({
@@ -62,11 +69,12 @@ const mocks = vi.hoisted(() => {
       recordToolCall,
       reset: vi.fn(),
     })),
-    trackUsage: vi.fn(() => ({
+    trackUsage: vi.fn((_usage: { promptTokens: number; completionTokens: number }) => ({
       totalInput: 10, totalOutput: 5, system: 0, history: 0, tools: 0, scratch: 10, utilisationPct: 0.1,
     })),
     shouldCompact: vi.fn(() => false),
     wrapToolsWithSpans: vi.fn((t: unknown) => t),
+    wrapToolsWithContentFilter: vi.fn((t: unknown) => t),
     streamText: vi.fn((opts: Record<string, unknown>) => {
       captured.opts = opts;
       return { toUIMessageStreamResponse: vi.fn() };
@@ -99,6 +107,10 @@ vi.mock("../tools/index.js", () => ({
 
 vi.mock("../../../observability/traceTools.js", () => ({
   wrapToolsWithSpans: mocks.wrapToolsWithSpans,
+}));
+
+vi.mock("../../../guardrails/tools.js", () => ({
+  wrapToolsWithContentFilter: mocks.wrapToolsWithContentFilter,
 }));
 
 vi.mock("../../../observability/tracing.js", () => ({
@@ -164,7 +176,7 @@ describe("agent.ts wiring — tracing (chat span)", () => {
     mocks.startChatSpan.mockClear();
     await invokeCallbacks();
     expect(mocks.startChatSpan).toHaveBeenCalledTimes(1);
-    const arg = mocks.startChatSpan.mock.calls[0][0] as { inputTokens: number; outputTokens: number };
+    const arg = mocks.startChatSpan.mock.calls[0][0];
     expect(arg.inputTokens).toBe(10);
     expect(arg.outputTokens).toBe(5);
   });
@@ -179,6 +191,34 @@ describe("agent.ts wiring — traceTools (execute_tool span)", () => {
     // Duration / error-marking proof lives in traceTools.test.ts which exercises
     // the real implementation with a controlled span mock.
     expect(mocks.wrapToolsWithSpans).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("agent.ts wiring — guard layer 2 (tool-result content filter)", () => {
+  // AIT-70: until this test existed, agent.ts imported
+  // wrapToolsWithContentFilter and never called it. The import survived review
+  // because the module header documented the wiring, and guardrails' own suite
+  // passed because it exercises the wrapper directly — so the one guard against
+  // indirect prompt injection was tested, documented, and not running. A
+  // no-unused-vars warning was the only signal.
+  it("wrapToolsWithContentFilter is called by runAgent", () => {
+    mocks.wrapToolsWithContentFilter.mockClear();
+    runAgent([]);
+    expect(mocks.wrapToolsWithContentFilter).toHaveBeenCalledTimes(1);
+  });
+
+  it("the span wrapper encloses the filter, not the other way round", () => {
+    // FAILS IF: the two wrappers are swapped in agent.ts. Span-outside is what
+    // makes execute_tool's duration cover the filtering work and marks the span
+    // is_error when the filter throws; filter-outside would report the tool as
+    // fast and clean while the filter was still running.
+    mocks.wrapToolsWithSpans.mockClear();
+    mocks.wrapToolsWithContentFilter.mockClear();
+    runAgent([]);
+
+    const filterOrder = mocks.wrapToolsWithContentFilter.mock.invocationCallOrder[0];
+    const spanOrder = mocks.wrapToolsWithSpans.mock.invocationCallOrder[0];
+    expect(filterOrder).toBeLessThan(spanOrder);
   });
 });
 
@@ -201,7 +241,7 @@ describe("agent.ts wiring — context budget", () => {
     mocks.trackUsage.mockClear();
     await invokeCallbacks();
     expect(mocks.trackUsage).toHaveBeenCalledTimes(1);
-    const arg = mocks.trackUsage.mock.calls[0][0] as { promptTokens: number; completionTokens: number };
+    const arg = mocks.trackUsage.mock.calls[0][0];
     expect(arg.promptTokens).toBe(10);
     expect(arg.completionTokens).toBe(5);
   });

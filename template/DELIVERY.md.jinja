@@ -28,7 +28,6 @@ G2 (per the lifecycle schema in `LIFECYCLE.md`). Each row below is the evidence
 |---|---|
 | `eval_gate_green` | `make eval-gate` passes against `{{ eval_root }}/targets.yaml`, incl. the margin-over-naive-baseline row. Last run: <!-- date + result --> |
 | `security_review_clean` | `/security-review` run for the shipping commit, no unresolved findings. Artifact: <!-- link --> |
-| `sanyi_audit_clean` | `/sanyi audit` passes — no cross-layer contract violations in what's shipping. |
 | `deployment_target_resolved` | DESIGN.md's deployment decision is `Resolved` (`{{ deployment_target }}`), not Open/Deferred. |
 | `runbook_monitoring_documented` | `DEPLOYMENT.md` Rollout/Rollback/Monitoring sections filled + DESIGN.md operator-model row set. |
 
@@ -54,10 +53,6 @@ discussed** — grow the golden set, run `make eval-heuristic` / `eval-grade` /
 - **Golden set:** <!-- size, how curated, what it covers -->
 - **Gate result:** <!-- the `make eval-gate` scoreboard at G2 — metric vs. target per row -->
 - **Margin over naive baseline:** <!-- the number that justifies the AI over the DESIGN.md baseline -->
-
-<!-- SANYI note: the threshold VALUES here are 变易 (tune freely in targets.yaml,
-     no deploy). "The eval gate runs before release" is 不易 — enforced in CI,
-     recorded in SANYI.md. -->
 
 ---
 
@@ -97,9 +92,9 @@ deployment.
   finding) keeps `phase` at `delivery`; a post-launch rollback returns
   deployment *to* delivery. `/gate-check` re-audits rather than assuming forward
   progress — that's normal, not a failure.
-- Layered onto an existing repo? Template-owned G2 checks (eval-gate, sanyi) may
+- Layered onto an existing repo? Template-owned G2 checks (eval-gate) may
   be inapplicable — `/gate-check` marks them `true` with a note rather than
   blocking on machinery the project never adopted. Record that here too.
-- The invariant (不易): **nothing advances to deployment without the eval gate
-  green and the handoff above filled.** Every number and threshold is 变易 —
-  tune per project.
+- The invariant: **nothing advances to deployment without the eval gate
+  green and the handoff above filled.** Every number and threshold is tunable
+  per project.

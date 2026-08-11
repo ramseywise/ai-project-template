@@ -10,7 +10,7 @@ rollback criteria, the A/B decision procedure, and the alert checklist. Keep it
 current — a stale runbook is worse than none.
 
 > **Gate G2 must be green before deployment.** Run `/deploy-check` — it audits
-> G2 readiness (eval-gate, security review, sanyi audit, deployment-target
+> G2 readiness (eval-gate, security review, deployment-target
 > decision, this runbook) and reports what's missing. It does **not** write
 > `LIFECYCLE.md` — only `/gate-check` does; `/deploy-check` is the launch-day
 > pre-flight, `/gate-check` is the recorded verdict.
@@ -26,7 +26,6 @@ schema in `LIFECYCLE.md`):
 |---|---|
 | `eval_gate_green` | `{{ eval_root }}/targets.yaml` has ≥1 **activated** (uncommented) target — a fully-commented file passes `make eval-gate` vacuously (CI/CD only WARNs on it so canary iteration isn't blocked; readiness holds the real line). Then `make eval-gate` passes against those targets, including the margin-over-naive-baseline row. |
 | `security_review_clean` | `/security-review` run for the shipping commit, no unresolved findings. |
-| `sanyi_audit_clean` | `/sanyi audit` passes — no cross-layer contract violations in what's shipping. |
 | `deployment_target_resolved` | DESIGN.md's deployment decision is `Resolved` (this project: `{{ deployment_target }}`), not Open/Deferred. |
 | `runbook_monitoring_documented` | This file's Rollout, Rollback, and Monitoring sections are filled — not placeholders. |
 

@@ -62,16 +62,8 @@ _message_after_copy: >+
   {%- if include_mcp_server %}
   - MCP server: `cd mcp_servers/{{ mcp_server_slug }} && {% if mcp_server_language == "typescript" %}npm install{% else %}uv sync{% endif %}`.
   {%- endif %}
-  {%- if include_akira %}
-  - Run the `/akira` skill (Claude Code) for a proactive quality scan once you have real code to scan.
-  {%- endif %}
   {%- if include_dev_companion %}
   - `.claude/docs/companion/collaboration.md` starts blank — /grow-companion fills it in as real sessions happen.
-  {%- endif %}
-  {%- if scaffold_full_project %}
-  - Review the seeded SANYI.md (change contract) — Jianyi/Bianyi entries are pre-filled from your answers; complete the 不易 Buyi interview with `/sanyi init` before the first review run.
-  {%- else %}
-  - Run `/sanyi init` to define this project's change-contract (变易/简易/不易 layers) now that its shape is set.
   {%- endif %}
 
 _message_after_update: >+
@@ -409,8 +401,7 @@ primary_chat_agent:
     framework(s) of the user-facing chat agent — the agent itself is named by
     the next question (agent_slug), not after the framework. A new project
     needs one working example (lg_agent by default); the other framework is a
-    `copier update -d primary_chat_agent=…` away. akira (quality scanning) is
-    a .claude skill + agent, not product source. "none" means no prebuilt
+    `copier update -d primary_chat_agent=…` away. "none" means no prebuilt
     chat agent — build your own.
   choices:
     lg_agent: "lg_agent"
@@ -451,7 +442,7 @@ agent_slug:
     {% if not (agent_slug | regex_search('^[a-z][a-z0-9_]*$')) %}agent_slug
     must be a lowercase Python identifier (letters/digits/underscores, letter
     first){% endif %}{% if agent_slug in ['rag_agent', 'lg_agent', 'adk_agent',
-    'akira', 'agents', 'core', 'tests'] %} agent_slug '{{ agent_slug }}' is
+    'agents', 'core', 'tests'] %} agent_slug '{{ agent_slug }}' is
     reserved{% endif %}
   # A3: no longer asked at genesis — the single chat example is named `assistant`
   # by default; rename it with -d agent_slug=<name> (validator still enforced).
@@ -882,13 +873,12 @@ optional_features:
   type: str
   multiselect: true
   help: >-
-    Optional add-ons. Defaults are seeded from your Phase-1 answers — akira
-    and the dev companion are on by default; integrations implied by your
-    external-systems answer are pre-selected; everything else is off.
+    Optional add-ons. Defaults are seeded from your Phase-1 answers — the dev
+    companion is on by default; integrations implied by your external-systems
+    answer are pre-selected; everything else is off.
     (Calendar isn't listed here — selecting Calendar in external systems
     already scaffolds the Google Calendar client.)
   choices:
-    "akira — proactive quality scans (.claude skill + vendored akira-scan agent)": akira
     "dev companion — living how-we-work doc + /dream maintenance audits": dev_companion
     "promptfoo — config-driven HTTP eval harness alongside the Python evals": promptfoo
     "ragas — LLM-judge eval grader (KNOWN ISSUE: ragas 0.4.3 import bug upstream, degrades gracefully, no real scores until fixed)": ragas
@@ -898,9 +888,9 @@ optional_features:
     "n8n webhook — HMAC-verified inbound receiver (POST /webhooks/n8n)": n8n_webhook
     "composio — third-party app actions (Gmail/Slack/GitHub, hundreds more)": composio
     "ml — classical ML/stats toolkit (regression, time-series, A/B, clustering)": ml
-  default: "['akira', 'dev_companion'{% if 'web' in external_systems %}, 'web_research'{% endif %}{% if 'slack' in external_systems or 'github' in external_systems or 'email' in external_systems or 'google_workspace' in external_systems %}, 'composio'{% endif %}{% if project_type == 'workflow' %}, 'n8n_webhook'{% endif %}{% if project_type == 'eval_suite' %}, 'promptfoo'{% endif %}]"
+  default: "['dev_companion'{% if 'web' in external_systems %}, 'web_research'{% endif %}{% if 'slack' in external_systems or 'github' in external_systems or 'email' in external_systems or 'google_workspace' in external_systems %}, 'composio'{% endif %}{% if project_type == 'workflow' %}, 'n8n_webhook'{% endif %}{% if project_type == 'eval_suite' %}, 'promptfoo'{% endif %}]"
   # A3 (F4): optional integrations are mid-project capabilities, not a genesis
-  # menu — the shape-derived default (akira + dev_companion, plus integrations
+  # menu — the shape-derived default (dev_companion, plus integrations
   # implied by external_systems/shape) is applied silently; add more later with
   # -d optional_features=[…] or the /add-integration path. Still overridable.
   when: false
@@ -973,11 +963,6 @@ eval_metrics:
 # Both gated on scaffold_full_project: optional_features is skipped in
 # layering-only mode but still computes its full default list, which would
 # otherwise flip these on in an existing repo that never asked for them.
-include_akira:
-  type: bool
-  default: "{{ scaffold_full_project and 'akira' in optional_features }}"
-  when: false
-
 include_dev_companion:
   type: bool
   default: "{{ scaffold_full_project and 'dev_companion' in optional_features }}"
@@ -1285,24 +1270,20 @@ _tasks:
     _copier_conf.dst_path ~ '/.claude/skills/design-initiative ' ~
     _copier_conf.dst_path ~ '/.claude/skills/design-milestones ' ~
     _copier_conf.dst_path ~ '/.claude/skills/design-prototype ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/akira ' ~
     _copier_conf.dst_path ~ '/.claude/skills/review-shared ' ~
     _copier_conf.dst_path ~ '/.claude/skills/docs-check ' ~
     _copier_conf.dst_path ~ '/.claude/skills/github-projects ' ~
     _copier_conf.dst_path ~ '/.claude/skills/mcp-builder ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/skill-creator ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/sanyi' }}
-  # akira is .claude-only (vendored skill + akira-scan agent definition) — no
-  # product source. Guarded on include_* alone (not `(not scaffold_full_project)
-  # or ...`): these skills/docs live under .claude/, which layering-only mode
-  # DOES ship, so the removal must fire there too when the toggles are off —
-  # unlike the _scaffold/ cleanups below, which layering mode discards
-  # wholesale anyway.
-  - "{{ 'true' if include_akira else 'rm -rf ' ~ _copier_conf.dst_path ~ '/.claude/skills/akira ' ~ _copier_conf.dst_path ~ '/.claude/agents/akira-scan.md ' ~ _copier_conf.dst_path ~ '/.claude/agents/akira-wander.md' }}"
+    _copier_conf.dst_path ~ '/.claude/skills/skill-creator' }}
+  # dev_companion is .claude-only and guarded on include_* alone (not
+  # `(not scaffold_full_project) or ...`): it lives under .claude/, which
+  # layering-only mode DOES ship, so the removal must fire there too when the
+  # toggle is off — unlike the _scaffold/ cleanups below, which layering mode
+  # discards wholesale anyway.
   - "{{ 'true' if include_dev_companion else 'rm -rf ' ~ _copier_conf.dst_path ~ '/.claude/docs/companion' }}"
   # integrations/ sub-modules are independently removable — a blanket rm -rf tied
   # to one toggle would also delete modules gated by the OTHER toggles below.
-  # Same staging-path caveat as akira/dream above — integrations/ is staged
+  # Same staging-path caveat as dev_companion above — integrations/ is staged
   # under _scaffold/{{ py_project_root }}/{{ ai_source_root }}, only moved into place by the big mv task
   # when scaffold_full_project=true.
   - "{{ 'true' if (not scaffold_full_project) or include_n8n_webhook else 'rm -f ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/integrations/n8n_webhook.py' }}"
@@ -1383,8 +1364,8 @@ _tasks:
   - "{{ 'true' if (not scaffold_full_project) or include_composio else 'rm -f ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/integrations/composio.py' }}"
   - "{{ 'true' if (not scaffold_full_project) or include_web_research else 'rm -f ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/integrations/web_research.py' }}"
   # The chat-agent trees are staged under _scaffold/ at their rendered
-  # {{ lg_agent_dir }}/{{ adk_agent_dir }} names (same reasoning as the akira
-  # cleanup above) — when a framework isn't chosen its dir var falls back to
+  # {{ lg_agent_dir }}/{{ adk_agent_dir }} names (same reasoning as the
+  # cleanups above) — when a framework isn't chosen its dir var falls back to
   # the framework name and the tree is removed here. 'none' removes both,
   # leaving rag_agent (shared retrieval infra for the MCP tool, if included)
   # as the sole example agent.
@@ -1424,7 +1405,7 @@ _tasks:
   - "{{ 'true' if (not scaffold_full_project) or (is_agent_shaped and primary_chat_agent in ['lg_agent', 'both']) else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/context_budget' }}"
   # ml/ (classical ML/stats toolkit) is staged under _scaffold/ like the
   # other optional full-project-tier content — removed from staging (not the
-  # final path) if not requested, same reasoning as the akira/lg_agent cleanup above.
+  # final path) if not requested, same reasoning as the lg_agent cleanup above.
   - "{{ 'true' if (not scaffold_full_project) or include_ml else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ml_source_root ~ ' ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/unit/ml' }}"
   # experiments/ (run registry) is staged the same way — removed from staging
   # when not requested, same reasoning as ml/ above. NOT gated on include_ml:
@@ -1440,7 +1421,8 @@ _tasks:
   # Guarded on the positive condition (not `(not scaffold_full_project) or ...`):
   # ts_lint.sh expects the scaffolded TS backend, which only exists when a full
   # scaffold picked a TS language — layering mode must remove it like any other
-  # .claude/ file whose target doesn't exist (same guard class as akira above).
+  # .claude/ file whose target doesn't exist (same guard class as the
+  # dev_companion removal above).
   - "{{ 'true' if (scaffold_full_project and primary_backend_language in ['typescript', 'both']) else 'rm -f ' ~ _copier_conf.dst_path ~ '/.claude/hooks/ts_lint.sh' }}"
   # Vercel AI SDK agent/ subtree is staged under _scaffold/<ts_project_root>/<ts_source_root>/agent
   # (same staging convention as the Python agents above) — remove it before the
@@ -1533,7 +1515,6 @@ _tasks:
     ~ _copier_conf.dst_path ~ '/_scaffold/.pre-commit-config.yaml '
     ~ _copier_conf.dst_path ~ '/_scaffold/renovate.json '
     ~ _copier_conf.dst_path ~ '/_scaffold/.env.example '
-    ~ _copier_conf.dst_path ~ '/_scaffold/SANYI.md '
     ~ _copier_conf.dst_path ~ '/_scaffold/project_init.sh '
     ~ _copier_conf.dst_path ~ '/') if scaffold_full_project else 'true' }}
   # README.md is the project's own doc — never clobber an existing one on

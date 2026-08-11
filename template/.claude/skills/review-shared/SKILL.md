@@ -9,8 +9,8 @@ allowed-tools: Read
 
 # Review Shared
 
-Shared review infrastructure consumed by orchestrators (`/code-review`, `/workflow-review`) and
-agents (`akira-scan`, `akira-wander`) via `skills: [review-shared]` in their frontmatter.
+Shared review infrastructure consumed by orchestrators (`/code-review`, `/workflow-review`)
+and the configured review reporters via `skills: [review-shared]` in their frontmatter.
 This skill is read-only knowledge — it never acts, only informs.
 
 ## Evidence classification

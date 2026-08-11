@@ -18,6 +18,7 @@
 
 import { vi, describe, it, expect } from "vitest";
 
+import { asToolSet, executeOf } from "../../testing/toolStubs.js";
 import { wrapToolsWithSpans } from "../traceTools.js";
 
 // ---------------------------------------------------------------------------
@@ -80,8 +81,8 @@ describe("wrapToolsWithSpans — execute_tool span", () => {
       },
     };
 
-    const wrapped = wrapToolsWithSpans({ slow: slowTool });
-    await (wrapped.slow as { execute: () => Promise<unknown> }).execute();
+    const wrapped = wrapToolsWithSpans(asToolSet({ slow: slowTool }));
+    await executeOf(wrapped.slow)();
 
     expect(spanCreatedAt).toBeLessThan(executeStartedAt);
     expect(span.endedAt).toBeGreaterThan(executeEndedAt);
@@ -100,10 +101,8 @@ describe("wrapToolsWithSpans — execute_tool span", () => {
       execute: async () => { throw new Error("tool-failure"); },
     };
 
-    const wrapped = wrapToolsWithSpans({ fail: failingTool });
-    await expect(
-      (wrapped.fail as { execute: () => Promise<unknown> }).execute(),
-    ).rejects.toThrow("tool-failure");
+    const wrapped = wrapToolsWithSpans(asToolSet({ fail: failingTool }));
+    await expect(executeOf(wrapped.fail)()).rejects.toThrow("tool-failure");
 
     // finally block must always run — span must end
     expect(span.end).toHaveBeenCalledTimes(1);
@@ -117,7 +116,7 @@ describe("wrapToolsWithSpans — execute_tool span", () => {
   it("tools without execute are passed through unchanged", () => {
     mocks.startExecuteToolSpan.mockClear();
     const noExec = { description: "no execute", inputSchema: {} };
-    const wrapped = wrapToolsWithSpans({ noExec });
+    const wrapped = wrapToolsWithSpans(asToolSet({ noExec }));
     // No execute to wrap — object reference is preserved
     expect(wrapped.noExec).toEqual(noExec);
     expect(mocks.startExecuteToolSpan).not.toHaveBeenCalled();
