@@ -74,7 +74,9 @@ export interface VerificationResult {
  * Consumes the stream and returns the concatenated text.
  */
 async function collectStream(
-  stream: ReturnType<typeof runAgent>,
+  // runAgent is async since AI SDK v7, so ReturnType<typeof runAgent> is a
+  // Promise — Awaited<> unwraps it to the StreamTextResult this consumes.
+  stream: Awaited<ReturnType<typeof runAgent>>,
 ): Promise<string> {
   let text = "";
   for await (const chunk of stream.textStream) {
@@ -121,7 +123,7 @@ export async function runWithVerification(
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     stallDetector?.reset();
 
-    const stream = runAgent(currentMessages);
+    const stream = await runAgent(currentMessages);
     const answer = await collectStream(stream);
 
     if (!grader) {

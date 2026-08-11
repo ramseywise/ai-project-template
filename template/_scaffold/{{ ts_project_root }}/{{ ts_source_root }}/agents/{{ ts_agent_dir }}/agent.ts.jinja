@@ -28,7 +28,14 @@
  *                         stateless per request (see contextBudget.ts comment)
  */
 
-import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from "ai";
+import {
+  convertToModelMessages,
+  stepCountIs,
+  streamText,
+  type StreamTextResult,
+  type ToolSet,
+  type UIMessage,
+} from "ai";
 import { getModel } from "../../model/gateway.js";
 import { settings } from "./settings.js";
 import { tools } from "./tools/index.js";
@@ -40,13 +47,25 @@ import { trackUsage, shouldCompact } from "./contextBudget.js";
 
 const SYSTEM_PROMPT = "You are a helpful assistant for {{ project_name }}.";
 
-export function runAgent(messages: UIMessage[]) {
+// `async` since AI SDK v7: convertToModelMessages returns a promise there, and
+// streamText's `messages` is typed Array<ModelMessage> — it does not await a
+// promise passed in its place. So the await has to happen here, which makes
+// every caller await runAgent (api/handler.ts, verificationLoop.ts, tests).
+// The return type is written out rather than inferred: tsconfig sets
+// `declaration: true`, and the inferred type mentions an `Output` type the AI
+// SDK does not export, which fails the .d.ts emit (TS4058). The type parameters
+// are <TOOLS, RUNTIME_CONTEXT, OUTPUT>; RUNTIME_CONTEXT is `any` because this
+// call passes no runtime context and streamText infers it as such.
+export async function runAgent(
+  messages: UIMessage[],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<StreamTextResult<ToolSet, any, never>> {
   const stallDetector = createStallDetector();
 
   return streamText({
     model: getModel(),
     system: SYSTEM_PROMPT,
-    messages: convertToModelMessages(messages),
+    messages: await convertToModelMessages(messages),
     // Both tool wrappers compose here, innermost first:
     //   wrapToolsWithContentFilter — guard layer 2, scrubs injection text out of
     //     every tool result before it re-enters the prompt (see guardrails/tools.ts)

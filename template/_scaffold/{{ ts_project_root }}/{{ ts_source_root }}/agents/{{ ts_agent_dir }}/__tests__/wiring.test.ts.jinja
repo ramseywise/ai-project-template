@@ -89,7 +89,9 @@ const mocks = vi.hoisted(() => {
 vi.mock("ai", () => ({
   // Only stub the symbols agent.ts imports from "ai"
   streamText: mocks.streamText,
-  convertToModelMessages: vi.fn(() => []),
+  // async in AI SDK v7 — the stub must return a promise or agent.ts's `await`
+  // resolves to undefined and streamText receives no messages.
+  convertToModelMessages: vi.fn(async () => []),
   stepCountIs: vi.fn(() => () => false),
 }));
 
@@ -142,7 +144,7 @@ vi.mock("../contextBudget.js", () => ({
 
 async function invokeCallbacks() {
   mocks.captured.opts = {};
-  runAgent([]);
+  await runAgent([]);
   if (typeof mocks.captured.opts["onStepFinish"] === "function") {
     await (mocks.captured.opts["onStepFinish"] as (s: unknown) => Promise<void>)(SYNTHETIC_STEP);
   }
@@ -156,14 +158,14 @@ async function invokeCallbacks() {
 // ---------------------------------------------------------------------------
 
 describe("agent.ts — request params", () => {
-  it("sends no sampling params: they 400 on thinking-by-default models", () => {
+  it("sends no sampling params: they 400 on thinking-by-default models", async () => {
     // Claude Opus 5, Fable 5, Opus 4.8/4.7 and Sonnet 5 reject
     // temperature/top_p/top_k with a 400. The default model (Haiku 4.5) still
     // accepts them, so this only breaks once TS_AGENT_MODEL points at a current
     // model — a runtime-only failure no linter catches. Re-add
     // `temperature: settings.generationTemperature` to agent.ts and this fails.
     mocks.captured.opts = {};
-    runAgent([]);
+    await runAgent([]);
 
     for (const param of ["temperature", "topP", "topK"]) {
       expect(mocks.captured.opts).not.toHaveProperty(param);
@@ -185,7 +187,7 @@ describe("agent.ts wiring — tracing (chat span)", () => {
 describe("agent.ts wiring — traceTools (execute_tool span)", () => {
   it("wrapToolsWithSpans is called by runAgent so tool spans bracket real execution", async () => {
     mocks.wrapToolsWithSpans.mockClear();
-    runAgent([]);
+    await runAgent([]);
     // agent.ts must call wrapToolsWithSpans(tools) — if the call is removed the
     // mock is never invoked and this assertion fails.
     // Duration / error-marking proof lives in traceTools.test.ts which exercises
@@ -201,20 +203,20 @@ describe("agent.ts wiring — guard layer 2 (tool-result content filter)", () =>
   // passed because it exercises the wrapper directly — so the one guard against
   // indirect prompt injection was tested, documented, and not running. A
   // no-unused-vars warning was the only signal.
-  it("wrapToolsWithContentFilter is called by runAgent", () => {
+  it("wrapToolsWithContentFilter is called by runAgent", async () => {
     mocks.wrapToolsWithContentFilter.mockClear();
-    runAgent([]);
+    await runAgent([]);
     expect(mocks.wrapToolsWithContentFilter).toHaveBeenCalledTimes(1);
   });
 
-  it("the span wrapper encloses the filter, not the other way round", () => {
+  it("the span wrapper encloses the filter, not the other way round", async () => {
     // FAILS IF: the two wrappers are swapped in agent.ts. Span-outside is what
     // makes execute_tool's duration cover the filtering work and marks the span
     // is_error when the filter throws; filter-outside would report the tool as
     // fast and clean while the filter was still running.
     mocks.wrapToolsWithSpans.mockClear();
     mocks.wrapToolsWithContentFilter.mockClear();
-    runAgent([]);
+    await runAgent([]);
 
     const filterOrder = mocks.wrapToolsWithContentFilter.mock.invocationCallOrder[0];
     const spanOrder = mocks.wrapToolsWithSpans.mock.invocationCallOrder[0];

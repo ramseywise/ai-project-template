@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+
 from evals.generation.cases import load_case_rows
 from evals.generation.metrics import compute_metrics, is_grounded
 from evals.generation.runner import ProducerOutcome, run_all, run_case

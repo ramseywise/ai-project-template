@@ -50,7 +50,7 @@ export async function chatHandler(req: Request): Promise<Response> {
     return Response.json({ error: inbound.text }, { status: 400 });
   }
 
-  const result = runAgent(body.messages);
+  const result = await runAgent(body.messages);
   const response = result.toUIMessageStreamResponse();
 
   // Layer 3 — scrub in transit. A null body (never expected here) is passed
