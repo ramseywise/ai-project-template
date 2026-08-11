@@ -385,6 +385,11 @@ ml_source_root:
   default: ml
   when: false
 
+run_registry_root:
+  type: str
+  default: experiments
+  when: false
+
 # ─── Phase 2 — Architecture (A3: derived from Phase 1, -d-only, never asked) ─
 # These were interview questions; A3 (F4) made them `when: false` — the shape
 # example is derived from project_type and each component is a deferred
@@ -958,6 +963,16 @@ include_ml:
   # optional_features expression, kept verbatim.
   when: false
 
+# The run registry (experiments/) is a top-level shared root, not an
+# ml_source_root subtree — AI evals consume the same record shape (see
+# experiments/record.py), so this does NOT gate on include_ml. Default is
+# "on whenever a full scaffold happens", same posture as eval_root, which
+# has no off-switch of its own either.
+include_run_registry:
+  type: bool
+  default: "{{ scaffold_full_project }}"
+  when: false
+
 # LLM tracing provider for backend/src/observability/ (step 3′). Agentic-only:
 # an ml-only project has no LLM calls to trace, so the subtree is removed in
 # _tasks when is_agent_shaped is false and this collapses to 'none'.
@@ -1119,7 +1134,7 @@ eval_root:
 
 eval_allowed_dirs:
   type: str
-  default: graders metrics pipelines reports utils
+  default: generation graders metrics pipelines reports utils
   when: false
 
 # Canonical eval-suite directory-layout enforcement — only meaningful for
@@ -1342,6 +1357,10 @@ _tasks:
   # other optional full-project-tier content — removed from staging (not the
   # final path) if not requested, same reasoning as the akira/lg_agent cleanup above.
   - "{{ 'true' if (not scaffold_full_project) or include_ml else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ml_source_root ~ ' ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/unit/ml' }}"
+  # experiments/ (run registry) is staged the same way — removed from staging
+  # when not requested, same reasoning as ml/ above. NOT gated on include_ml:
+  # this root is shared with AI evals, not ML-only.
+  - "{{ 'true' if (not scaffold_full_project) or include_run_registry else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ run_registry_root ~ ' ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/unit/' ~ run_registry_root }}"
   - "{{ 'true' if has_typescript else 'rm -f ' ~ _copier_conf.dst_path ~ '/.claude/hooks/ts_quality.sh ' ~ _copier_conf.dst_path ~ '/.claude/hooks/ts_typecheck.sh' }}"
   # ts_lint.sh is the real eslint-equivalent of ts_quality.sh's ad-hoc pattern
   # checks — only meaningful when a real TS backend is actually scaffolded
@@ -1476,6 +1495,14 @@ _tasks:
   # lands beside the AI source root (backend/ml/ by default) — a sibling of
   # <ai_source_root>, not nested inside it.
   - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/' ~ py_project_root ~ '/' ~ ml_source_root ~ ' && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ml_source_root ~ '/. ' ~ _copier_conf.dst_path ~ '/' ~ py_project_root ~ '/' ~ ml_source_root ~ '/') if (scaffold_full_project and include_ml and py_project_root != '' and primary_backend_language in ['python', 'both']) else 'true' }}"
+  # Separate merge (not part of the block above) — same reasoning as the ml/
+  # merge immediately above: the experiments/ cleanup task rm -rf's the whole
+  # staged directory when include_run_registry is false, so it may not exist
+  # at all. Staged at _scaffold/<py_project_root>/<run_registry_root>/ and
+  # lands beside the AI source root — a sibling of <ai_source_root> and
+  # <ml_source_root>, not nested inside either (top-level shared root, not
+  # ML-only — see include_run_registry above).
+  - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/' ~ py_project_root ~ '/' ~ run_registry_root ~ ' && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ run_registry_root ~ '/. ' ~ _copier_conf.dst_path ~ '/' ~ py_project_root ~ '/' ~ run_registry_root ~ '/') if (scaffold_full_project and include_run_registry and py_project_root != '' and primary_backend_language in ['python', 'both']) else 'true' }}"
   # scripts/ — Python repo tooling (check_imports.py, the AIT-51 unimported-module
   # guard). Separate merge, not part of the block above: it only belongs in a render
   # with a Python backend, mirroring the ai_source_root merge's own condition. A
