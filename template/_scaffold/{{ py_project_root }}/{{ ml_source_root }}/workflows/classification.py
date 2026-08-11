@@ -34,7 +34,7 @@ from sklearn.model_selection import cross_val_predict
 
 from ml.evaluation.calibration import assess_calibration, calibrate_classifier, recommend_method
 from ml.evaluation.metrics import classification_metrics, pr_curve, roc_curve_points
-from ml.evaluation.splitting import RANDOM_STATE, SplitPlan, make_splitter
+from ml.evaluation.splitting import RANDOM_STATE, SplitPlan, make_splitter, split_columns
 from ml.evaluation.threshold import choose_threshold
 from ml.sampling.resample import build_sampler
 from ml.selection.registry import get_models, get_spec
@@ -80,7 +80,12 @@ def run_classification(
     if target not in df.columns:
         raise KeyError(f"target {target!r} is not a column in the frame: {list(df.columns)}")
 
-    plan = infer_column_types(df, target=target)
+    # The group and time columns are split metadata: they steer the folds and
+    # must not reach the feature matrix. A group column is entity identity —
+    # near-unique, so it would land in `high_cardinality` and be target-encoded,
+    # which is the label leaking back in through the grouping contract.
+    split_cols = [c for c in split_columns(splitter, group_col, time_col) if c in df.columns]
+    plan = infer_column_types(df, target=target, exclude=split_cols)
     features = list(plan.features)
     if not features:
         raise ValueError(
@@ -134,6 +139,7 @@ def run_classification(
                 transformer=transformer,
                 x=x,
                 y=y,
+                frame=df,
                 split_plan=split_plan,
                 sampling=sampling,
                 plan=plan,
@@ -177,6 +183,7 @@ def _fit_one(
     transformer: Any,
     x: pd.DataFrame,
     y: pd.Series,
+    frame: pd.DataFrame,
     split_plan: SplitPlan,
     sampling: str,
     plan: Any,
@@ -198,7 +205,10 @@ def _fit_one(
     # estimator across calls would make the second run's "fresh" model stale.
     pipeline = build_pipeline(clone(transformer), clone(estimator), sampler=sampler)
 
-    cv = list(split_plan.split(x, y))
+    # `frame=` so the splitter reads its group/time columns from the source frame;
+    # `x` no longer carries them. The yielded indices are positional and the two
+    # frames share row order, so they stay valid against `x`.
+    cv = list(split_plan.split(x, y, frame=frame))
     y_pred = cross_val_predict(pipeline, x, y, cv=cv, method="predict")
 
     y_prob = None
@@ -233,12 +243,17 @@ def _fit_one(
             )
 
         if cost_fp is not None and cost_fn is not None:
+            # `y_prob` is out-of-fold, so the probabilities are honest — but the
+            # threshold is still chosen by minimising cost over these same rows
+            # and then scored at that point. The selection is in-sample even
+            # though the predictions are not, so the result says so.
             threshold = choose_threshold(
                 y,
                 y_prob,
                 cost_fp=cost_fp,
                 cost_fn=cost_fn,
                 positive_label=positive_label,
+                in_sample=True,
             )
 
     # Fit on the full frame last: the metrics above are out-of-fold, and the

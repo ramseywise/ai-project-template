@@ -34,6 +34,15 @@ from ml.transform.columns import ColumnPlan
 
 Metrics = ClassificationMetrics | RegressionMetrics | ClusteringMetrics
 
+DEFAULT_TIE_TOLERANCE = 0.005
+"""Headline-metric margin below which a model and the baseline are called a tie.
+
+Half a point of PR-AUC or R² is comfortably inside the fold-to-fold spread of a
+5-fold comparison on a few thousand rows, so a smaller gap is not evidence of a
+better model. Deliberately a named constant rather than a magic number: a project
+whose metric is tighter or noisier than that should override it at the call site
+and be able to point at what it changed."""
+
 
 @dataclass
 class ModelResult:
@@ -88,17 +97,43 @@ class RunResult:
         return next((m for m in self.models if m.is_baseline), None)
 
     @property
-    def beats_baseline(self) -> bool | None:
-        """Whether the best model actually improves on the baseline.
+    def baseline_margin(self) -> float | None:
+        """Headline score of the best model minus the baseline's.
 
-        `None` when there is no baseline to compare against. The question is worth
-        asking explicitly: a gradient-boosted ensemble that ties logistic
-        regression is a result, and usually the wrong model to ship.
+        `None` when there is nothing to compare. Exposed alongside the verdict
+        because the size of the gap is the part a reader can actually judge — a
+        boolean hides whether the win was 0.30 or 0.0002.
         """
         best, base = self.best, self.baseline
         if best is None or base is None or best is base:
             return None
-        return _score(best) > _score(base)
+        return _score(best) - _score(base)
+
+    def beats_baseline(self, tolerance: float = DEFAULT_TIE_TOLERANCE) -> bool | None:
+        """Whether the best model improves on the baseline by more than `tolerance`.
+
+        `None` when there is no baseline to compare against, **and also** when the
+        margin falls inside the band — a near-tie is not a `False` (the baseline
+        did not win either), it is the absence of a verdict. The question is worth
+        asking explicitly: a gradient-boosted ensemble that ties logistic
+        regression is a result, and usually the wrong model to ship.
+
+        A strict `>` would call a 0.0002 margin a win. That margin is noise —
+        smaller than the fold-to-fold spread of the same comparison rerun with a
+        different seed — and a near-tie is the single most common real outcome of
+        a model comparison, so the default band makes the common case reportable.
+        Pass `tolerance=0` for the raw strict comparison, or read
+        `baseline_margin` and decide with a domain-specific band.
+        """
+        if tolerance < 0:
+            raise ValueError(f"tolerance must be non-negative, got {tolerance}")
+
+        margin = self.baseline_margin
+        if margin is None:
+            return None
+        if abs(margin) <= tolerance:
+            return None
+        return margin > 0
 
     def assert_no_transform_outside_pipeline(self) -> None:
         """Raise unless every fitted model is a single `Pipeline`.

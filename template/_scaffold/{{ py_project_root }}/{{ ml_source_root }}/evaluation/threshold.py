@@ -51,6 +51,32 @@ class ThresholdResult:
     sweep: list[tuple[float, float]] = field(default_factory=list)
     """(threshold, expected_cost) over the candidate grid — the curve a report
     draws to show how flat or sharp the optimum is."""
+    in_sample: bool = True
+    """Whether `threshold` was selected on the same rows the metrics below
+    describe.
+
+    `True` — the default, because it is what `choose_threshold` does — means
+    `precision`, `recall`, and `expected_cost` are optimistic: the threshold was
+    fitted to minimise cost on these exact rows, so it has absorbed their noise
+    and a fresh sample will score worse. The size of the gap depends on how flat
+    the `sweep` curve is around the optimum.
+
+    Set `False` only when the threshold came from rows disjoint from the ones
+    being scored — chosen on a validation fold and measured on a held-out one.
+    Carried as a field rather than left to the docstring so a report can state
+    the caveat without its author having had to know to add it."""
+
+    @property
+    def selection_caveat(self) -> str | None:
+        """The sentence a report should print next to `precision`/`recall`, or
+        `None` when the threshold was chosen out-of-sample and needs no caveat."""
+        if not self.in_sample:
+            return None
+        return (
+            "Threshold chosen on the same rows these metrics describe, so precision "
+            "and recall are optimistic — the operating point is fitted to this "
+            "sample's noise. Expect a fresh sample to score lower."
+        )
 
     @property
     def savings_vs_default(self) -> float:
@@ -91,6 +117,7 @@ def choose_threshold(
     cost_fn: float,
     positive_label: Any = 1,
     candidates: Any = None,
+    in_sample: bool = True,
 ) -> ThresholdResult:
     """Pick the threshold minimising expected cost. Pure function.
 
@@ -100,6 +127,14 @@ def choose_threshold(
     data admits is in that set and a finer grid buys nothing. Ties break toward
     the **lower** threshold, which flags more rows — under an asymmetric cost
     matrix where `cost_fn > cost_fp`, that is the conservative side.
+
+    **The returned metrics are in-sample by default.** The threshold is fitted to
+    these rows, so the `precision` and `recall` measured at it are optimistic in
+    the same way any fitted quantity scored on its own training data is. The
+    result carries `in_sample=True` and a `selection_caveat` saying so, so a
+    report states it without the caller having to know. Pass `in_sample=False`
+    when the rows scored here are disjoint from the rows the threshold was chosen
+    on — that is the arrangement that makes these numbers an honest estimate.
 
     Raises `ValueError` on non-positive costs: a zero cost makes one error class
     free, and the minimiser then degenerates to flagging everything or nothing —
@@ -164,6 +199,7 @@ def choose_threshold(
         false_negatives=fn,
         true_negatives=tn,
         sweep=sweep,
+        in_sample=in_sample,
     )
 
 

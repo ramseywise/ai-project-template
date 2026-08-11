@@ -23,7 +23,7 @@ from sklearn.base import clone
 from sklearn.model_selection import KFold, cross_val_predict
 
 from ml.evaluation.metrics import regression_metrics
-from ml.evaluation.splitting import RANDOM_STATE, SplitPlan, make_splitter
+from ml.evaluation.splitting import RANDOM_STATE, SplitPlan, make_splitter, split_columns
 from ml.selection.registry import get_models, get_spec
 from ml.transform.columns import infer_column_types
 from ml.transform.encoders import build_transformer
@@ -47,7 +47,10 @@ def run_prediction(
     if target not in df.columns:
         raise KeyError(f"target {target!r} is not a column in the frame: {list(df.columns)}")
 
-    plan = infer_column_types(df, target=target)
+    # Group and time columns steer the folds; they are not features. See
+    # `infer_column_types(exclude=...)` for why letting them through leaks.
+    split_cols = [c for c in split_columns(splitter, group_col, time_col) if c in df.columns]
+    plan = infer_column_types(df, target=target, exclude=split_cols)
     features = list(plan.features)
     if not features:
         raise ValueError(f"no usable feature columns were inferred from {len(df.columns)} columns.")
@@ -79,6 +82,7 @@ def run_prediction(
                     transformer=transformer,
                     x=x,
                     y=y,
+                    frame=df,
                     split_plan=split_plan,
                 )
             )
@@ -139,13 +143,16 @@ def _fit_one(
     transformer: Any,
     x: pd.DataFrame,
     y: pd.Series,
+    frame: pd.DataFrame,
     split_plan: SplitPlan,
 ) -> ModelResult:
     spec = get_spec(name)
     started = time.perf_counter()
 
     pipeline = build_pipeline(clone(transformer), clone(estimator))
-    cv = list(split_plan.split(x, y))
+    # `frame=` so the group/time columns resolve off the source frame rather than
+    # having to be features. Indices are positional; the row order is shared.
+    cv = list(split_plan.split(x, y, frame=frame))
     y_pred = cross_val_predict(pipeline, x, y, cv=cv, method="predict")
 
     metrics = regression_metrics(y, y_pred)

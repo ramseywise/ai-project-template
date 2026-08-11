@@ -140,8 +140,22 @@ def _verdict(result: RunResult) -> str:
         return '<p class="note bad">No model was fitted successfully.</p>'
 
     name, value = _headline(best)
-    beats = result.beats_baseline
-    if beats is None and result.baseline is best:
+    beats = result.beats_baseline()
+    margin = result.baseline_margin
+    if beats is None and margin is not None:
+        # A comparison happened and landed inside the tie band. Distinct from the
+        # other two `None` cases below, which mean there was no comparison at all
+        # — a reader told "tie" and a reader told "no baseline" need to do
+        # different things.
+        base = result.baseline
+        body = (
+            f"<strong>{escape(best.name)}</strong> and the "
+            f"<strong>{escape(base.name)}</strong> baseline are a tie at {escape(name)} "
+            f"— a margin of {margin:+.4g}, inside the noise of the comparison. "
+            "Prefer the baseline; the extra complexity bought nothing measurable."
+        )
+        css = "warn"
+    elif beats is None and result.baseline is best:
         body = (
             f"<strong>{escape(best.name)}</strong> is the best model at "
             f"{escape(name)} {value:.4g} — and it <strong>is</strong> the baseline. "
@@ -283,12 +297,17 @@ def _threshold(result: RunResult) -> str:
     cells = "".join(
         f"<div><dt>{escape(label)}</dt><dd>{escape(value)}</dd></div>" for label, value in items
     )
+    # The caveat renders straight from the result rather than being written here,
+    # so a report cannot quietly omit it: an in-sample threshold makes the
+    # precision/recall above optimistic and the reader has to be told.
+    caveat = t.selection_caveat
+    caveat_html = f'\n<p class="note warn">{escape(caveat)}</p>' if caveat else ""
     return (
         "<h2>Decision threshold</h2>\n"
         f'<p class="note">False positive costs {t.cost_fp:,.4g}, false negative costs '
         f"{t.cost_fn:,.4g} — a {t.cost_ratio:.3g}× ratio. 0.5 is only the right cutoff "
         "when the two errors cost the same, which they almost never do.</p>\n"
-        f'<dl class="meta">{cells}</dl>\n'
+        f'<dl class="meta">{cells}</dl>{caveat_html}\n'
         f'<div class="grid"><div class="card"><h3>COST SWEEP</h3>{sweep}'
         "<p>Expected cost across candidate thresholds.</p></div></div>"
     )

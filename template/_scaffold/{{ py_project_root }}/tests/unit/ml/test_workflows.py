@@ -15,7 +15,11 @@ import pytest
 from sklearn.datasets import load_breast_cancer, make_blobs, make_classification, make_regression
 from sklearn.pipeline import Pipeline
 
+from ml.evaluation.metrics import RegressionMetrics
+from ml.evaluation.splitting import assert_no_group_leakage
+from ml.transform.columns import ColumnPlan
 from ml.workflows import run_classification, run_clustering, run_prediction
+from ml.workflows.base import ModelResult, RunResult
 
 RANDOM_STATE = 42
 
@@ -230,7 +234,7 @@ def test_beats_baseline_is_none_when_the_baseline_wins(cancer_frame):
     result = run_classification(cancer_frame, target="malignant", seed=RANDOM_STATE)
 
     assert result.best is result.baseline, "logistic is expected to win on this frame"
-    assert result.beats_baseline is None
+    assert result.beats_baseline() is None
 
 
 def test_beats_baseline_is_true_when_a_model_actually_wins(xor_frame):
@@ -247,7 +251,7 @@ def test_beats_baseline_is_true_when_a_model_actually_wins(xor_frame):
 
     assert result.best.name == "random_forest"
     assert result.baseline.name == "logistic"
-    assert result.beats_baseline is True
+    assert result.beats_baseline() is True
     assert result.baseline.metrics.roc_auc < 0.6, "logistic is at chance on XOR"
     assert result.best.metrics.roc_auc > 0.9
 
@@ -256,7 +260,122 @@ def test_beats_baseline_is_none_without_a_comparison(cancer_frame):
     baseline_only = run_classification(
         cancer_frame, target="malignant", models=["logistic"], seed=RANDOM_STATE
     )
-    assert baseline_only.beats_baseline is None, "nothing to compare against itself"
+    assert baseline_only.beats_baseline() is None, "nothing to compare against itself"
+
+
+def _two_model_result(best_score: float, baseline_score: float) -> RunResult:
+    """A `RunResult` with two models at chosen R² values.
+
+    Hand-built rather than fitted: the tie band is arithmetic over two numbers,
+    and pinning a real fit to a margin of exactly 0.0002 would be a fixture
+    fighting the optimiser rather than a test of the property.
+    """
+    return RunResult(
+        family="prediction",
+        output="continuous",
+        target="y",
+        models=[
+            ModelResult(
+                name="candidate",
+                estimator=Pipeline([("preprocess", "passthrough"), ("model", "passthrough")]),
+                metrics=RegressionMetrics(
+                    rmse=0.0, mae=0.0, mape=None, r2=best_score, n_samples=100
+                ),
+            ),
+            ModelResult(
+                name="baseline",
+                estimator=Pipeline([("preprocess", "passthrough"), ("model", "passthrough")]),
+                metrics=RegressionMetrics(
+                    rmse=0.0, mae=0.0, mape=None, r2=baseline_score, n_samples=100
+                ),
+                is_baseline=True,
+            ),
+        ],
+        column_plan=ColumnPlan(),
+        split_plan=None,
+        n_rows=100,
+        n_features=3,
+        seed=RANDOM_STATE,
+    )
+
+
+def test_a_near_tie_is_not_a_win():
+    """The finding this band exists for: a 0.0002 margin is noise, and a strict
+    `>` called it a victory. Inside the band the answer is `None` — no verdict —
+    not `False`, because the baseline did not win either."""
+    result = _two_model_result(best_score=0.7002, baseline_score=0.7000)
+
+    assert result.beats_baseline() is None
+    assert result.baseline_margin == pytest.approx(0.0002)
+
+
+def test_a_margin_outside_the_band_is_still_a_win():
+    result = _two_model_result(best_score=0.80, baseline_score=0.70)
+
+    assert result.beats_baseline() is True
+    assert result.baseline_margin == pytest.approx(0.10)
+
+
+def test_the_tolerance_band_is_callable_down_to_strict_comparison():
+    """`tolerance=0` recovers the old strict `>`, so a project that genuinely
+    wants every margin adjudicated can still ask for that."""
+    result = _two_model_result(best_score=0.7002, baseline_score=0.7000)
+
+    assert result.beats_baseline(tolerance=0) is True
+    assert result.beats_baseline(tolerance=0.5) is None
+
+
+def test_a_negative_tolerance_is_rejected():
+    result = _two_model_result(best_score=0.80, baseline_score=0.70)
+
+    with pytest.raises(ValueError, match="non-negative"):
+        result.beats_baseline(tolerance=-0.1)
+
+
+def test_a_grouped_run_keeps_the_group_column_out_of_the_features():
+    """The leak this fix closes: `group_col` had to be a feature for the split to
+    resolve it, and at near-unique cardinality the transformer target-encoded
+    borrower identity against the label."""
+    rng = np.random.default_rng(RANDOM_STATE)
+    n_entities, per_entity = 40, 5
+    n = n_entities * per_entity
+    frame = pd.DataFrame(
+        {
+            # Near-unique, exactly the shape that lands in `high_cardinality`.
+            "entity": np.repeat([f"e{i}" for i in range(n_entities)], per_entity),
+            "f0": rng.normal(size=n),
+            "label": rng.integers(0, 2, size=n),
+        }
+    )
+
+    result = run_classification(
+        frame, target="label", group_col="entity", models=["logistic"], seed=RANDOM_STATE
+    )
+
+    plan = result.column_plan
+    assert "entity" not in plan.features
+    assert "entity" not in plan.high_cardinality, "the group column must not be target-encoded"
+    assert plan.excluded == ("entity",)
+    assert result.split_plan.group_col == "entity"
+
+
+def test_a_grouped_run_still_keeps_groups_off_the_fold_boundary():
+    """Excluding the column from the features must not cost the guarantee it was
+    there for — no entity may span a fold."""
+    rng = np.random.default_rng(RANDOM_STATE)
+    n_entities, per_entity = 40, 5
+    n = n_entities * per_entity
+    entities = np.repeat([f"e{i}" for i in range(n_entities)], per_entity)
+    frame = pd.DataFrame(
+        {"entity": entities, "f0": rng.normal(size=n), "value": rng.normal(size=n)}
+    )
+
+    result = run_prediction(frame, target="value", group_col="entity", n_splits=4)
+
+    assert "entity" not in result.column_plan.features
+    x = frame[list(result.column_plan.features)]
+    for train_idx, test_idx in result.split_plan.split(x, frame["value"], frame=frame):
+        assert_no_group_leakage(train_idx, test_idx, entities)
 
 
 def test_comparison_frame_has_one_row_per_model(cancer_frame):
