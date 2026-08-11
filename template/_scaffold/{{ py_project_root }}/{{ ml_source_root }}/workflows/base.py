@@ -34,6 +34,25 @@ from ml.transform.columns import ColumnPlan
 
 Metrics = ClassificationMetrics | RegressionMetrics | ClusteringMetrics
 
+BASELINE_TOLERANCE = 0.01
+"""Minimum headline margin over the baseline before a model is called better.
+
+A strict `>` reports a 0.0002 margin as a win. Cross-validated metrics carry
+fold-to-fold variance far larger than that, so a margin inside the noise band is
+a coin flip being reported as a finding. One point is the floor at which the
+difference is worth acting on.
+"""
+
+
+class TransformLeakageError(RuntimeError):
+    """Raised when a model fitted a transformer outside its cross-validation
+    pipeline, which inflates every score it reported.
+
+    A distinct type rather than `TypeError`: leakage is a result-validity
+    failure, and a caller that wants to catch it must not have to catch every
+    other type error alongside it.
+    """
+
 
 @dataclass
 class ModelResult:
@@ -94,11 +113,16 @@ class RunResult:
         `None` when there is no baseline to compare against. The question is worth
         asking explicitly: a gradient-boosted ensemble that ties logistic
         regression is a result, and usually the wrong model to ship.
+
+        The margin must clear `BASELINE_TOLERANCE`: a strict `>` calls a 0.0002
+        margin a win, and cross-validated metrics carry fold-to-fold variance far
+        larger than that. Inside the band it is a coin flip being reported as a
+        finding.
         """
         best, base = self.best, self.baseline
         if best is None or base is None or best is base:
             return None
-        return _score(best) > _score(base)
+        return (_score(best) - _score(base)) > BASELINE_TOLERANCE
 
     def assert_no_transform_outside_pipeline(self) -> None:
         """Raise unless every fitted model is a single `Pipeline`.
@@ -108,14 +132,14 @@ class RunResult:
         """
         for model in self.models:
             if not isinstance(model.estimator, Pipeline):
-                raise TypeError(
+                raise TransformLeakageError(
                     f"model {model.name!r} is a {type(model.estimator).__name__}, not a "
                     "Pipeline. Preprocessing outside the pipeline is fitted on the whole "
                     "frame, so every cross-validated score it produces is inflated."
                 )
             steps = dict(model.estimator.named_steps)
             if "preprocess" not in steps:
-                raise TypeError(
+                raise TransformLeakageError(
                     f"model {model.name!r} has no 'preprocess' step; its transformer was "
                     "fitted somewhere the CV split cannot reach."
                 )

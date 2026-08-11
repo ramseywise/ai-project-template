@@ -9,6 +9,8 @@ number means anything.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -16,6 +18,7 @@ from sklearn.datasets import load_breast_cancer, make_blobs, make_classification
 from sklearn.pipeline import Pipeline
 
 from ml.workflows import run_classification, run_clustering, run_prediction
+from ml.workflows.base import BASELINE_TOLERANCE, TransformLeakageError
 
 RANDOM_STATE = 42
 
@@ -121,7 +124,7 @@ def test_assert_no_transform_outside_pipeline_actually_raises(cancer_frame):
     )
     result.models[0].estimator = LogisticRegression()  # a bare estimator, not a pipeline
 
-    with pytest.raises(TypeError, match="not a Pipeline"):
+    with pytest.raises(TransformLeakageError, match="not a Pipeline"):
         result.assert_no_transform_outside_pipeline()
 
 
@@ -401,3 +404,38 @@ def test_prediction_respects_a_group_column():
     )
     assert result.split_plan.kind == "group"
     assert result.split_plan.group_col == "entity"
+
+
+# Ported from main (PR #72), which asserted this on a pure-noise frame. That
+# fixture does not transfer: under this branch's PR-AUC `_score`, random_forest
+# overfits 400 noise rows to a real 0.063 margin over the logistic baseline, so
+# the frame tests the model zoo rather than the comparison rule. The band is
+# asserted directly on constructed scores instead — WHAT MAKES THIS FAIL is a
+# strict `>` with no tolerance, which calls a 0.0002 margin a win.
+@pytest.mark.parametrize(
+    ("margin", "expected"),
+    [
+        (BASELINE_TOLERANCE / 2, False),  # inside the band — fold-to-fold variance
+        (BASELINE_TOLERANCE * 2, True),  # outside — worth acting on
+    ],
+)
+def test_beats_baseline_requires_clearing_the_tolerance_band(cancer_frame, margin, expected):
+    result = run_classification(
+        cancer_frame, target="malignant", models=["logistic"], seed=RANDOM_STATE
+    )
+    baseline = result.models[0]
+    assert baseline.is_baseline, "fixture assumes the single model is the baseline"
+
+    # A second model scoring a controlled margin above the baseline. Constructing
+    # the margin is the point: a fitted model's margin is whatever the data gives,
+    # which is exactly what makes it useless for testing the threshold.
+    contender = replace(baseline, name="contender", is_baseline=False)
+    contender.metrics = replace(
+        baseline.metrics, average_precision=baseline.metrics.average_precision + margin
+    )
+    result.models = [contender, baseline]
+
+    assert result.beats_baseline is expected, (
+        f"a {margin:.4f} margin against a {BASELINE_TOLERANCE} band should be "
+        f"{'a win' if expected else 'noise'}"
+    )

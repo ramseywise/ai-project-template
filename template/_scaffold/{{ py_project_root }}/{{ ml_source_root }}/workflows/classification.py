@@ -28,6 +28,7 @@ import logging
 import time
 from typing import Any
 
+import numpy as np
 import pandas as pd
 from sklearn.base import clone
 from sklearn.model_selection import cross_val_predict
@@ -40,14 +41,24 @@ from ml.sampling.resample import build_sampler
 from ml.selection.registry import get_models, get_spec
 from ml.transform.columns import infer_column_types
 from ml.transform.encoders import build_transformer
-from ml.workflows.base import ModelResult, RunResult, _score, build_pipeline
+from ml.workflows.base import (
+    BASELINE_TOLERANCE,
+    ModelResult,
+    RunResult,
+    TransformLeakageError,
+    _score,
+    build_pipeline,
+)
+
+# Re-exported: both are defined in `base` so the shared `RunResult` can use them
+# without importing this module back, but callers reach for them here.
+__all__ = ["BASELINE_TOLERANCE", "TransformLeakageError", "run_classification"]
 
 logger = logging.getLogger(__name__)
 
 IMBALANCE_THRESHOLD = 0.35
 """Minority-class fraction below which a run is treated as imbalanced — PR-AUC
 leads the report and class weighting is worth applying."""
-
 
 def run_classification(
     df: pd.DataFrame,
@@ -204,7 +215,10 @@ def _fit_one(
     y_prob = None
     if hasattr(estimator, "predict_proba"):
         probabilities = cross_val_predict(pipeline, x, y, cv=cv, method="predict_proba")
-        y_prob = probabilities[:, -1] if is_binary else probabilities
+        if is_binary:
+            y_prob = probabilities[:, _positive_column(classes, positive_label)]
+        else:
+            y_prob = probabilities
 
     metrics = classification_metrics(
         y,
@@ -229,6 +243,7 @@ def _fit_one(
                 y=y,
                 cv=cv,
                 raw_prob=y_prob,
+                classes=classes,
                 positive_label=positive_label,
             )
 
@@ -258,6 +273,19 @@ def _fit_one(
     )
 
 
+def _positive_column(classes: list[Any], positive_label: Any) -> int:
+    """Index of the positive class, located by label rather than by position.
+
+    `predict_proba[:, -1]` assumes the positive class sorts last. That holds for
+    0/1 and silently does not for other encodings, which produces a perfectly
+    inverted score that still looks like a probability.
+    """
+    try:
+        return classes.index(positive_label)
+    except ValueError:
+        return len(classes) - 1
+
+
 def _make_sampler(sampling: str, *, plan: Any, x: pd.DataFrame, seed: int) -> Any:
     """Build the fold-level sampler, or `None` for the weight-only strategies.
 
@@ -277,12 +305,22 @@ def _make_sampler(sampling: str, *, plan: Any, x: pd.DataFrame, seed: int) -> An
     )
 
 
-def _calibrate(*, pipeline: Any, x: pd.DataFrame, y: pd.Series, cv: list, raw_prob, positive_label):
+def _calibrate(
+    *,
+    pipeline: Any,
+    x: pd.DataFrame,
+    y: pd.Series,
+    cv: list,
+    raw_prob,
+    classes: list[Any],
+    positive_label,
+):
     """Cross-validate a calibrated copy and report the before/after."""
     method = recommend_method(len(y))
     try:
         calibrated = calibrate_classifier(clone(pipeline), method=method, cv=3)
-        adjusted = cross_val_predict(calibrated, x, y, cv=cv, method="predict_proba")[:, -1]
+        probabilities = cross_val_predict(calibrated, x, y, cv=cv, method="predict_proba")
+        adjusted = probabilities[:, _positive_column(classes, positive_label)]
     except Exception as exc:
         logger.warning("calibration failed, reporting uncalibrated probabilities: %s", exc)
         return None
