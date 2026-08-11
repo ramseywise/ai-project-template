@@ -1,6 +1,6 @@
 include ~/.claude/Makefile.common
 
-.PHONY: help lint test test_render new_project new_project_dev run_copier check_tools preview_defaults project
+.PHONY: help lint lint-render test new_project new_project_dev run_copier check_tools preview_defaults project
 
 input_dir := .
 
@@ -10,6 +10,69 @@ help:  ## Show available targets
 lint:  ## Validate template paths, copier config, and Python lint
 	@python3 scripts/validate_paths.py
 	@ruff check scripts/
+
+## Lint the SCAFFOLD by rendering it and running the rendered project's own
+## `make lint-check`. `make lint` above only covers scripts/ — it cannot touch
+## template/_scaffold/, whose files carry Jinja in both paths and bodies and so
+## are unparseable by ruff until rendered. Without this target the scaffold's
+## Python is linted exclusively by test-render.yml's "Lint rendered project"
+## step, i.e. only after push (PR #65 shipped RUF046 + 6 unformatted files
+## green locally on exactly this gap).
+##
+## Two profiles, chosen for lint COVERAGE rather than feature breadth:
+##   defaults  the baseline scaffold surface
+##   ml        adds {{ ml_source_root }} to the render's LINT_PATHS; with
+##             include_ml=false the ML tree is rm -rf'd at render time, so it
+##             is entirely lint-invisible without this row (this is the profile
+##             PR #65 broke)
+## Mirrors the CI step's install: lint needs the dev group (ruff) only, not the
+## ~2GB agent runtime, hence `uv sync --only-group dev` + UV_NO_SYNC=1 to stop
+## `uv run` re-syncing the full project underneath it.
+##
+## copier narrates 50+ _tasks to stderr; that is captured per-profile and only
+## replayed when a render fails, so a passing run shows just the lint results.
+##
+## Usage: make lint-render                    (both profiles, temp dirs removed)
+##        make lint-render KEEP=1             (leave the renders in place)
+##        make lint-render PROFILES=ml        (one profile)
+##        make lint-render DST=/some/path     (render root you choose, kept)
+lint-render: check_tools
+	@set -u; \
+	failed=""; \
+	for profile in $${PROFILES:-defaults ml}; do \
+	  case "$$profile" in \
+	    defaults) extra="" ;; \
+	    ml) extra="-d include_ml=true" ;; \
+	    *) echo "unknown profile: $$profile (valid: defaults ml)"; exit 2 ;; \
+	  esac; \
+	  if [ -n "$${DST:-}" ]; then dst="$$DST/$$profile"; keep=1; mkdir -p "$$dst"; \
+	  else dst="$$(mktemp -d -t ait_lint_$$profile)"; keep="$${KEEP:-}"; fi; \
+	  log="$$dst.render.log"; \
+	  echo "--- $$profile: rendering to $$dst"; \
+	  if ! copier copy --overwrite --defaults --trust \
+	    -d project_name=TestProject -d scaffold_full_project=true \
+	    -d primary_backend_language=python -d primary_chat_agent=lg_agent \
+	    -d include_agent_reference_library=false \
+	    -d global_skills_source=none -d enable_macos_notifications=false \
+	    $$extra $(input_dir) "$$dst" >"$$log" 2>&1; then \
+	    echo "--- $$profile: render FAILED"; cat "$$log"; \
+	    failed="$$failed $$profile(render)"; rm -f "$$log"; \
+	    [ -n "$$keep" ] || rm -rf "$$dst"; continue; \
+	  fi; \
+	  rm -f "$$log"; \
+	  if [ ! -f "$$dst/pyproject.toml" ]; then \
+	    echo "--- $$profile: no pyproject.toml rendered — nothing to lint"; \
+	    [ -n "$$keep" ] || rm -rf "$$dst"; continue; \
+	  fi; \
+	  if ( cd "$$dst" && uv sync --only-group dev --quiet && UV_NO_SYNC=1 $(MAKE) lint-check ); then \
+	    echo "--- $$profile: lint-check OK"; \
+	  else \
+	    echo "--- $$profile: lint-check FAILED"; failed="$$failed $$profile"; \
+	  fi; \
+	  if [ -n "$$keep" ]; then echo "--- $$profile: kept at $$dst"; else rm -rf "$$dst"; fi; \
+	done; \
+	if [ -n "$$failed" ]; then echo; echo "lint-render FAILED for:$$failed"; exit 1; fi; \
+	echo; echo "lint-render passed"
 
 test:  ## Validate paths + catalog check
 	@python3 scripts/validate_paths.py
