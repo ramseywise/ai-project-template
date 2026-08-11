@@ -28,7 +28,6 @@ import logging
 import time
 from typing import Any
 
-import numpy as np
 import pandas as pd
 from sklearn.base import clone
 from sklearn.model_selection import cross_val_predict
