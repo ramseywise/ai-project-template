@@ -64,6 +64,7 @@ VAR_DEFAULTS: dict[str, str] = {
     "py_project_root": "backend",
     "ai_source_root": "src",
     "ml_source_root": "ml",
+    "run_registry_root": "experiments",
     "eval_root": "evals",
     "ts_project_root": "my-project",
     "ts_source_root": "src",
@@ -861,6 +862,7 @@ _CATALOG_SKIP_VARS: set[str] = {
     "has_gradeable_interactions",
     "include_interaction_evals",
     "enable_structure_guard",
+    "include_run_registry",
     # derived slug vars (computed from mcp_server_slug; not set independently)
     "py_mcp_server_slug",
     "ts_mcp_server_slug",
@@ -906,6 +908,7 @@ _CATALOG_SKIP_VARS: set[str] = {
     "py_project_root",
     "ai_source_root",
     "ml_source_root",
+    "run_registry_root",
     "eval_root",
     "ts_project_root",
     "ts_source_root",
