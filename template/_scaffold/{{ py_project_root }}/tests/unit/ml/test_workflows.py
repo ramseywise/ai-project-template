@@ -19,7 +19,7 @@ from ml.evaluation.metrics import RegressionMetrics
 from ml.evaluation.splitting import assert_no_group_leakage
 from ml.transform.columns import ColumnPlan
 from ml.workflows import run_classification, run_clustering, run_prediction
-from ml.workflows.base import ModelResult, RunResult
+from ml.workflows.base import ModelResult, RunResult, TransformLeakageError
 
 RANDOM_STATE = 42
 
@@ -125,7 +125,7 @@ def test_assert_no_transform_outside_pipeline_actually_raises(cancer_frame):
     )
     result.models[0].estimator = LogisticRegression()  # a bare estimator, not a pipeline
 
-    with pytest.raises(TypeError, match="not a Pipeline"):
+    with pytest.raises(TransformLeakageError, match="not a Pipeline"):
         result.assert_no_transform_outside_pipeline()
 
 

@@ -67,6 +67,15 @@ class CalibrationReport:
         """Negative is better — the reduction in Brier score."""
         return self.brier_after - self.brier_before
 
+    @property
+    def ece_before(self) -> float:
+        """Short alias — reports abbreviate expected calibration error to ECE."""
+        return self.expected_calibration_error_before
+
+    @property
+    def ece_after(self) -> float:
+        return self.expected_calibration_error_after
+
 
 def recommend_method(n_samples: int) -> Method:
     """sigmoid on small validation sets, isotonic when there is enough data."""
