@@ -1134,7 +1134,7 @@ eval_root:
 
 eval_allowed_dirs:
   type: str
-  default: graders metrics pipelines reports utils
+  default: generation graders metrics pipelines reports utils
   when: false
 
 # Canonical eval-suite directory-layout enforcement — only meaningful for
