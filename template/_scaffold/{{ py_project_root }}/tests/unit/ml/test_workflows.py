@@ -439,3 +439,35 @@ def test_beats_baseline_requires_clearing_the_tolerance_band(cancer_frame, margi
         f"a {margin:.4f} margin against a {BASELINE_TOLERANCE} band should be "
         f"{'a win' if expected else 'noise'}"
     )
+
+
+# `_positive_column` is tested directly rather than through `run_classification`.
+# The workflow derives `positive_label = classes[-1]` from an already-sorted
+# `classes`, so the label lookup and the old positional `[:, -1]` always agree
+# there — a run-level test would pass with the bug reinstated and prove nothing.
+# The divergence only appears when the positive label is not the last class,
+# which is reachable whenever a caller supplies one.
+@pytest.mark.parametrize(
+    ("classes", "positive_label", "expected"),
+    [
+        ([0, 1], 1, 1),  # the 0/1 case the positional form got right by luck
+        (["churn", "retained"], "churn", 0),  # positive class sorts FIRST
+        (["a", "b", "c"], "b", 1),  # neither first nor last
+        (["no", "yes"], "yes", 1),
+    ],
+)
+def test_positive_column_locates_the_label_not_the_position(classes, positive_label, expected):
+    from ml.workflows.classification import _positive_column
+
+    assert _positive_column(classes, positive_label) == expected
+
+
+def test_positive_column_falls_back_to_the_last_class_when_the_label_is_absent():
+    """An unknown label degrades to the trailing column rather than raising.
+
+    Deliberate: a mislabelled `positive_label` should not abort a run that is
+    otherwise fine, and the last column is the conventional positive class.
+    """
+    from ml.workflows.classification import _positive_column
+
+    assert _positive_column(["a", "b", "c"], "missing") == 2
