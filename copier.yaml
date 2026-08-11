@@ -82,6 +82,11 @@ _message_after_update: >+
 
 _exclude:
   - __pycache__
+  - "*.py[cod]"
+  - .venv
+  - .pytest_cache
+  - .ruff_cache
+  - .DS_Store
   - .git
   - copier.yaml
 
@@ -622,6 +627,17 @@ ts_project_root:
   default: "{{ project_slug }}"
   when: false
 
+# The TS agent's own directory under {{ ts_source_root }}/agents/ — the TS twin
+# of lg_agent_dir/adk_agent_dir. Before AIT-70 the TS agent lived in a singular
+# `agent/` directory that also held tracing, guards and the LLM client; those
+# moved out to observability/, guardrails/ and model/ (naming.md §1), leaving
+# agents/<name>/ to hold only agent logic. Named for what the agent DOES, same
+# convention as the Python agent dirs.
+ts_agent_dir:
+  type: str
+  default: chat_agent
+  when: false
+
 # ts_backend_dest was deleted 2026-07-19 (two-root scaffold). It existed to
 # resolve a collision that no longer occurs: under `both`, Python owned
 # backend/ and TS had to fall back to its project-named root. Now each language
@@ -716,6 +732,59 @@ include_frontend:
     if (_external_data.design is defined and _external_data.design and
     _external_data.design.stages is defined and
     _external_data.design.stages.discovery == 'complete') else false }}
+  when: false
+
+# AIT-70: which frontend the frontend/ tree renders. Before this the tree was
+# Next.js-only, which meant no SPA option existed at all — dssg/project-mgmt-ai
+# (Vite + React 19 + Tailwind, a client-rendered console with no SSR need) had
+# to be hand-built rather than scaffolded. The two are genuinely different
+# shapes, not a preference: next brings SSR/RSC, file-system routing and its own
+# server runtime; vite is a client bundle served statically, pairing with a
+# separate api/ backend. Choose by whether the app needs server rendering.
+frontend_bundler:
+  type: str
+  help: >-
+    Frontend build tool. next scaffolds a Next.js app (SSR/RSC, file-system
+    routing, Supabase SSR auth) — pick it when pages must render server-side or
+    the frontend IS the backend (its own API routes). vite scaffolds a
+    React 19 + Tailwind SPA (client-rendered, react-router, vitest) — pick it
+    for a console/dashboard talking to a separate API, which is the
+    project-mgmt-ai shape.
+  choices:
+    next: "next"
+    vite: "vite"
+  default: >-
+    {{ _external_data.design.web.bundler
+    if (_external_data.design is defined and _external_data.design and
+    _external_data.design.stages is defined and
+    _external_data.design.stages.discovery == 'complete' and
+    _external_data.design.web.bundler is defined) else 'next' }}
+  # Default next preserves the pre-AIT-70 render for existing projects: a repo
+  # that answered include_frontend=true before this flag existed gets exactly
+  # what it had. Opt into the SPA with -d frontend_bundler=vite.
+  when: false
+
+# AIT-70: Supabase as the APPLICATION database — migrations, RLS policies and a
+# pgSQL test harness — which is distinct from the two Supabase touchpoints that
+# already existed: auth (@supabase/ssr in the frontend, JWT middleware in the
+# split_service backend) and vector_backend=postgres (pgvector as a RAG store).
+# Neither of those gives a project row-level tenant isolation or a migration
+# history. project-mgmt-ai's 8 migrations (tenancy, telemetry, approval spine,
+# delivery, documents) are the reusable pattern this scaffolds.
+include_supabase_db:
+  type: bool
+  help: >-
+    Scaffold supabase/ — a migrations tree with a tenancy + RLS starter, a
+    pgSQL RLS test harness, and the Supabase CLI as a dev dependency? For
+    projects where Postgres IS the application database and tenant isolation is
+    enforced in the database rather than the application layer.
+  default: >-
+    {{ _external_data.design.data.supabase_db
+    if (_external_data.design is defined and _external_data.design and
+    _external_data.design.stages is defined and
+    _external_data.design.stages.discovery == 'complete' and
+    _external_data.design.data is defined and
+    _external_data.design.data.supabase_db is defined) else false }}
   when: false
 
 # mcp_servers/ lives at template root, NOT inside _scaffold/ — deliberately. It

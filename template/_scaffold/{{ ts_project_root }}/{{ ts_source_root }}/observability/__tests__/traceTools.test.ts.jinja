@@ -10,12 +10,15 @@
  * controlled startExecuteToolSpan mock so span state is observable.  They
  * FAIL if the span-bracketing wrapper is removed from traceTools.ts.
  *
- * ESM note: tracing.js is mocked via jest.unstable_mockModule so the span
- * object is controlled without making real OTel calls.  wrapToolsWithSpans
- * is imported dynamically after the mock is registered.
+ * Hoisting note (vitest): tracing.js is mocked so the span object is controlled
+ * without making real OTel calls. `vi.mock` is hoisted above the imports, so its
+ * factory cannot close over a normal `const` — the span stubs live in
+ * `vi.hoisted()` and the subject is imported statically (AIT-70).
  */
 
-import { jest, describe, it, expect, beforeAll } from "@jest/globals";
+import { vi, describe, it, expect } from "vitest";
+
+import { wrapToolsWithSpans } from "../traceTools.js";
 
 // ---------------------------------------------------------------------------
 // Span mock factory — created fresh per test via mockImplementationOnce
@@ -23,37 +26,28 @@ import { jest, describe, it, expect, beforeAll } from "@jest/globals";
 
 function makeSpanMock() {
   return {
-    setStatus: jest.fn(),
-    setAttribute: jest.fn(),
-    end: jest.fn(),
+    setStatus: vi.fn(),
+    setAttribute: vi.fn(),
+    end: vi.fn(),
     // timestamps set by the mock's start/end hooks
     startedAt: 0,
     endedAt: 0,
   };
 }
 
-// Shared mock for startExecuteToolSpan — the real tracing.ts is replaced
-const mockStartExecuteToolSpan = jest.fn();
-const mockInputHash = jest.fn(() => "deadbeef");
-
-jest.unstable_mockModule("../{{ ts_source_root }}/agent/tracing.js", () => ({
-  startExecuteToolSpan: mockStartExecuteToolSpan,
-  inputHash: mockInputHash,
-  // Provide other named exports traceTools.ts might import (none currently,
-  // but this guard prevents "not exported" errors if the file grows)
-  startChatSpan: jest.fn(() => ({ end: jest.fn(), setStatus: jest.fn() })),
+// Shared mocks for tracing.ts — hoisted so the vi.mock factory can close over them
+const mocks = vi.hoisted(() => ({
+  startExecuteToolSpan: vi.fn(),
+  inputHash: vi.fn(() => "deadbeef"),
 }));
 
-// ---------------------------------------------------------------------------
-// Subject import — dynamic, after mock is registered
-// ---------------------------------------------------------------------------
-
-let wrapToolsWithSpans: (toolSet: Record<string, unknown>) => Record<string, unknown>;
-
-beforeAll(async () => {
-  const mod = await import("../{{ ts_source_root }}/agent/traceTools.js");
-  wrapToolsWithSpans = mod.wrapToolsWithSpans as typeof wrapToolsWithSpans;
-});
+vi.mock("../tracing.js", () => ({
+  startExecuteToolSpan: mocks.startExecuteToolSpan,
+  inputHash: mocks.inputHash,
+  // Provide other named exports traceTools.ts might import (none currently,
+  // but this guard prevents "not exported" errors if the file grows)
+  startChatSpan: vi.fn(() => ({ end: vi.fn(), setStatus: vi.fn() })),
+}));
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -70,7 +64,7 @@ describe("wrapToolsWithSpans — execute_tool span", () => {
     let executeStartedAt = 0;
     let executeEndedAt = 0;
 
-    mockStartExecuteToolSpan.mockImplementationOnce(() => {
+    mocks.startExecuteToolSpan.mockImplementationOnce(() => {
       spanCreatedAt = ++tick;
       // Wire end() to record when span closes
       span.end.mockImplementation(() => { span.endedAt = ++tick; });
@@ -100,7 +94,7 @@ describe("wrapToolsWithSpans — execute_tool span", () => {
 
   it("span ends and is marked error when execute throws", async () => {
     const span = makeSpanMock();
-    mockStartExecuteToolSpan.mockImplementationOnce(() => span);
+    mocks.startExecuteToolSpan.mockImplementationOnce(() => span);
 
     const failingTool = {
       execute: async () => { throw new Error("tool-failure"); },
@@ -121,11 +115,11 @@ describe("wrapToolsWithSpans — execute_tool span", () => {
   });
 
   it("tools without execute are passed through unchanged", () => {
-    mockStartExecuteToolSpan.mockClear();
+    mocks.startExecuteToolSpan.mockClear();
     const noExec = { description: "no execute", inputSchema: {} };
     const wrapped = wrapToolsWithSpans({ noExec });
     // No execute to wrap — object reference is preserved
     expect(wrapped.noExec).toEqual(noExec);
-    expect(mockStartExecuteToolSpan).not.toHaveBeenCalled();
+    expect(mocks.startExecuteToolSpan).not.toHaveBeenCalled();
   });
 });

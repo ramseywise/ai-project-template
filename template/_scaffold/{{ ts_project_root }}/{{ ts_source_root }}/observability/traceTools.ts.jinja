@@ -11,7 +11,7 @@
  *
  * Usage (agent.ts):
  *   import { wrapToolsWithSpans } from "./traceTools.js";
- *   import { tools } from "./tools/index.js";
+ *   import { tools } from "../agents/{{ ts_agent_dir }}/tools/index.js";
  *   // ...
  *   return streamText({ tools: wrapToolsWithSpans(tools), ... });
  *

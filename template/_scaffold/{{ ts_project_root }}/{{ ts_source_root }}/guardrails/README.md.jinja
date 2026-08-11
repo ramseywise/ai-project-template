@@ -1,4 +1,4 @@
-# {{ ts_project_root }}/{{ ts_source_root }}/security/ — input guard, content filter, output filter
+# {{ ts_project_root }}/{{ ts_source_root }}/guardrails/ — input guard, content filter, output filter
 
 Three deterministic guard layers around the agent loop. No provider flag and no
 SDK: these are regex and length checks, independent of `observability_provider`
@@ -10,7 +10,7 @@ SDK: these are regex and length checks, independent of `observability_provider`
 - `settings.ts` — reads `process.env`. Per-layer off-switches, `maxInputChars`,
   `refusalMessage`.
 
-This is the TypeScript twin of `{{ py_project_root }}/{{ ai_source_root }}/security/`.
+This is the TypeScript twin of `{{ py_project_root }}/{{ ai_source_root }}/guardrails/`.
 Same three layers, same fail-open/fail-closed contract; the seams differ only
 because this runtime streams.
 
@@ -33,7 +33,7 @@ Call sites, so you know what to change rather than what to add:
 | Layer | Call site | What it guards |
 |---|---|---|
 | `checkInput` | `agent/handler.ts` | the last user turn, before `runAgent` — a blocked turn never reaches the model, so it costs no tokens |
-| `filterContent` | `agent/guardTools.ts`, wired in `agent/agent.ts` | every tool result, before it re-enters the prompt |
+| `filterContent` | `guardrails/tools.ts`, wired in `agents/*/agent.ts` | every tool result, before it re-enters the prompt |
 | `guardTextStream` | `agent/handler.ts` | the response body, scrubbed in transit |
 
 Layer 2 is wired at the tool boundary rather than in the handler because tool

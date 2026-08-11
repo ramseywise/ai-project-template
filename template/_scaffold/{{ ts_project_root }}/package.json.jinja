@@ -13,7 +13,8 @@
     "lint:fix": "eslint . --fix",
     "check:unimported": "node scripts/check-unimported.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-vm-modules node_modules/.bin/jest"{% if ts_agent_framework == "vercel_ai_sdk" %},
+    "test": "vitest run",
+    "test:watch": "vitest"{% if ts_agent_framework == "vercel_ai_sdk" %},
     "eval": "tsx {{ ts_source_root }}/agent/eval/run.ts"{% endif %}
   },
   "engines": {
@@ -30,15 +31,13 @@
   "devDependencies": {
     "@eslint/js": "^9.15.0",
     "@types/express": "^4.17.21",
-    "@types/jest": "^29.5.14",
     "@types/node": "^22.10.0",
     "@types/supertest": "^6.0.2",
     "eslint": "^9.15.0",
-    "jest": "^29.7.0",
     "supertest": "^7.0.0",
-    "ts-jest": "^29.2.5",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
-    "typescript-eslint": "^8.15.0"
+    "typescript-eslint": "^8.15.0",
+    "vitest": "^3.2.4"
   }
 }

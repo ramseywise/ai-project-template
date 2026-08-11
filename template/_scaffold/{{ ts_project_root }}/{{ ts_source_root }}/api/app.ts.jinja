@@ -7,7 +7,7 @@
 
 import express, { type Request, type Response } from "express";
 {%- if ts_agent_framework == "vercel_ai_sdk" %}
-import { chatHandler } from "./agent/handler.js";
+import { chatHandler } from "./handler.js";
 {%- endif %}
 
 export function createApp() {

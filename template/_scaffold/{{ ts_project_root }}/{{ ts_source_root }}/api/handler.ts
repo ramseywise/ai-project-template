@@ -5,7 +5,7 @@
  * Next.js App Router route handler (`export const POST = chatHandler;`) in a
  * Vercel-hosted project — same function either way.
  *
- * Guard layers wired here (see ../security/guards.ts)
+ * Guard layers wired here (see ../guardrails/guards.ts)
  * ---------------------------------------------------
  * - checkInput      : on the last user turn, BEFORE runAgent — a blocked turn
  *                     returns the refusal without ever reaching the model, so
@@ -19,8 +19,8 @@
  */
 
 import type { UIMessage } from "ai";
-import { runAgent } from "./agent.js";
-import { checkInput, guardTextStream } from "../security/guards.js";
+import { runAgent } from "../agents/{{ ts_agent_dir }}/agent.js";
+import { checkInput, guardTextStream } from "../guardrails/guards.js";
 
 /** Last user turn's text — what checkInput screens. */
 function lastUserText(messages: UIMessage[]): string {

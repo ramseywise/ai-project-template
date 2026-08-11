@@ -11,8 +11,8 @@
  * construction, with no second edit to remember.
  *
  * Usage (agent.ts):
- *   import { wrapToolsWithContentFilter } from "./guardTools.js";
- *   import { wrapToolsWithSpans } from "./traceTools.js";
+ *   import { wrapToolsWithContentFilter } from "./tools.js";
+ *   import { wrapToolsWithSpans } from "../observability/traceTools.js";
  *   // ...
  *   tools: wrapToolsWithSpans(wrapToolsWithContentFilter(tools))
  *
@@ -25,7 +25,7 @@
  */
 
 import type { ToolSet } from "ai";
-import { filterContent } from "../security/guards.js";
+import { filterContent } from "./guards.js";
 
 /**
  * Return a copy of `toolSet` where every tool's result is content-filtered.

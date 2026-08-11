@@ -14,9 +14,9 @@
  * - tracing.ts      : startChatSpan in onFinish (token-attributed OTel summary span)
  * - stallDetector.ts: recordOutput + recordToolCall in onStepFinish; throws
  *                     StallDetectedError before maxSteps is exhausted
- * - context-budget.ts (pure parts): trackUsage + shouldCompact in onFinish;
+ * - contextBudget.ts (pure parts): trackUsage + shouldCompact in onFinish;
  *                     logs utilisation and warns when the context window is near full
- * - guardTools.ts   : wrapToolsWithContentFilter() runs guard layer 2 over every
+ * - guardrails/tools.ts: wrapToolsWithContentFilter() runs guard layer 2 over every
  *                     tool result before it re-enters the prompt (indirect
  *                     injection). Layers 1 and 3 live in handler.ts.
  *
@@ -25,18 +25,18 @@
  * - verificationLoop.ts : consumes the stream internally — incompatible with
  *                         the streaming HTTP response that handler.ts requires
  * - compactHistory()    : needs retained mutable history; handler.ts is
- *                         stateless per request (see context-budget.ts comment)
+ *                         stateless per request (see contextBudget.ts comment)
  */
 
 import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from "ai";
-import { getModel } from "./clients/llm.js";
+import { getModel } from "../../model/gateway.js";
 import { settings } from "./settings.js";
 import { tools } from "./tools/index.js";
-import { startChatSpan } from "./tracing.js";
-import { wrapToolsWithSpans } from "./traceTools.js";
-import { wrapToolsWithContentFilter } from "./guardTools.js";
+import { startChatSpan } from "../../observability/tracing.js";
+import { wrapToolsWithSpans } from "../../observability/traceTools.js";
+import { wrapToolsWithContentFilter } from "../../guardrails/tools.js";
 import { createStallDetector } from "./stallDetector.js";
-import { trackUsage, shouldCompact } from "./context-budget.js";
+import { trackUsage, shouldCompact } from "./contextBudget.js";
 
 const SYSTEM_PROMPT = "You are a helpful assistant for {{ project_name }}.";
 
