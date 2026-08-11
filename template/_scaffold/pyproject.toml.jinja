@@ -87,6 +87,9 @@ dependencies = [
     # a logged warning, so a stripped install still runs.
     "catboost>=1.2.5",
     "imbalanced-learn>=0.12.0",
+    # joblib arrives transitively with scikit-learn, but ml/persistence.py imports
+    # it directly — a direct import belongs in the direct dependencies.
+    "joblib>=1.4.0",
 {%- endif %}
 ]
 
