@@ -214,9 +214,7 @@ def test_calibration_improves_brier_on_a_deliberately_miscalibrated_model():
         x, y, test_size=0.3, stratify=y, random_state=RANDOM_STATE
     )
 
-    base = RandomForestClassifier(
-        n_estimators=25, max_depth=4, random_state=RANDOM_STATE
-    )
+    base = RandomForestClassifier(n_estimators=25, max_depth=4, random_state=RANDOM_STATE)
     raw = base.fit(x_train, y_train).predict_proba(x_test)[:, 1]
 
     calibrated = calibrate_classifier(
@@ -229,8 +227,7 @@ def test_calibration_improves_brier_on_a_deliberately_miscalibrated_model():
     report = assess_calibration(y_test, raw, adjusted, method="isotonic")
 
     assert report.improved, (
-        f"calibration did not improve Brier: {report.brier_before:.4f} -> "
-        f"{report.brier_after:.4f}"
+        f"calibration did not improve Brier: {report.brier_before:.4f} -> {report.brier_after:.4f}"
     )
     assert report.brier_delta < 0
     assert report.brier_after == pytest.approx(brier_score_loss(y_test, adjusted))

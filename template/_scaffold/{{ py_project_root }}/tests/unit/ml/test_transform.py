@@ -34,7 +34,8 @@ def mixed_frame() -> pd.DataFrame:
             "balance": rng.gamma(2.0, 500.0, n),
             "segment": rng.choice(["a", "b", "c"], n),
             "account_id": [f"acct_{i % 200}" for i in range(n)],
-            "opened_at": pd.to_datetime("2024-01-01") + pd.to_timedelta(rng.integers(0, 700, n), "D"),
+            "opened_at": pd.to_datetime("2024-01-01")
+            + pd.to_timedelta(rng.integers(0, 700, n), "D"),
             "is_active": rng.random(n) > 0.3,
             "constant_col": ["same"] * n,
             "target": rng.integers(0, 2, n),

@@ -44,11 +44,7 @@ class ColumnPlan:
     def features(self) -> tuple[str, ...]:
         """Every column the transformer will actually consume."""
         return (
-            self.numeric
-            + self.categorical
-            + self.high_cardinality
-            + self.datetime
-            + self.boolean
+            self.numeric + self.categorical + self.high_cardinality + self.datetime + self.boolean
         )
 
     def describe(self) -> pd.DataFrame:
