@@ -82,7 +82,7 @@ At least 3 scenarios (missing tool arg, provider timeout, malformed messages arr
 ## Step 3: Scaffold the File Set
 
 Substitute `{AGENT_NAME}` → camelCase/slug, `{OUTPUT_DIR}` →
-`{ts_project_root}/{ts_source_root}/agent/` (confirm the exact path from the project
+`{ts_project_root}/{ts_source_root}/agents/{ts_agent_dir}/` (confirm the exact path from the project
 layout — check `package.json` / `tsconfig.json` for the source root if unclear).
 
 ```
@@ -119,7 +119,7 @@ app.post("/agent/chat", async (req, res) => {
 Generation rules:
 
 **`agent.ts`**: import `convertToModelMessages`, `stepCountIs`, `streamText`, `UIMessage`
-from `"ai"`. Import `getModel` from `./clients/llm.js`, `settings` from `./settings.js`,
+from `"ai"`. Import `getModel` from `../../model/gateway.js`, `settings` from `./settings.js`,
 `tools` from `./tools/index.js`. Export `runAgent(messages: UIMessage[])` returning
 the `streamText(...)` result directly — don't `await` it; the caller (handler.ts)
 decides how to consume the stream.
@@ -147,7 +147,7 @@ export function runAgent(messages: UIMessage[]) {
 no class, no singleton pattern. Match Python's `settings.py` shape: one field per
 env var with a typed default.
 
-**`clients/llm.ts`**: sole `createAnthropic()` call site. Export `getProvider()` and
+**`model/gateway.ts`**: sole `createAnthropic()` call site. Export `getProvider()` and
 `getModel()`. Never call `createAnthropic()` elsewhere in the codebase.
 
 **`tools/{toolName}.ts`**: use `tool()` from `"ai"` + `z` from `"zod"`. Define
@@ -176,7 +176,7 @@ Add to `dependencies` (or verify already present from the template):
 
 Add npm scripts if absent:
 ```json
-"eval": "npx tsx src/{ts_source_root}/agent/eval/run.ts"
+"eval": "npx tsx {ts_source_root}/evals/run.ts"
 ```
 
 ---
@@ -187,7 +187,7 @@ Add npm scripts if absent:
 npm install
 npm run typecheck       # tsc --noEmit — must exit 0
 npm run lint            # eslint — must exit 0, zero violations
-npm test                # jest — all tests pass
+npm test                # vitest — all tests pass
 ```
 
 Then smoke-test the running server:
@@ -222,8 +222,9 @@ route → handler → agent loop → provider chain is wired.
 - **Never hardcode model strings.** All model/provider configuration lives in
   `settings.ts`, read from `process.env`. NEVER change an existing model string in
   code you're modifying unless explicitly asked.
-- **`clients/llm.ts` is the sole `createAnthropic()` call site.** All other files
-  call `getModel()`. Same discipline as Python's `clients/llm.py` convention.
+- **`model/gateway.ts` is the sole `createAnthropic()` call site.** All other files
+  call `getModel()`. Same discipline as Python's `model/gateway.py` convention, and
+  the rule `.claude/hooks/sdk_lint.sh` enforces (naming.md §1 rule 2).
 - **Do not `await runAgent()`.** Return the `streamText(...)` result and call
   `.toUIMessageStreamResponse()` on it in `handler.ts` — awaiting it loses the stream.
 - **Detect error chunks in eval.** The AI SDK streams provider errors inside a 200
@@ -255,8 +256,9 @@ Python's retrieval-grading pipeline. This is correct by design, not a gap.
 ## Scaffold as Reference
 
 The full staged tree lives at:
-`template/_scaffold/{{ ts_project_root }}/{{ ts_source_root }}/agent/`
+`template/_scaffold/{{ ts_project_root }}/{{ ts_source_root }}/agents/{{ ts_agent_dir }}/`
 
 Read it for canonical file shapes before generating anything new — especially
-`agent.ts.jinja`, `settings.ts.jinja`, `clients/llm.ts.jinja`, and `eval/run.ts.jinja`.
+`agent.ts.jinja`, `settings.ts.jinja`, `../../model/gateway.ts.jinja`, and
+`../../evals/run.ts.jinja`.
 The staged tree is the ground truth; this skill is the scaffolding guide.

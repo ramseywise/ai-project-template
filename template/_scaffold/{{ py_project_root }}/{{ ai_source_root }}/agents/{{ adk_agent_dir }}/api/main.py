@@ -43,7 +43,7 @@ def _require_api_key(key: str | None = Security(_api_key_header)) -> None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
-app = FastAPI(title=f"{__package__.split('.')[1]} gateway")
+app = FastAPI(title=f"{__package__.split('.')[1]} api")
 
 app.add_middleware(
     CORSMiddleware,

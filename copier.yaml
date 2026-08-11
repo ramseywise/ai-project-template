@@ -54,7 +54,7 @@ _message_after_copy: >+
   - TS backend service scaffolded at {{ ts_project_root }}/ — run `make ts-install` then `make ts-dev`.
   {%- endif %}
   {%- if has_typescript and ts_agent_framework == "vercel_ai_sdk" %}
-  - Vercel AI SDK agent scaffolded at {{ ts_project_root }}/{{ ts_source_root }}/agent/ — set ANTHROPIC_API_KEY, then `make ts-dev` and POST to /agent/chat to try it.
+  - Vercel AI SDK agent scaffolded at {{ ts_project_root }}/{{ ts_source_root }}/agents/{{ ts_agent_dir }}/ — set ANTHROPIC_API_KEY, then `make ts-dev` and POST to /agent/chat to try it.
   {%- endif %}
   {%- if scaffold_full_project and frontend_backend_topology == "split_service" %}
   - split_service scaffolded: Next.js frontend at {{ ts_project_root }}/ (`make ts-install` then `make ts-dev`) + FastAPI backend with Supabase-JWT auth ({{ py_project_root }}/{{ ai_source_root }}/middleware/auth.py). Create a Supabase project, fill in SUPABASE_URL/SUPABASE_ANON_KEY/SUPABASE_JWT_SECRET (backend) and NEXT_PUBLIC_SUPABASE_URL/NEXT_PUBLIC_SUPABASE_ANON_KEY (frontend) before first deploy — Vercel for the frontend, Railway for the backend (see railway.toml/vercel.json).
@@ -1308,7 +1308,7 @@ _tasks:
   - "{{ 'true' if (not scaffold_full_project) or include_n8n_webhook else 'rm -f ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/integrations/n8n_webhook.py' }}"
   - "{{ 'true' if (not scaffold_full_project) or include_calendar_integration else 'rm -f ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/integrations/google_calendar.py' }}"
   - "{{ 'true' if (not scaffold_full_project) or include_marketing_integrations else 'rm -f ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/integrations/eventbrite.py ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/integrations/linkedin.py ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/integrations/canva.py' }}"
-  - "{{ 'true' if (not scaffold_full_project) or include_meeting_intelligence else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/integrations/meeting_intelligence.py ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/integrations/clients ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/unit/integrations' }}"
+  - "{{ 'true' if (not scaffold_full_project) or include_meeting_intelligence else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/integrations/meeting_intelligence.py ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/integrations/model ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/unit/integrations' }}"
   # If nothing under integrations/ ended up enabled, remove the now-empty package.
   - "{{ 'true' if (not scaffold_full_project) or include_n8n_webhook or include_calendar_integration or include_marketing_integrations or include_meeting_intelligence or include_composio or include_web_research else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/integrations' }}"
   - "{{ 'true' if (not scaffold_full_project) or include_ragas_grader else 'rm -f ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ eval_root ~ '/graders/ragas_grader.py' }}"
@@ -1410,7 +1410,7 @@ _tasks:
   # has nothing to guard. Independent of observability_provider (guards don't
   # trace). Removed from staging (not the final path); like observability/ it
   # rides the AI source-root merge below, so there is no separate merge task.
-  - "{{ 'true' if (not scaffold_full_project) or include_security_guards else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/security' }}"
+  - "{{ 'true' if (not scaffold_full_project) or include_security_guards else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/guardrails' }}"
   # context_budget/ (step 4a′) is agentic-only — an ml-only or non-agent
   # project has no LLM calls to budget. Rides the AI source-root merge below
   # (same as observability/); no separate merge task needed.
@@ -1450,7 +1450,12 @@ _tasks:
   # traceTools were left behind before AIT-44 — a test importing a removed
   # module is an unconditional suite failure, and ts_agent_framework=none has
   # no matrix row to catch it.
-  - "{{ 'true' if (not scaffold_full_project) or (not has_typescript) or ts_project_root == '' or ts_agent_framework == 'vercel_ai_sdk' else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ ts_project_root ~ '/' ~ ts_source_root ~ '/agent ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ ts_project_root ~ '/tests/agent.test.ts ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ ts_project_root ~ '/tests/agent-wiring.test.ts ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ ts_project_root ~ '/tests/traceTools.test.ts ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ ts_project_root ~ '/tests/verificationLoop.test.ts' }}"
+  # AIT-70: the agent tree is now agents/<ts_agent_dir>/ with colocated
+  # __tests__/, and the modules that used to sit beside it moved out to
+  # observability/ (tracing + traceTools) and model/ (gateway) — all of which
+  # are agent-only and go with it. api/ and guardrails/ stay: a plain TS
+  # service still has an HTTP edge and still guards its inputs.
+  - "{{ 'true' if (not scaffold_full_project) or (not has_typescript) or ts_project_root == '' or ts_agent_framework == 'vercel_ai_sdk' else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ ts_project_root ~ '/' ~ ts_source_root ~ '/agents ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ ts_project_root ~ '/' ~ ts_source_root ~ '/observability ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ ts_project_root ~ '/' ~ ts_source_root ~ '/model ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ ts_project_root ~ '/' ~ ts_source_root ~ '/evals' }}"
   # TS backend service (package.json/tsconfig/eslint/jest/src/tests) is staged
   # under _scaffold/<ts_project_root> — only relevant when has_typescript is true
   # (short-circuited below, so ts_project_root is safe to reference) AND

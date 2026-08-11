@@ -9,7 +9,7 @@ from ..settings import settings
 
 log = logging.getLogger(__name__)
 
-# The agent package name ("agents.<name>.clients" -> "<name>") — survives renames.
+# The agent package name ("agents.<name>.model" -> "<name>") — survives renames.
 _AGENT_NAME = __name__.split(".")[1]
 
 

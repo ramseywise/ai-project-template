@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class SecuritySettings(BaseSettings):
-    """Guard settings for security/ -- separate from each agent's own Settings
+    """Guard settings for guardrails/ -- separate from each agent's own Settings
     class since the guards aren't agent-specific (every agent path runs the same
     three layers). Same convention as observability/settings.py.jinja."""
 

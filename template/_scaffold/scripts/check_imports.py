@@ -46,8 +46,8 @@ ENTRY_POINTS: dict[str, str] = {
     # `make {agent}-up` runs `uvicorn agents.<agent>.main:app` — the ASGI app is
     # named on a command line, so no module imports main.py.
     "agents.*.main": "uvicorn target (Makefile: `uvicorn agents.<agent>.main:app`)",
-    # `make {agent}-gateway-up` runs the ADK gateway the same way.
-    "agents.*.gateway.main": "uvicorn target (Makefile: ADK gateway app)",
+    # `make {agent}-api-up` runs the ADK HTTP edge the same way.
+    "agents.*.api.main": "uvicorn target (Makefile: ADK api app)",
     # `python -m core.pipelines.corpus <cmd>` — __main__.py is executed by the
     # interpreter's -m machinery, never imported.
     "core.pipelines.corpus.__main__": "`python -m` entry (Makefile: corpus-preprocess/ingest)",
