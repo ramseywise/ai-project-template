@@ -172,9 +172,7 @@ def _build_pipeline(
         [
             (
                 "preprocess",
-                TabularPreprocessor(
-                    numeric_features=numeric, categorical_features=categorical
-                ),
+                TabularPreprocessor(numeric_features=numeric, categorical_features=categorical),
             ),
             ("model", model),
         ]
@@ -221,7 +219,7 @@ def _out_of_fold_probabilities(
             calibrated = calibrate_classifier(clone(pipeline), method=method, cv=3)
             calibrated.fit(x_train, y_train)
             prob_cal[test_idx] = _positive_probability(calibrated, x_test, positive_label)
-        except Exception as exc:  # noqa: BLE001 — a failed calibration degrades, not aborts
+        except Exception as exc:  # a failed calibration degrades, not aborts
             logger.warning("calibration failed on a fold (%s); using raw probabilities", exc)
             prob_cal[test_idx] = prob_raw[test_idx]
 
@@ -298,7 +296,7 @@ def run_classification(
     try:
         _, _ = sampler.fit_resample(x, y)
         class_weight = getattr(sampler, "class_weight_", None)
-    except Exception as exc:  # noqa: BLE001 — degrade to unweighted rather than abort
+    except Exception as exc:  # degrade to unweighted rather than abort
         logger.warning("sampler %r failed (%s); continuing unweighted", sampling, exc)
         class_weight = None
 
@@ -316,7 +314,7 @@ def run_classification(
             prob_raw, prob_cal, _ = _out_of_fold_probabilities(
                 pipeline, x, y, split_plan, positive_label, calibrate, calibration_method
             )
-        except Exception as exc:  # noqa: BLE001 — one bad model must not kill the run
+        except Exception as exc:  # one bad model must not kill the run
             logger.warning("model %r failed and was skipped: %s", name, exc)
             skipped[name] = str(exc)
             continue

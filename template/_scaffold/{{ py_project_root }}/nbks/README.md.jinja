@@ -7,10 +7,26 @@ notebooks in VS Code/Jupytext).
 - `corpus_analysis.py` — corpus statistics for the ingested article set
   (sizes, categories, token distributions) to sanity-check ingestion before
   trusting retrieval quality numbers.
-{% else %}
+{% endif %}
+{%- if is_ml_shaped %}
+- `01_eda.py` — the first hour of the modelling problem. Bivariate-first:
+  every section compares a feature *against the target* rather than
+  cataloguing columns in isolation. Point the four parameters at the top
+  (`DATA`, `SEP`, `TARGET`, `DROP`) at your frame and work down.
+
+  Two cells are load-bearing and easy to skip. The **leakage audit** runs
+  before any correlation work, because a leaked feature does not raise an
+  error — it returns a great score and reads as success. The **handoff cell**
+  at the bottom is this notebook's actual output: the `CATEGORICAL` /
+  `NUMERIC` / `ORDINAL` / `EXCLUDED` lists that feed
+  `{{ ml_source_root }}/selection/`. It reconciles its own counts, so a column
+  nobody decided about is reported rather than silently dropped.
+{%- endif %}
+{%- if not has_corpus_pipeline and not is_ml_shaped %}
 No notebooks ship for this project shape yet — drop new analyses here as `.py`
 scripts.
-{% endif %}
-Convention: notebooks are read-only consumers of `core/` and the data dirs —
+{%- endif %}
+
+Convention: notebooks are read-only consumers of{% if include_core_etl %} `core/` and{% endif %} the data dirs —
 no pipeline logic lives here. Promote anything reusable into a real module
 with tests.
