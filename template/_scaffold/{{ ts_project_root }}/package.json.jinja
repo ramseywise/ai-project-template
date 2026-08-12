@@ -15,7 +15,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"{% if ts_agent_framework == "vercel_ai_sdk" %},
-    "eval": "tsx {{ ts_source_root }}/agent/eval/run.ts"{% endif %}
+    "eval": "tsx {{ ts_source_root }}/evals/run.ts"{% endif %}
   },
   "engines": {
     "node": ">=18"

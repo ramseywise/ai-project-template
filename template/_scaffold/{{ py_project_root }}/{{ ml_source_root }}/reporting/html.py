@@ -78,9 +78,7 @@ def _model_table(result: Any) -> str:
 
     return (
         "<table><thead><tr><th>model</th><th>PR-AUC</th><th>ROC-AUC</th>"
-        "<th>Brier</th><th>fit (s)</th></tr></thead><tbody>"
-        + "".join(rows)
-        + "</tbody></table>"
+        "<th>Brier</th><th>fit (s)</th></tr></thead><tbody>" + "".join(rows) + "</tbody></table>"
     )
 
 

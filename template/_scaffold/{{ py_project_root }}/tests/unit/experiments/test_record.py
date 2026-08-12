@@ -24,7 +24,9 @@ def _code_state() -> CodeState:
 
 
 def _data_identity() -> DataIdentity:
-    return DataIdentity(frame_hash="abc123", n_rows=100, n_cols=5, columns=("a", "b", "c", "d", "e"))
+    return DataIdentity(
+        frame_hash="abc123", n_rows=100, n_cols=5, columns=("a", "b", "c", "d", "e")
+    )
 
 
 def test_headline_metric_absent_from_metrics_raises() -> None:

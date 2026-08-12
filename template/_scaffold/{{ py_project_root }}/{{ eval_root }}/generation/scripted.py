@@ -112,9 +112,7 @@ class ScriptedProvider:
             # A hex literal where the contract requires a named theme color.
             return "#ff2d55" if breaching and self.bad_color else "accent"
 
-        over = breaching and (
-            self.stress_fields is None or field_spec.name in self.stress_fields
-        )
+        over = breaching and (self.stress_fields is None or field_spec.name in self.stress_fields)
 
         # Aim just inside the word ceiling, or past it when overshooting.
         ceiling = field_spec.max_words or 20

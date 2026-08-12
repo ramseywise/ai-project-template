@@ -101,7 +101,11 @@ async def _produce(case: LogCase, contract: LogLineContract, provider: Any) -> P
     if not valid:
         used_fallback = True
         output = {
-            spec.name: (output.get(spec.name, "")[: spec.max_chars] if spec.max_chars else output.get(spec.name, ""))
+            spec.name: (
+                output.get(spec.name, "")[: spec.max_chars]
+                if spec.max_chars
+                else output.get(spec.name, "")
+            )
             for spec in contract.fields
         }
 
@@ -120,10 +124,30 @@ async def _produce(case: LogCase, contract: LogLineContract, provider: Any) -> P
 
 
 CASES = [
-    LogCase(case_id="easy-1", prompt="disk usage warning", source_lines=["disk usage exceeded 90 percent"], difficulty="easy"),
-    LogCase(case_id="medium-1", prompt="connection reset", source_lines=["connection reset by peer"], difficulty="medium"),
-    LogCase(case_id="hard-1", prompt="unhandled exception", source_lines=["unhandled exception in worker pool"], difficulty="hard"),
-    LogCase(case_id="hard-stubborn", prompt="fatal crash", source_lines=["fatal crash during shutdown sequence"], difficulty="hard"),
+    LogCase(
+        case_id="easy-1",
+        prompt="disk usage warning",
+        source_lines=["disk usage exceeded 90 percent"],
+        difficulty="easy",
+    ),
+    LogCase(
+        case_id="medium-1",
+        prompt="connection reset",
+        source_lines=["connection reset by peer"],
+        difficulty="medium",
+    ),
+    LogCase(
+        case_id="hard-1",
+        prompt="unhandled exception",
+        source_lines=["unhandled exception in worker pool"],
+        difficulty="hard",
+    ),
+    LogCase(
+        case_id="hard-stubborn",
+        prompt="fatal crash",
+        source_lines=["fatal crash during shutdown sequence"],
+        difficulty="hard",
+    ),
 ]
 
 STRESS_PROFILES = {"hard-stubborn": StressProfile(stubborn=True)}
@@ -166,7 +190,9 @@ async def test_second_consumer_runs_end_to_end_with_non_degenerate_spread() -> N
 
 @pytest.mark.asyncio
 async def test_dead_producer_scores_as_error_without_ending_the_run() -> None:
-    async def dead_produce(case: LogCase, contract: LogLineContract, provider: Any) -> ProducerOutcome:
+    async def dead_produce(
+        case: LogCase, contract: LogLineContract, provider: Any
+    ) -> ProducerOutcome:
         if case.case_id == "boom":
             raise RuntimeError("simulated producer failure")
         return await _produce(case, contract, provider)
@@ -177,7 +203,9 @@ async def test_dead_producer_scores_as_error_without_ending_the_run() -> None:
     ]
     providers = {c.case_id: scripted_provider_for(c, LOG_CONTRACT.fields, {}) for c in cases}
 
-    async def produce_with_provider(case: LogCase, contract: LogLineContract, _provider: Any) -> ProducerOutcome:
+    async def produce_with_provider(
+        case: LogCase, contract: LogLineContract, _provider: Any
+    ) -> ProducerOutcome:
         return await dead_produce(case, contract, providers[case.case_id])
 
     results = await run_all(
@@ -203,7 +231,9 @@ async def test_run_all_preserves_case_order() -> None:
 
     providers = {c.case_id: scripted_provider_for(c, LOG_CONTRACT.fields, {}) for c in CASES}
 
-    async def produce_with_provider(case: LogCase, contract: LogLineContract, _provider: Any) -> ProducerOutcome:
+    async def produce_with_provider(
+        case: LogCase, contract: LogLineContract, _provider: Any
+    ) -> ProducerOutcome:
         return await produce(case, contract, providers[case.case_id])
 
     results = await run_all(
@@ -220,11 +250,7 @@ async def test_run_all_preserves_case_order() -> None:
 class TestLoadCaseRows:
     def test_skips_blank_lines_and_rejects_duplicates(self, tmp_path: Path) -> None:
         good = tmp_path / "cases.jsonl"
-        good.write_text(
-            '{"case_id": "a", "prompt": "x"}\n'
-            "\n"
-            '{"case_id": "b", "prompt": "y"}\n'
-        )
+        good.write_text('{"case_id": "a", "prompt": "x"}\n\n{"case_id": "b", "prompt": "y"}\n')
         rows = load_case_rows(good, LogCase.from_dict)
         assert [r.case_id for r in rows] == ["a", "b"]
 
@@ -250,3 +276,51 @@ class TestNoGalactusImport:
             assert mod.__file__ is not None
             with open(mod.__file__) as f:
                 assert "galactus" not in f.read()
+
+
+@pytest.mark.asyncio
+async def test_shared_provider_attributes_only_its_own_calls_to_each_case() -> None:
+    """`run_all(provider=...)` is documented, but every test above hands each
+    case its own provider — so a cumulative `provider.calls` read looked correct.
+
+    On the shared path the counter never resets, so case N would report every
+    call made since the run began: per-case counts climb 1, 2, 3 and the total
+    grows quadratically while the run is behaving perfectly.
+    """
+
+    class CountingProvider:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def complete_structured(self, _prompt: str, _schema: Any) -> dict[str, str]:
+            self.calls += 1
+            return {"level": "INFO", "message": "ok"}
+
+    shared = CountingProvider()
+
+    async def produce_one_call(
+        case: LogCase, contract: LogLineContract, provider: Any
+    ) -> ProducerOutcome:
+        output = await provider.complete_structured(case.prompt, None)
+        return ProducerOutcome(
+            output=output,
+            first_pass_valid=True,
+            repair_attempts=0,
+            used_fallback=False,
+            grounding_texts=[],
+        )
+
+    results = await run_all(
+        CASES,
+        contract_for=_contract_for,
+        produce=produce_one_call,
+        validate=_validate,
+        is_grounded=is_grounded,
+        provider=shared,
+    )
+
+    assert shared.calls == len(CASES), "fixture must make exactly one call per case"
+    assert [r.llm_calls for r in results] == [1] * len(CASES), (
+        "each case must report only the calls it made, not the run's running total"
+    )
+    assert sum(r.llm_calls for r in results) == shared.calls

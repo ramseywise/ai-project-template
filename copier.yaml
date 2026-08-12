@@ -1022,9 +1022,13 @@ include_ml:
 # experiments/record.py), so this does NOT gate on include_ml. Default is
 # "on whenever a full scaffold happens", same posture as eval_root, which
 # has no off-switch of its own either.
+# It IS gated on the backend language: experiments/ is a Python tree, and the
+# _tasks copy step already refuses to stage it for a TS-only backend. Without
+# the same guard here the flag stays true for that scaffold and pulls in a
+# pandas dependency plus pyright/pythonpath entries for a tree that never lands.
 include_run_registry:
   type: bool
-  default: "{{ scaffold_full_project }}"
+  default: "{{ scaffold_full_project and primary_backend_language in ['python', 'both'] }}"
   when: false
 
 # LLM tracing provider for backend/src/observability/ (step 3′). Agentic-only:

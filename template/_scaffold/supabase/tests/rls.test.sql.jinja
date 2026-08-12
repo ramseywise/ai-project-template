@@ -137,12 +137,16 @@ select is(
 reset role;
 select test_as(:bob_id);
 
-select is(
-  (select count(*) from (insert into organization_members
-     (organization_id, user_id, role)
-     values ('eeeeeeee-0000-0000-0000-000000000002',
-             '22222222-2222-2222-2222-222222222222', 'member')
-     on conflict do nothing returning 1) i)::int, 0,
+-- A WITH CHECK denial raises 42501 rather than inserting zero rows, so this
+-- asserts the error the way the items INSERT deny-cases above do. Counting
+-- rows here would abort the plan on the raised exception instead of failing
+-- the single test.
+select throws_ok(
+  $$insert into organization_members (organization_id, user_id, role)
+    values ('eeeeeeee-0000-0000-0000-000000000002',
+            '22222222-2222-2222-2222-222222222222', 'member')$$,
+  '42501',
+  null,
   'bob cannot add himself to another org'
 );
 

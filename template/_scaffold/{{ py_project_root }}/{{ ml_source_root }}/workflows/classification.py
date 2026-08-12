@@ -172,9 +172,7 @@ def _build_pipeline(
         [
             (
                 "preprocess",
-                TabularPreprocessor(
-                    numeric_features=numeric, categorical_features=categorical
-                ),
+                TabularPreprocessor(numeric_features=numeric, categorical_features=categorical),
             ),
             ("model", model),
         ]
@@ -221,7 +219,7 @@ def _out_of_fold_probabilities(
             calibrated = calibrate_classifier(clone(pipeline), method=method, cv=3)
             calibrated.fit(x_train, y_train)
             prob_cal[test_idx] = _positive_probability(calibrated, x_test, positive_label)
-        except Exception as exc:  # noqa: BLE001 — a failed calibration degrades, not aborts
+        except Exception as exc:  # a failed calibration degrades, not aborts
             logger.warning("calibration failed on a fold (%s); using raw probabilities", exc)
             prob_cal[test_idx] = prob_raw[test_idx]
 
@@ -242,6 +240,21 @@ def _positive_probability(fitted: Any, x: pd.DataFrame, positive_label: Any) -> 
     except ValueError:
         index = len(classes) - 1
     return proba[:, index]
+
+
+def _negative_label(y: np.ndarray, positive_label: Any) -> Any:
+    """The other label in a binary target, in the target's own encoding.
+
+    Thresholding a probability yields a positive/negative decision, and that
+    decision has to be expressed in the same labels as `y_true` for the
+    label-based metrics to see any agreement at all. Falls back to `int(not
+    positive_label)` only for a degenerate single-class fold, where there is no
+    second label to read off the data.
+    """
+    others = [label for label in np.unique(y).tolist() if label != positive_label]
+    if not others:
+        return 0 if positive_label == 1 else int(not positive_label)
+    return others[0]
 
 
 def run_classification(
@@ -298,7 +311,7 @@ def run_classification(
     try:
         _, _ = sampler.fit_resample(x, y)
         class_weight = getattr(sampler, "class_weight_", None)
-    except Exception as exc:  # noqa: BLE001 — degrade to unweighted rather than abort
+    except Exception as exc:  # degrade to unweighted rather than abort
         logger.warning("sampler %r failed (%s); continuing unweighted", sampling, exc)
         class_weight = None
 
@@ -316,7 +329,7 @@ def run_classification(
             prob_raw, prob_cal, _ = _out_of_fold_probabilities(
                 pipeline, x, y, split_plan, positive_label, calibrate, calibration_method
             )
-        except Exception as exc:  # noqa: BLE001 — one bad model must not kill the run
+        except Exception as exc:  # one bad model must not kill the run
             logger.warning("model %r failed and was skipped: %s", name, exc)
             skipped[name] = str(exc)
             continue
@@ -329,7 +342,14 @@ def run_classification(
 
         y_scored = y[scored]
         prob_scored = prob_cal[scored]
-        y_pred = (prob_scored >= 0.5).astype(int)
+        # Threshold back into the label space, not into 0/1. `y_scored` holds the
+        # original labels and classification_metrics compares against them with
+        # pos_label=positive_label, so a hardcoded int encoding makes every
+        # label-based metric (precision/recall/f1/confusion) silently zero out
+        # whenever the labels are not already 0/1 — while PR-AUC, which is
+        # computed from probabilities, still looks healthy.
+        negative_label = _negative_label(y_scored, positive_label)
+        y_pred = np.where(prob_scored >= 0.5, positive_label, negative_label)
 
         metrics = classification_metrics(
             y_scored, y_pred, prob_scored, positive_label=positive_label

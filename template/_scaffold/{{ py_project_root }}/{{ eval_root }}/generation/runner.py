@@ -59,6 +59,13 @@ async def run_case(
     """
     contract = contract_for(case)
 
+    # `provider.calls` is cumulative for the provider's lifetime, so a bare read
+    # attributes every earlier case's calls to this one when a single provider is
+    # shared across a run (the documented run_all(provider=...) path). Record the
+    # delta across this case instead; with a fresh provider per case the baseline
+    # is 0 and the delta is identical to the old reading.
+    calls_before = getattr(provider, "calls", 0)
+
     try:
         outcome = await produce(case, contract, provider)
     except Exception as exc:  # one dead case must not end the run
@@ -70,7 +77,7 @@ async def run_case(
             used_fallback=False,
             grounded=False,
             contract_valid=False,
-            llm_calls=getattr(provider, "calls", 0),
+            llm_calls=getattr(provider, "calls", 0) - calls_before,
             error=f"{type(exc).__name__}: {exc}",
         )
 
@@ -82,7 +89,7 @@ async def run_case(
         used_fallback=outcome.used_fallback,
         grounded=is_grounded(outcome.output, outcome.grounding_texts),
         contract_valid=validate(outcome.output, contract),
-        llm_calls=getattr(provider, "calls", 0),
+        llm_calls=getattr(provider, "calls", 0) - calls_before,
     )
 
 

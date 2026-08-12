@@ -149,3 +149,36 @@ def test_no_signal_does_not_beat_the_baseline():
         "features are pure noise — a margin this small is fold-to-fold variance "
         "being reported as signal"
     )
+
+
+# --- Test 4: labels that are not already 0/1. `positive_label` is a public
+# parameter and `_positive_probability` goes out of its way to locate the
+# positive class by label, so a string-labelled target is a supported call.
+# Thresholding into a hardcoded 0/1 encoding breaks that contract: y_true holds
+# the original labels, so sklearn sees a mixed/multiclass comparison and the
+# whole model is dropped into `skipped` — a silent empty report, not an error.
+def test_non_binary_encoded_labels_are_scored_in_their_own_encoding(imbalanced_frame):
+    frame = imbalanced_frame.copy()
+    frame["charged_off"] = np.where(frame["charged_off"] == 1, "churn", "stay")
+
+    result = run_classification(
+        frame,
+        target="charged_off",
+        output="binary",
+        models=["logistic"],
+        sampling="class_weight",
+        splitter=make_splitter(n_splits=3, random_state=RANDOM_STATE),
+        positive_label="churn",
+        seed=RANDOM_STATE,
+    )
+
+    assert result.best is not None, (
+        "a string-labelled target dropped every candidate into `skipped` — the "
+        "predictions were encoded 0/1 while y_true held the original labels"
+    )
+    # The label-based metrics are the ones a 0/1 encoding destroys; PR-AUC is
+    # computed from probabilities and stays healthy either way, which is exactly
+    # what makes the failure quiet enough to need asserting here.
+    assert result.best.metrics.precision > 0.0
+    assert result.best.metrics.recall > 0.0
+    assert result.best.metrics.f1 > 0.0
