@@ -118,7 +118,7 @@ notebooks = [
 package = false
 
 [tool.pytest.ini_options]
-pythonpath = ["{{ py_project_root }}/{{ ai_source_root }}"{% if include_ml or include_run_registry %}, "{{ py_project_root }}"{% endif %}, "."]
+pythonpath = [{% if not is_ml_shaped %}"{{ py_project_root }}/{{ ai_source_root }}", {% endif %}{% if include_ml or include_run_registry %}"{{ py_project_root }}", {% endif %}"."]
 asyncio_mode = "auto"
 addopts = "-v --ignore=tests/integration"
 markers = ["integration: real external calls, opt-in only"]
@@ -148,9 +148,9 @@ ignore = ["E501", "RUF001", "RUF002", "RUF003", "N803", "N806"]
 #     is a real directory (e.g. 'backend') rather than '.'.
 # Pinning the whole set makes import order identical across every layout.
 [tool.ruff.lint.isort]
-known-first-party = ["agents", "context_budget", "integrations", "middleware", "observability", "security"{% if include_ml %}, "{{ ml_source_root }}"{% endif %}{% if include_run_registry %}, "{{ run_registry_root }}"{% endif %}]
+known-first-party = [{% if not is_ml_shaped %}"agents", "context_budget", "integrations", "middleware", "observability", "security"{% endif %}{% if include_ml %}{% if not is_ml_shaped %}, {% endif %}"{{ ml_source_root }}"{% endif %}{% if include_run_registry %}, "{{ run_registry_root }}"{% endif %}]
 
 [tool.pyright]
-include = ["{{ py_project_root }}/{{ ai_source_root }}", "core", "{{ eval_root }}", "tests"{% if include_ml %}, "{{ py_project_root }}/{{ ml_source_root }}"{% endif %}{% if include_run_registry %}, "{{ py_project_root }}/{{ run_registry_root }}"{% endif %}]
-extraPaths = ["{{ py_project_root }}/{{ ai_source_root }}"{% if include_ml or include_run_registry %}, "{{ py_project_root }}"{% endif %}]
+include = [{% if not is_ml_shaped %}"{{ py_project_root }}/{{ ai_source_root }}", {% endif %}{% if include_core_etl %}"core", {% endif %}{% if include_eval_suite %}"{{ eval_root }}", {% endif %}"tests"{% if include_ml %}, "{{ py_project_root }}/{{ ml_source_root }}"{% endif %}{% if include_run_registry %}, "{{ py_project_root }}/{{ run_registry_root }}"{% endif %}]
+extraPaths = [{% if not is_ml_shaped %}"{{ py_project_root }}/{{ ai_source_root }}"{% if include_ml or include_run_registry %}, {% endif %}{% endif %}{% if include_ml or include_run_registry %}"{{ py_project_root }}"{% endif %}]
 pythonVersion = "{{ python_version }}"
