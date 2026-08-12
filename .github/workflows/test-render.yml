@@ -158,11 +158,16 @@ jobs:
             ${{ matrix.args }} \
             . "$GITHUB_WORKSPACE/out"
 
-      # .agents/ is vendored reference material that mentions copier variables in
+      # skills/ is vendored reference material that mentions copier variables in
       # prose (e.g. framework-selection's SKILL.md) — excluded here for the same
       # reason the generated Makefile's LINT_PATHS and pre-commit exclude it.
+      # It moved from .agents/ to .claude/skills/ ("mv skills folder"), which is
+      # why the exclusion is keyed to the directory name rather than the old path.
       # .claude/skills/new-agent/references/ carries Cypher/JSON/prose examples
       # with literal {{ }} (not unrendered copier) — same exclusion rationale.
+      # The f-string pattern is scripted.py's literal {{field}} placeholder
+      # emitted by an f-string ('{{{{' collapses to '{{' at runtime) — real code,
+      # not unrendered copier.
       # {{prompt}}/{{question}} are promptfoo's own runtime template syntax, not
       # unrendered copier Jinja — filtered by pattern (not by excluding the whole
       # file, which also carries real copier substitutions worth checking).
@@ -179,7 +184,7 @@ jobs:
         env:
           ACTIONS_EXPR: '[$]{{'
         run: |
-          if grep -rn '{{' out/ --exclude-dir='.agents' --exclude-dir='references' --include='*.py' --include='*.md' --include='*.toml' --include='*.yaml' --include='*.yml' | grep -v "font-family\|border-collapse\|padding: 0.4rem\|background: #f2f2f2\|margin-bottom\|font-weight: bold\|{{prompt}}\|{{question}}\|{{ }}\|$ACTIONS_EXPR"; then
+          if grep -rn '{{' out/ --exclude-dir='.agents' --exclude-dir='skills' --exclude-dir='references' --include='*.py' --include='*.md' --include='*.toml' --include='*.yaml' --include='*.yml' | grep -v "font-family\|border-collapse\|padding: 0.4rem\|background: #f2f2f2\|margin-bottom\|font-weight: bold\|{{prompt}}\|{{question}}\|{{ }}\|return f\"{{{{{field_spec.name}}}}}\"$\|$ACTIONS_EXPR"; then
             echo "Leftover unrendered Jinja found"
             exit 1
           fi
