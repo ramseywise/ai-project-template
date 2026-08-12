@@ -64,6 +64,7 @@ VAR_DEFAULTS: dict[str, str] = {
     "py_project_root": "backend",
     "ai_source_root": "src",
     "ml_source_root": "ml",
+    "run_registry_root": "experiments",
     "eval_root": "evals",
     "ts_project_root": "my-project",
     "ts_source_root": "src",
@@ -87,6 +88,17 @@ JINJA_VAR_RE = re.compile(r"\{\{[^}]+\}\}")
 # Matches CSS-style {{ }} blocks (contain `:` property syntax or `;`) — not Jinja expressions.
 # Compiled once at module level; used in render-test body sweep.
 _CSS_RE = re.compile(r"\{\{\s*[\w-]+(?:\s*:\s*[^}]+|[^}]*;[^}]*)\}\}")
+# Python f-string brace escaping, not unrendered Jinja: inside an f-string `{{` and
+# `}}` are the escapes for a literal brace, so `f"{{{{{expr}}}}}"` EMITS the text
+# `{{value}}` — a placeholder the rendered code writes at runtime. JINJA_VAR_RE sees
+# the doubled braces and can't tell the two apart, so the body sweep reported these
+# as leftover template syntax on a clean render.
+#
+# The same false positive is filtered in .github/workflows/test-render.yml's "Check
+# for leftover Jinja" step; keep the two in sync. Matching the escape *form* (an odd
+# run of braces around a single expression) rather than whitelisting one literal line
+# keeps this from rotting the moment that expression is renamed.
+_FSTRING_BRACE_RE = re.compile(r"\{\{\{+[^{}]+\}\}\}+")
 
 # Path fragment patterns that _tasks uses (rm, mv, cp, mkdir).
 # We extract the path arguments after the command name.
@@ -662,6 +674,23 @@ RENDER_MATRIX = [
         ],
     },
     {
+        # The ml_model SHAPE — no agentic scaffold at all. Distinct from the
+        # "python ml + all metrics" row below, which is ML layered onto one.
+        "label": "ml_model shape",
+        "flags": [
+            "-d",
+            "project_name=TestProject",
+            "-d",
+            "project_type=ml_model",
+            "-d",
+            "include_agent_reference_library=false",
+            "-d",
+            "global_skills_source=none",
+            "-d",
+            "enable_macos_notifications=false",
+        ],
+    },
+    {
         "label": "python ml + all metrics",
         "flags": [
             "-d",
@@ -797,10 +826,25 @@ def run_render_tests() -> list[dict[str, Any]]:
                             # expression (bare identifier, filter, or operator) —
                             # not CSS properties (contain ; or start with a CSS keyword
                             # followed by non-identifier chars). _CSS_RE is at module level.
+                            # f-string escapes are spotted by span rather than by
+                            # fullmatch: JINJA_VAR_RE's `[^}]+` stops at the first
+                            # `}`, so on `f"{{{{{name}}}}}"` it captures a prefix of
+                            # the escape, never the whole thing. Overlapping the
+                            # match against the escapes found in the full body is
+                            # what makes the two regexes comparable.
+                            fstring_spans = [m.span() for m in _FSTRING_BRACE_RE.finditer(body)]
+
+                            def _is_fstring_escape(
+                                match: re.Match[str],
+                                spans: list[tuple[int, int]] = fstring_spans,
+                            ) -> bool:
+                                start, end = match.span()
+                                return any(s <= start and end <= e for s, e in spans)
+
                             jinja_matches = [
                                 m
                                 for m in JINJA_VAR_RE.finditer(body)
-                                if not _CSS_RE.fullmatch(m.group(0))
+                                if not _CSS_RE.fullmatch(m.group(0)) and not _is_fstring_escape(m)
                             ]
                             if (
                                 suffix not in allowed_template_exts
@@ -861,6 +905,18 @@ _CATALOG_SKIP_VARS: set[str] = {
     "has_gradeable_interactions",
     "include_interaction_evals",
     "enable_structure_guard",
+    "include_run_registry",
+    # ml_model shape gates — all derived from project_type via is_ml_shaped,
+    # not independently set. They govern which roots a shape renders (the
+    # inverse of a capability: you do not "add lifecycle docs" to a project,
+    # the shape either has them or it does not), so there is nothing for
+    # /add-capability to document.
+    "is_ml_shaped",
+    "include_llm_kit",
+    "include_eval_suite",
+    "include_core_etl",
+    "include_lifecycle_docs",
+    "include_notebooks",
     # derived slug vars (computed from mcp_server_slug; not set independently)
     "py_mcp_server_slug",
     "ts_mcp_server_slug",
@@ -906,6 +962,7 @@ _CATALOG_SKIP_VARS: set[str] = {
     "py_project_root",
     "ai_source_root",
     "ml_source_root",
+    "run_registry_root",
     "eval_root",
     "ts_project_root",
     "ts_source_root",
