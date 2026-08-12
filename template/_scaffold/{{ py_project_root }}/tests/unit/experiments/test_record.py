@@ -9,6 +9,7 @@ failure mode (WALKTHROUGH's brier/getattr bug) this schema exists to close.
 from __future__ import annotations
 
 import pytest
+
 from experiments.record import CodeState, DataIdentity, ExecutionConfig, NotApplicable, RunRecord
 
 
