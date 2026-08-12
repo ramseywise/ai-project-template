@@ -120,6 +120,7 @@ project_type:
     "MCP server": mcp_server
     "AI backend / API service": ai_backend
     "Evaluation suite": eval_suite
+    "ML model (tabular / classical ML)": ml_model
     "Research prototype": prototype
     "Layer onto an existing repo (tooling only)": existing_repo
   default: chat_app
@@ -139,6 +140,26 @@ scaffold_full_project:
 is_agent_shaped:
   type: bool
   default: "{{ scaffold_full_project and project_type in ['chat_app', 'agent', 'workflow', 'rag', 'ai_backend'] }}"
+  when: false
+
+# The ML twin of is_agent_shaped, and the reason it exists as its own predicate
+# rather than as `not is_agent_shaped`: those two are NOT complements. Several
+# shapes (eval_suite, mcp_server, prototype) are neither agent-shaped nor
+# ml-shaped, and each still ships the agentic scaffold. Only ml_model selects
+# an ML-shaped project — a project whose payload is {{ ml_source_root }}/ +
+# nbks/ + tests/unit/ml and which renders NO agents/, evals/, llm_kit/, core/,
+# or agentic lifecycle docs.
+#
+# This is the flag the gate-7 walkthrough asked for. Before it, `include_ml=true`
+# layered ML *on top of* a full agentic scaffold — there was no way to render an
+# ML project, only an agentic project that also had ml/. include_ml stays the
+# "add the ML toolkit to whatever this project is" capability toggle; this is
+# the "this project IS an ML project" shape predicate. Referenced by
+# include_ml/has_corpus_pipeline/include_llm_kit/the doc gates and the _tasks
+# cleanups — edit the shape list here only.
+is_ml_shaped:
+  type: bool
+  default: "{{ scaffold_full_project and project_type == 'ml_model' }}"
   when: false
 
 primary_users:
@@ -1010,11 +1031,76 @@ include_ml:
     if (_external_data.design is defined and _external_data.design and
     _external_data.design.stages is defined and
     _external_data.design.stages.discovery == 'complete') else
-    ('ml' in optional_features) }}
+    (is_ml_shaped or 'ml' in optional_features) }}
   # Q5 row 2: repoints include_ml's OWN default directly, bypassing the
   # optional_features multiselect (design.yaml never reconstructs that list).
   # Stage-gated on discovery; else = existing A3-derived 'ml' in
-  # optional_features expression, kept verbatim.
+  # optional_features expression, plus is_ml_shaped: the ml_model shape ships
+  # the ML toolkit as its payload, not as an opt-in add-on. Kept as an OR (not
+  # a replacement) so a non-ML shape can still add ml/ via optional_features,
+  # which is the pre-existing /add-capability path.
+  when: false
+
+# The run registry (experiments/) is a top-level shared root, not an
+# ml_source_root subtree — AI evals consume the same record shape (see
+# experiments/record.py), so this does NOT gate on include_ml. Default is
+# "on whenever a full scaffold happens", same posture as eval_root, which
+# has no off-switch of its own either. It is one of the few roots an ml_model
+# render KEEPS: a model comparison is exactly the thing a run registry records.
+include_run_registry:
+  type: bool
+  default: "{{ scaffold_full_project }}"
+  when: false
+
+# llm_kit/ is a standalone LLM-calling starter kit at the repo root. It had no
+# gate at all before ml_model existed — it rendered into every project,
+# including layering-only ones, and nothing in copier.yaml or _tasks referenced
+# it. An ML project has no LLM call to make, so it is the clearest thing to drop:
+# gated OFF for the ml_model shape and preserved everywhere else, so this
+# introduces the flag without changing any existing render.
+include_llm_kit:
+  type: bool
+  default: "{{ not is_ml_shaped }}"
+  when: false
+
+# The eval suite (evals/) grades model interactions — an ML project measures its
+# models with ml/evaluation/ and the run registry instead, so the whole eval root
+# goes. Its own toggle rather than a bare is_ml_shaped reference in _tasks: the
+# eval tree is also what a future non-agentic-but-graded shape would want to keep,
+# and `-d include_eval_suite=true` restores it on an ml_model render.
+include_eval_suite:
+  type: bool
+  default: "{{ scaffold_full_project and not is_ml_shaped }}"
+  when: false
+
+# core/ is the general ETL home for the corpus/document pipeline that feeds
+# retrieval. An ML project's data work lives in ml/transform + ml/feature_engineering
+# against a tabular frame, so core/ ships nothing it uses. Same override posture
+# as include_eval_suite above.
+include_core_etl:
+  type: bool
+  default: "{{ scaffold_full_project and not is_ml_shaped }}"
+  when: false
+
+# The agentic lifecycle docs (LIFECYCLE/DELIVERY/DEPLOYMENT/RELEASE + SANYI) are
+# written around gates that read eval evidence and a change contract over agent
+# behaviour — none of which an ml_model render produces. DESIGN.md and CLAUDE.md
+# are NOT in this set: both are shape-neutral project docs every render keeps.
+include_lifecycle_docs:
+  type: bool
+  default: "{{ scaffold_full_project and not is_ml_shaped }}"
+  when: false
+
+# nbks/ used to ride entirely on has_corpus_pipeline — the corpus_analysis.py
+# notebook was the only thing in it, so a non-corpus render dropped the whole
+# directory. An ML project is the case where notebooks matter MOST (the
+# prototype-genesis ML branch treats the EDA notebook as load-bearing: templated
+# code arrives while the operator looks at real data), so the gate becomes the
+# union of the two reasons a project has notebooks. Which notebook FILES ship is
+# still decided per-reason — see the two _tasks cleanups.
+include_notebooks:
+  type: bool
+  default: "{{ scaffold_full_project and (has_corpus_pipeline or is_ml_shaped) }}"
   when: false
 
 # The run registry (experiments/) is a top-level shared root, not an
@@ -1300,6 +1386,10 @@ _tasks:
   # Corpus data pipeline (core/pipelines/corpus/) + its retrieval golden-QA eval,
   # tests, example corpus, analysis notebook, and lg_agent's retrieve node +
   # test — shipped only when the corpus demo layer is on (has_corpus_pipeline).
+  # Note this removes nbks/corpus_analysis.py, the FILE, not nbks/ the directory:
+  # the ML shape also ships notebooks (see include_notebooks), so the directory's
+  # own removal moved to its own task below. Removing the dir here would delete
+  # the ML EDA notebook on every ml_model render, which has no corpus pipeline.
   # core/ itself (the general ETL home) always ships in a full scaffold; only the
   # corpus SUBpackage and everything welded to it is removed here for a
   # non-retrieval shape. Staged under _scaffold/, removed before the big mv —
@@ -1322,7 +1412,7 @@ _tasks:
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/core/pipelines/corpus '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/data/raw_corpus '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/unit/core '
-    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/nbks '
+    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/nbks/corpus_analysis.py '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ eval_root ~ '/graders/custom '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ eval_root ~ '/pipelines/run.py '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ eval_root ~ '/graders/citation.py '
@@ -1358,7 +1448,7 @@ _tasks:
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ eval_root ~ '/reports/builder.py '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ eval_root ~ '/reports/renderer.py '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/data/evals '
-    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/unit/evals' }}
+    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/unit/evals/test_interaction_evals.py' }}
   - "{{ 'true' if (not scaffold_full_project) or include_promptfoo else 'rm -f ' ~ _copier_conf.dst_path ~ '/_scaffold/promptfoo.config.yaml' }}"
   # cd.yml builds infrastructure/containers/lg_agent/Dockerfile — the only image
   # the template ships — so it needs BOTH a docker/cloud deployment_target and
@@ -1521,6 +1611,12 @@ _tasks:
     ~ _copier_conf.dst_path ~ '/_scaffold/.env.example '
     ~ _copier_conf.dst_path ~ '/_scaffold/project_init.sh '
     ~ _copier_conf.dst_path ~ '/') if scaffold_full_project else 'true' }}
+  # SANYI.md is promoted separately, not in the unconditional mv above: the
+  # lifecycle-docs cleanup removes it from staging for the ml_model shape, and
+  # `mv` fails the WHOLE task (taking pyproject.toml/Makefile with it) the moment
+  # one listed source is missing. Same reasoning as the railway.toml/promptfoo
+  # bare-file moves further down.
+  - "{{ ('mv ' ~ _copier_conf.dst_path ~ '/_scaffold/SANYI.md ' ~ _copier_conf.dst_path ~ '/') if (scaffold_full_project and include_lifecycle_docs) else 'true' }}"
   # README.md is the project's own doc — never clobber an existing one on
   # re-render (copier --skip semantics don't reach post-task mv).
   - >-
@@ -1542,28 +1638,39 @@ _tasks:
     ~ _copier_conf.dst_path ~ '/_scaffold/configs/. ' ~ _copier_conf.dst_path ~ '/configs/'
     ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/data && cp -R '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/data/. ' ~ _copier_conf.dst_path ~ '/data/'
-    ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/core && cp -R '
-    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/core/. ' ~ _copier_conf.dst_path ~ '/core/'
-    ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/' ~ eval_root ~ ' && cp -R '
-    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ eval_root ~ '/. ' ~ _copier_conf.dst_path ~ '/' ~ eval_root ~ '/'
     ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/tests && cp -R '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/. ' ~ _copier_conf.dst_path ~ '/tests/'
     ~ ' && mkdir -p ' ~ _copier_conf.dst_path ~ '/infrastructure && cp -R '
     ~ _copier_conf.dst_path ~ '/_scaffold/infrastructure/. ' ~ _copier_conf.dst_path ~ '/infrastructure/'
     ) if scaffold_full_project else 'true' }}
+  # Separate merges (not part of the block above) — core/ and evals/ are removed
+  # from staging entirely for the ml_model shape, so their source dirs may not
+  # exist. Folding a missing source into the chained && block aborts the whole
+  # chain (and with it every promotion after it), which is why each optional root
+  # gets its own task — same reasoning as the ml/ and nbks/ merges below.
+  - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/core && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/core/. ' ~ _copier_conf.dst_path ~ '/core/') if (scaffold_full_project and include_core_etl) else 'true' }}"
+  - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/' ~ eval_root ~ ' && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ eval_root ~ '/. ' ~ _copier_conf.dst_path ~ '/' ~ eval_root ~ '/') if (scaffold_full_project and include_eval_suite) else 'true' }}"
   # Separate merge (not part of the block above) — the corpus cleanup task above
-  # rm -rf's the whole staged nbks directory when the project ships no notebooks
-  # (has_corpus_pipeline=false), so it may not exist at all; folding it into the
+  # removes the corpus notebook and the nbks task removes the directory when the
+  # project ships no notebooks at all, so it may not exist; folding it into the
   # chained && block would abort the whole chain on a missing source path (same
-  # reasoning as the ml merge below).
-  - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/nbks && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/nbks/. ' ~ _copier_conf.dst_path ~ '/nbks/') if (scaffold_full_project and has_corpus_pipeline) else 'true' }}"
+  # reasoning as the ml merge below). Gated on include_notebooks rather than
+  # has_corpus_pipeline so the ml_model shape's EDA notebook actually promotes —
+  # under the old gate it was staged, never copied, and silently discarded with
+  # _scaffold/.
+  - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/nbks && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/nbks/. ' ~ _copier_conf.dst_path ~ '/nbks/') if (scaffold_full_project and include_notebooks) else 'true' }}"
   # Separate merge (not part of the block above) — the Python backend tree only
   # belongs in a project whose backend is Python. Pre-2b′ this rode along in the
   # unconditional block, so a typescript-only project still got a Python src/
   # tree beside its TS root; re-parenting both to backend/ turned that latent
   # bug into a visible collision. Gated here to mirror the TS merge's own
   # primary_backend_language condition.
-  - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/' ~ py_project_root ~ '/' ~ ai_source_root ~ ' && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/. ' ~ _copier_conf.dst_path ~ '/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/') if (scaffold_full_project and py_project_root != '' and primary_backend_language in ['python', 'both']) else 'true' }}"
+  # `not is_ml_shaped` guard: the ml_model cleanup removes the whole staged AI
+  # source tree, and this task's `mkdir -p` runs before the `cp -R`, so without
+  # the guard an ML render ends up with an empty backend/src/ — a directory the
+  # project has no use for, created by the very task that had nothing to copy
+  # into it.
+  - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/' ~ py_project_root ~ '/' ~ ai_source_root ~ ' && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/. ' ~ _copier_conf.dst_path ~ '/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/') if (scaffold_full_project and not is_ml_shaped and py_project_root != '' and primary_backend_language in ['python', 'both']) else 'true' }}"
   # Separate merge (not part of the block above) — the ml/ cleanup task above
   # rm -rf's the whole staged ml directory when include_ml is false, so it may
   # not exist at all; folding it in would make the copy fail on a missing

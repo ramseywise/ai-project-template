@@ -31,7 +31,7 @@
 # {{ py_project_root }}/{{ ai_source_root }}/ holds "agents" (imported bare, e.g. `agents.{{ lg_agent_dir }}`); "core"
 # and "{{ eval_root }}" live at the project root — both need to be on PYTHONPATH
 # for anything invoked outside of pytest (which reads pythonpath from pyproject.toml).
-PY := PYTHONPATH={{ py_project_root }}/{{ ai_source_root }}:{% if include_ml %}{{ py_project_root }}:{% endif %}. uv run python
+PY := PYTHONPATH={% if not is_ml_shaped %}{{ py_project_root }}/{{ ai_source_root }}:{% endif %}{% if include_ml %}{{ py_project_root }}:{% endif %}. uv run python
 UVICORN := PYTHONPATH={{ py_project_root }}/{{ ai_source_root }}:. uv run uvicorn
 
 setup:
@@ -184,7 +184,7 @@ test-integration:
 # ship vendored reference material (e.g. mcp-builder's example scripts) that
 # isn't held to this project's lint config and was never meant to be.
 {% if primary_backend_language in ["python", "both"] -%}
-LINT_PATHS := {{ py_project_root }}/{{ ai_source_root }} core {{ eval_root }} tests{% if include_ml %} {{ py_project_root }}/{{ ml_source_root }}{% endif %}
+LINT_PATHS := {% if not is_ml_shaped %}{{ py_project_root }}/{{ ai_source_root }} {% endif %}{% if include_core_etl %}core {% endif %}{% if include_eval_suite %}{{ eval_root }} {% endif %}tests{% if include_ml %} {{ py_project_root }}/{{ ml_source_root }}{% endif %}{% if include_notebooks %} nbks{% endif %}
 
 lint:
 	uv run ruff check $(LINT_PATHS) --fix

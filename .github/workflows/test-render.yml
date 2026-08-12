@@ -71,6 +71,16 @@ jobs:
           - name: ml
             args: "-d include_ml=true"
             tier: test-py
+          # The ml_model SHAPE, as distinct from the `ml` row above: that one
+          # adds the ML toolkit to an agentic scaffold, this one renders an ML
+          # project — ml/ + nbks/ + tests/unit/ml and no agentic tree at all.
+          # assert_no_agentic=true drives the structural assertion step below;
+          # without it this row would only prove the render doesn't crash, which
+          # is precisely the failure mode the shape exists to prevent.
+          - name: project_type-ml_model
+            args: "-d project_type=ml_model"
+            tier: test-py
+            assert_no_agentic: "true"
           # include_mcp_server is derived (when: false) and defaults OFF for
           # chat_app, so it must be forced here — without it this row rendered
           # no mcp_servers/ at all and the test-mcp-ts step had no working dir.
@@ -158,11 +168,16 @@ jobs:
             ${{ matrix.args }} \
             . "$GITHUB_WORKSPACE/out"
 
-      # .agents/ is vendored reference material that mentions copier variables in
+      # skills/ is vendored reference material that mentions copier variables in
       # prose (e.g. framework-selection's SKILL.md) — excluded here for the same
       # reason the generated Makefile's LINT_PATHS and pre-commit exclude it.
+      # It moved from .agents/ to .claude/skills/ ("mv skills folder"), which is
+      # why the exclusion is keyed to the directory name rather than the old path.
       # .claude/skills/new-agent/references/ carries Cypher/JSON/prose examples
       # with literal {{ }} (not unrendered copier) — same exclusion rationale.
+      # The f-string pattern is scripted.py's literal {{field}} placeholder
+      # emitted by an f-string ('{{{{' collapses to '{{' at runtime) — real code,
+      # not unrendered copier.
       # {{prompt}}/{{question}} are promptfoo's own runtime template syntax, not
       # unrendered copier Jinja — filtered by pattern (not by excluding the whole
       # file, which also carries real copier substitutions worth checking).
@@ -179,7 +194,7 @@ jobs:
         env:
           ACTIONS_EXPR: '[$]{{'
         run: |
-          if grep -rn '{{' out/ --exclude-dir='.agents' --exclude-dir='references' --include='*.py' --include='*.md' --include='*.toml' --include='*.yaml' --include='*.yml' | grep -v "font-family\|border-collapse\|padding: 0.4rem\|background: #f2f2f2\|margin-bottom\|font-weight: bold\|{{prompt}}\|{{question}}\|{{ }}\|$ACTIONS_EXPR"; then
+          if grep -rn '{{' out/ --exclude-dir='.agents' --exclude-dir='skills' --exclude-dir='references' --include='*.py' --include='*.md' --include='*.toml' --include='*.yaml' --include='*.yml' | grep -v "font-family\|border-collapse\|padding: 0.4rem\|background: #f2f2f2\|margin-bottom\|font-weight: bold\|{{prompt}}\|{{question}}\|{{ }}\|return f\"{{{{{field_spec.name}}}}}\"$\|$ACTIONS_EXPR"; then
             echo "Leftover unrendered Jinja found"
             exit 1
           fi
@@ -208,6 +223,38 @@ jobs:
           grep -q 'eval-report' "$CI" && { echo "FAIL: eval-report leaked into a fire-and-forget ci.yml"; exit 1; }
           test ! -f out/.github/workflows/cd.yml || { echo "FAIL: cd.yml rendered for a fire-and-forget profile"; exit 1; }
           echo "OK: no eval gate for the fire-and-forget profile (ci.yml untaxed, no cd.yml)"
+
+      # ml_model shape: the render must be an ML PROJECT, not an agentic scaffold
+      # that also has ml/. Asserted structurally because every individual removal
+      # is a separate _tasks entry — a gate that silently stops firing leaves the
+      # unwanted tree in place, and nothing else in this workflow would notice.
+      # The payload half is asserted too: a shape that removed everything and
+      # shipped no ml/ would otherwise "pass" the absence checks.
+      - name: Assert ml_model renders no agentic scaffold
+        if: matrix.assert_no_agentic == 'true'
+        run: |
+          cd out
+          fail=0
+          # Absent: the agentic tree, the LLM starter kit, the eval suite, the
+          # corpus ETL home, and the lifecycle/change-contract docs.
+          for p in backend/src src/agents evals llm_kit core \
+                   LIFECYCLE.md DELIVERY.md DEPLOYMENT.md RELEASE.md SANYI.md \
+                   tests/unit/agents tests/unit/evals tests/unit/core tests/smoke; do
+            if [ -e "$p" ]; then echo "FAIL: $p rendered for project_type=ml_model"; fail=1; fi
+          done
+          # No agents/ package anywhere in the project source (.claude/ ships
+          # vendored skill payload that legitimately mentions agents — excluded).
+          if find . -type d -name agents -not -path "./.claude/*" | grep -q .; then
+            echo "FAIL: an agents/ directory survived somewhere in the render"
+            find . -type d -name agents -not -path "./.claude/*"
+            fail=1
+          fi
+          # Present: the ML payload the shape exists to deliver.
+          for p in backend/ml nbks/01_eda.py tests/unit/ml backend/experiments; do
+            if [ ! -e "$p" ]; then echo "FAIL: $p missing from an ml_model render"; fail=1; fi
+          done
+          [ "$fail" = 0 ] || exit 1
+          echo "OK: ml_model rendered the ML payload and no agentic scaffold"
 
       # Delegates to the render's own `make lint-check` (LINT_PATHS) rather than
       # repo-wide ruff — .claude/ ships vendored reference scripts (mcp-builder)
