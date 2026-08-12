@@ -1,0 +1,262 @@
+# %% [markdown]
+# # 07 — Calibration and thresholds
+#
+# **Question this notebook answers:** are the probabilities trustworthy as
+# probabilities, and where should the operating point sit?
+#
+# This is the first notebook where **costs** appear, and that is the whole reason
+# `calibration/` is a separate stage from `evaluation/`. A threshold is not a model
+# output: it is a decision that consumes a business input (what a false negative
+# costs relative to a false positive). Choosing one inside a training run buries a
+# business decision where no reviewer will find it.
+#
+# Two distinct claims, easy to conflate:
+#
+# - **Discrimination** (PR-AUC, ROC-AUC) — can the model rank?
+# - **Calibration** (Brier, reliability) — when it says 0.7, does it happen 70% of
+#   the time?
+#
+# A model can rank perfectly and be badly calibrated. If you threshold on a
+# probability, or quote one to a human, calibration is the property that matters.
+
+# %%
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path.cwd().parent if Path.cwd().name == "nbks" else Path.cwd()
+sys.path.insert(0, str(REPO_ROOT / "{{ py_project_root }}"))
+sys.path.insert(0, str(REPO_ROOT / "nbks"))
+
+import matplotlib
+
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from _sample_data import TARGET, load_frame
+from sklearn.base import clone
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+
+from ml.calibration import (
+    assess_calibration,
+    calibrate_classifier,
+    choose_threshold,
+    expected_cost,
+    recommend_method,
+    reliability_curve,
+    threshold_for_capacity,
+)
+from ml.config import settings
+from ml.schemas import OperatingPoint, ThresholdPolicy
+from ml.selection.registry import get_models
+
+pd.set_option("display.max_columns", 200)
+
+frame, _ = load_frame()
+DROP = ["collections_flag", "customer_id", "opened_at", "household_id"]
+modelling = frame.drop(columns=[c for c in DROP if c in frame.columns])
+
+y = modelling[TARGET]
+x = modelling.drop(columns=[TARGET])
+numeric = [c for c in x.columns if pd.api.types.is_numeric_dtype(x[c])]
+categorical = [c for c in x.columns if c not in numeric]
+
+x_fit, x_holdout, y_fit, y_holdout = train_test_split(
+    x, y, test_size=0.35, stratify=y, random_state=settings.random_seed
+)
+
+preprocessor = ColumnTransformer(
+    [
+        ("num", make_pipeline(SimpleImputer(strategy="median"), StandardScaler()), numeric),
+        ("cat", OneHotEncoder(handle_unknown="ignore"), categorical),
+    ]
+)
+model = get_models("classification", "binary", random_state=settings.random_seed)["logistic"]
+pipeline = make_pipeline(clone(preprocessor), clone(model)).fit(x_fit, y_fit)
+probabilities = pipeline.predict_proba(x_holdout)[:, 1]
+print(f"holdout rows: {len(y_holdout):,}  prevalence: {y_holdout.mean():.4f}")
+
+# %% [markdown]
+# ## Is it calibrated already?
+#
+# `assess_calibration` is honest in both directions — it will tell you calibration
+# made things worse, which happens on small validation sets.
+
+# %%
+recommended = recommend_method(len(y_holdout))
+print(f"recommended method for {len(y_holdout):,} rows: {recommended}")
+print(f"(isotonic needs >= {settings.isotonic_min_samples:,} rows or it overfits the curve)")
+
+from sklearn.metrics import brier_score_loss
+
+brier_uncalibrated = brier_score_loss(y_holdout.to_numpy(), probabilities)
+print(f"\nBrier, uncalibrated: {brier_uncalibrated:.5f}")
+
+# %% [markdown]
+# ## Reliability curve
+#
+# The diagonal is perfect calibration. Below it means overconfident — the model
+# says 0.8 and the event happens less often than that.
+
+# %%
+curve = reliability_curve(y_holdout.to_numpy(), probabilities, n_bins=10)
+fig, axis = plt.subplots(figsize=(5, 5))
+axis.plot([0, 1], [0, 1], linestyle="--", linewidth=1, label="perfect")
+axis.plot(curve.x, curve.y, marker="o", label="model")
+axis.set_xlabel("mean predicted probability")
+axis.set_ylabel("observed frequency")
+axis.set_title("Reliability")
+axis.legend(fontsize=8)
+fig.tight_layout()
+plt.show()
+
+# %% [markdown]
+# ## Calibrate, then check it helped
+#
+# Empty bins are dropped from the curve rather than plotted as zero — a bin with no
+# rows is an absence of evidence, not evidence of miscalibration.
+
+# %%
+calibrated = calibrate_classifier(clone(pipeline), method=recommended, cv=3)
+calibrated.fit(x_fit, y_fit)
+calibrated_probabilities = calibrated.predict_proba(x_holdout)[:, 1]
+
+report = assess_calibration(
+    y_holdout.to_numpy(),
+    probabilities,
+    calibrated_probabilities,
+    method=recommended,
+)
+print(f"Brier before: {report.brier_before:.5f}")
+print(f"Brier after:  {report.brier_after:.5f}")
+print(f"\ncalibration helped: {report.improved}")
+if not report.improved:
+    print("^ keep the uncalibrated probabilities; this is a real outcome, not a bug")
+
+improved = report.improved
+use_probabilities = calibrated_probabilities if improved else probabilities
+
+# %% [markdown]
+# ## Now the costs
+#
+# The two numbers below are the ones to get from a human, not from the data.
+# `cost_fn = 5` says missing a positive is five times worse than a false alarm.
+# They live in config so they are overridable per engagement rather than compiled
+# into a module.
+
+# %%
+cost_fp = settings.cost_fp
+cost_fn = 5.0  # override the default here, deliberately and visibly
+print(f"cost_fp = {cost_fp}, cost_fn = {cost_fn}  (ratio 1:{cost_fn / cost_fp:.0f})")
+
+chosen = choose_threshold(
+    y_holdout.to_numpy(), use_probabilities, cost_fp=cost_fp, cost_fn=cost_fn
+)
+print(f"\nchosen threshold: {chosen.threshold:.4f}")
+print(f"precision: {chosen.precision:.4f}  recall: {chosen.recall:.4f}")
+print(f"expected cost: {chosen.expected_cost:.2f}")
+
+# %% [markdown]
+# ### These numbers are in-sample
+#
+# The threshold was chosen on the same rows it is scored on, so its precision and
+# recall are optimistic. `ThresholdResult` marks this rather than leaving the caller
+# to remember it. To get an honest estimate, choose on one split and measure on
+# another.
+
+# %%
+print(f"in-sample: {getattr(chosen, 'in_sample', 'see ThresholdResult docs')}")
+
+# %% [markdown]
+# ## The cost curve
+#
+# Sensitivity is what matters here. A sharp minimum means the threshold is worth
+# arguing about; a flat basin means anything in a wide band performs the same, and
+# the exact number is false precision.
+
+# %%
+grid = np.linspace(0.02, 0.98, 97)
+costs = [
+    expected_cost(y_holdout.to_numpy(), use_probabilities, t, cost_fp=cost_fp, cost_fn=cost_fn)
+    for t in grid
+]
+
+fig, axis = plt.subplots(figsize=(6, 3.6))
+axis.plot(grid, costs)
+axis.axvline(chosen.threshold, linestyle="--", linewidth=1, label=f"chosen {chosen.threshold:.3f}")
+axis.set_xlabel("threshold")
+axis.set_ylabel("expected cost")
+axis.legend(fontsize=8)
+fig.tight_layout()
+plt.show()
+
+within_1pct = [t for t, c in zip(grid, costs, strict=False) if c <= min(costs) * 1.01]
+print(f"thresholds within 1% of optimal cost: {min(within_1pct):.3f} to {max(within_1pct):.3f}")
+
+# %% [markdown]
+# ## Coverage banding
+#
+# The operational question is usually not "what is optimal" but "we can review 200
+# cases a week". `threshold_for_capacity` answers that one.
+
+# %%
+bands = []
+for coverage in (0.01, 0.05, 0.10, 0.20):
+    capacity = max(1, round(coverage * len(use_probabilities)))
+    threshold = threshold_for_capacity(use_probabilities, capacity=capacity)
+    flagged = use_probabilities >= threshold
+    precision = float(y_holdout.to_numpy()[flagged].mean()) if flagged.any() else 0.0
+    recall = float(y_holdout.to_numpy()[flagged].sum() / max(y_holdout.sum(), 1))
+    bands.append(
+        {
+            "coverage": coverage,
+            "threshold": round(threshold, 4),
+            "precision": round(precision, 4),
+            "recall": round(recall, 4),
+        }
+    )
+pd.DataFrame(bands)
+
+# %% [markdown]
+# ## The policy — what `api/` will consume
+#
+# `ThresholdPolicy` is the typed handoff to the serving edge. Note that
+# `ScoringService` refuses to run without a selected point: a service with no
+# threshold would have to invent one.
+
+# %%
+points = tuple(
+    OperatingPoint(
+        threshold=band["threshold"],
+        precision=band["precision"],
+        recall=band["recall"],
+        coverage=band["coverage"],
+        in_sample=True,
+    )
+    for band in bands
+)
+selected = min(points, key=lambda p: abs(p.threshold - chosen.threshold))
+
+policy = ThresholdPolicy(
+    method=recommended if improved else "none",
+    brier_before=report.brier_before,
+    brier_after=report.brier_after if improved else None,
+    points=points,
+    selected=selected,
+    cost_fp=cost_fp,
+    cost_fn=cost_fn,
+)
+print(policy.model_dump_json(indent=2))
+
+# %% [markdown]
+# ## Handoff
+#
+# **Output of this notebook:** a `ThresholdPolicy` with a selected operating point,
+# ready for `ml.api.ScoringService`. Next: `08_monitoring.py`.

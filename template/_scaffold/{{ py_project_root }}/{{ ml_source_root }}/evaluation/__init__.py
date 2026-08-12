@@ -14,6 +14,14 @@ call site.
 
 from __future__ import annotations
 
+from ml.evaluation.baselines import (
+    MetricVerdict,
+    RunVerdict,
+    check_absolute,
+    check_baseline,
+    load_targets,
+    write_baseline,
+)
 from ml.evaluation.compare import (
     ModelComparisonResult,
     ModelCVResult,
@@ -52,22 +60,28 @@ __all__ = [
     "ClusteringMetrics",
     "CurvePoints",
     "GroupLeakageError",
+    "MetricVerdict",
     "ModelCVResult",
     "ModelComparisonResult",
     "RegressionMetrics",
+    "RunVerdict",
     "SortedTimeSeriesSplit",
     "SplitPlan",
     "TabularPreprocessor",
     "TemporalLeakageError",
     "assert_no_group_leakage",
     "assert_temporal_order",
+    "check_absolute",
+    "check_baseline",
     "classification_metrics",
     "clustering_metrics",
     "compare_classifiers",
     "default_baseline_models",
+    "load_targets",
     "make_splitter",
     "pr_curve",
     "precision_at_k",
     "regression_metrics",
     "roc_curve_points",
+    "write_baseline",
 ]

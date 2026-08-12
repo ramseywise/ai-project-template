@@ -1,0 +1,196 @@
+# %% [markdown]
+# # 08 — Monitoring
+#
+# **Question this notebook answers:** has the population moved, and do the training
+# and serving paths agree?
+#
+# Last stage, and the only one that runs while the model is already making
+# decisions. Two different failures live here and they are worth keeping apart:
+#
+# - **Drift** — the world changed. The model is still computing what it always did;
+#   the inputs no longer resemble what it was fitted on.
+# - **Train/serve skew** — the two code paths disagree about the same world. The
+#   model is being fed differently-computed features than it was trained on.
+#
+# Skew is the more dangerous of the two, because every offline metric stays healthy
+# while production quietly degrades. Drift at least shows up in the input
+# distributions.
+
+# %%
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path.cwd().parent if Path.cwd().name == "nbks" else Path.cwd()
+sys.path.insert(0, str(REPO_ROOT / "{{ py_project_root }}"))
+sys.path.insert(0, str(REPO_ROOT / "nbks"))
+
+import matplotlib
+
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from _sample_data import TARGET, load_frame, sample_frame
+
+from ml.monitoring import (
+    PSI_MODERATE,
+    PSI_SIGNIFICANT,
+    detect_drift,
+    population_stability_index,
+    train_serve_skew,
+)
+
+pd.set_option("display.max_columns", 200)
+
+reference, _ = load_frame()
+FEATURES = ["age", "income", "utilisation", "region", "tier"]
+print(f"reference window: {len(reference):,} rows")
+
+# %% [markdown]
+# ## Build a current window
+#
+# For the demonstration the current window is the synthetic frame with a different
+# seed plus a deliberate shift in `utilisation` and a change in the `region` mix. In
+# production this is last month's scored rows.
+
+# %%
+current = sample_frame(n=1000, seed=7)
+current["utilisation"] = np.clip(current["utilisation"] * 1.6, 0, 1.5)
+current.loc[current.sample(frac=0.30, random_state=7).index, "region"] = "west"
+print(f"current window:   {len(current):,} rows")
+
+# %% [markdown]
+# ## Drift report
+#
+# The conventional PSI bands: below 0.1 is noise, 0.1–0.25 is worth watching, above
+# 0.25 is a material shift. They are conventions, not laws — but they are the ones
+# risk teams already read, which is worth more than a better metric nobody trusts.
+
+# %%
+report = detect_drift(reference, current, features=FEATURES, method="psi")
+
+rows = []
+for feature in report.features:
+    if feature.statistic > PSI_SIGNIFICANT:
+        band = "SIGNIFICANT"
+    elif feature.statistic > PSI_MODERATE:
+        band = "watch"
+    else:
+        band = "stable"
+    rows.append({"feature": feature.feature, "psi": round(feature.statistic, 4), "band": band})
+
+pd.DataFrame(rows).sort_values("psi", ascending=False)
+
+# %%
+print(f"drifted features: {report.drifted_features}")
+print(f"reference rows: {report.reference_rows:,}  current rows: {report.current_rows:,}")
+
+# %% [markdown]
+# ### Why bins come from the reference
+#
+# PSI cuts its bins on the *reference* quantiles, never on the combined sample. If
+# the bins were cut on the combination, the current window could move the edges and
+# mask the very shift being measured — the metric would be least sensitive exactly
+# when it matters most. This asymmetry is asserted in
+# `tests/unit/ml/monitoring/test_drift.py`.
+
+# %%
+forward = population_stability_index(reference["utilisation"], current["utilisation"])
+backward = population_stability_index(current["utilisation"], reference["utilisation"])
+print(f"PSI(reference -> current): {forward:.4f}")
+print(f"PSI(current -> reference): {backward:.4f}")
+print(f"asymmetric (expected): {not np.isclose(forward, backward, rtol=0.05)}")
+
+# %% [markdown]
+# ## Visualise the shift
+#
+# A PSI number tells you something moved; the overlay tells you *how*, which is what
+# decides whether to retrain or to go and ask someone what changed upstream.
+
+# %%
+numeric_features = [f for f in FEATURES if pd.api.types.is_numeric_dtype(reference[f])]
+fig, axes = plt.subplots(
+    1, len(numeric_features), figsize=(4 * len(numeric_features), 3.2), squeeze=False
+)
+for axis, feature in zip(axes[0], numeric_features, strict=False):
+    axis.hist(reference[feature].dropna(), bins=30, alpha=0.55, density=True, label="reference")
+    axis.hist(current[feature].dropna(), bins=30, alpha=0.55, density=True, label="current")
+    psi = population_stability_index(reference[feature], current[feature])
+    axis.set_title(f"{feature} (PSI {psi:.3f})")
+    axis.legend(fontsize=7)
+fig.tight_layout()
+plt.show()
+
+# %% [markdown]
+# ## Target drift is a separate question
+#
+# The label distribution moving is not input drift, and it has a different cause
+# list: a genuine change in base rate, a labelling-process change, or a reporting
+# lag that makes recent outcomes look artificially rare.
+
+# %%
+print(f"reference prevalence: {reference[TARGET].mean():.4f}")
+print(f"current prevalence:   {current[TARGET].mean():.4f}")
+print(f"target PSI: {population_stability_index(reference[TARGET], current[TARGET]):.4f}")
+
+# %% [markdown]
+# ## Train/serve skew
+#
+# Run this on a handful of **known individual rows**, not in aggregate. Aggregate
+# statistics can match to three decimal places while every individual row is
+# computed wrongly — an off-by-one join or a different null convention averages out.
+
+# %%
+training_row = {
+    "age": 41.0,
+    "income": 52_300.0,
+    "utilisation": 0.34,
+    "income_over_age": 52_300.0 / 41.0,
+}
+serving_row = {
+    "age": 41.0,
+    "income": 52_300.0,
+    "utilisation": 0.34,
+    # The serving path computed this in cents, not dollars — the classic skew bug.
+    "income_over_age": 5_230_000.0 / 41.0,
+}
+
+skew = train_serve_skew(training_row, serving_row)
+if skew:
+    for feature, detail in skew.items():
+        print(f"SKEW {feature}: {detail}")
+else:
+    print("no skew detected")
+
+# %% [markdown]
+# ### A feature present on only one side
+#
+# Also skew, and the easiest kind to ship: a feature added to training and never
+# wired into serving is silently imputed or defaulted at request time.
+
+# %%
+print(train_serve_skew({"only_in_training": 1.0}, {"only_in_serving": 1.0}))
+
+# %% [markdown]
+# ## What to do with a drift finding
+#
+# A drift report is an input to a decision, not the decision. `monitoring/` owns no
+# training for that reason. The options, roughly in order of cost:
+#
+# 1. **Nothing** — the shift is in a feature the model barely uses. Check importance
+#    before acting.
+# 2. **Re-threshold** — discrimination holds but the score distribution moved, so
+#    the operating point no longer means what it did. Re-run `07_calibration.py`.
+# 3. **Retrain** — the relationship changed, not just the inputs.
+# 4. **Go upstream** — a step change in one feature is usually a pipeline change,
+#    not the world. PSI of 0.9 overnight is a bug somewhere else.
+
+# %% [markdown]
+# ## Handoff
+#
+# **Output of this notebook:** a `DriftReport`, a skew verdict, and a decision from
+# the list above. This is the end of the stage sequence — it feeds back into
+# `00_data_contract.py` when the contract itself needs tightening.

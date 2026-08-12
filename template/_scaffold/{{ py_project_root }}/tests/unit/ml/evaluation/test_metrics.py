@@ -11,15 +11,13 @@ Calibration and threshold tests moved to `../calibration/test_calibration.py`
 when those modules became their own stage — the split is the point, so the tests
 follow the code rather than staying in one file.
 """
+
 from __future__ import annotations
 
 import numpy as np
 import pytest
 from sklearn.datasets import make_blobs, make_classification
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import brier_score_loss
-from sklearn.model_selection import train_test_split
 
 from ml.evaluation.metrics import (
     classification_metrics,

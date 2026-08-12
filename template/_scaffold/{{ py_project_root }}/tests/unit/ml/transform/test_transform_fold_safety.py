@@ -18,9 +18,9 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
+from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.pipeline import make_pipeline
-from sklearn.linear_model import LogisticRegression
 
 from ml.evaluation.compare import TabularPreprocessor
 from ml.transform.encoders import TargetEncoder

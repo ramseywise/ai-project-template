@@ -14,11 +14,17 @@
 # `{{ ml_source_root }}/selection/`.
 
 # %%
+import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+
+REPO_ROOT = Path.cwd().parent if Path.cwd().name == "nbks" else Path.cwd()
+sys.path.insert(0, str(REPO_ROOT / "nbks"))
+
+from _sample_data import sample_frame
 
 # --- Parameters -------------------------------------------------------------
 # Change these four lines to point the notebook at your frame.
@@ -37,8 +43,14 @@ pd.set_option("display.max_columns", 200)
 # a training example, and filling the label invents outcomes.
 
 # %%
-df = pd.read_csv(DATA, sep=SEP)
-print(f"raw: {df.shape}")
+# Falls back to the synthetic frame when DATA is absent, so this notebook runs on
+# a fresh clone. Point DATA at your own CSV and the fallback disappears.
+if DATA.exists():
+    df = pd.read_csv(DATA, sep=SEP)
+    print(f"raw: {df.shape}  (from {DATA})")
+else:
+    df = sample_frame()
+    print(f"raw: {df.shape}  (SYNTHETIC — {DATA} not found)")
 
 df = df[~df[TARGET].isna()].copy()
 print(f"labelled: {df.shape}")
