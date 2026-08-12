@@ -9,7 +9,7 @@ scripted-adapter machinery — extracted from a real case study
 (``ai-marketing-comms/evals/run.py`` in the galactus repo) so a project that
 needs this shape does not have to invent it from scratch.
 
-See ``{{ eval_root }}/CLAUDE.md`` for the full directory-layout rationale.
+See this eval root's ``CLAUDE.md`` for the full directory-layout rationale.
 """
 
 from __future__ import annotations
