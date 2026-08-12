@@ -20,7 +20,11 @@ def summarize_table(rows: list[dict[str, Any]]) -> str:
     widths = {h: max(len(h), *(len(str(row.get(h, ""))) for row in rows)) for h in headers}
 
     def line(values: list[str]) -> str:
-        return "| " + " | ".join(v.ljust(widths[h]) for h, v in zip(headers, values, strict=True)) + " |"
+        return (
+            "| "
+            + " | ".join(v.ljust(widths[h]) for h, v in zip(headers, values, strict=True))
+            + " |"
+        )
 
     out = [
         line(headers),

@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import pytest
+
 from evals.generation.scripted import (
     GenerationCase,
     ScriptedProvider,
@@ -109,9 +110,7 @@ class TestStubborn:
     @pytest.mark.asyncio
     async def test_non_stubborn_tightens_on_second_call(self) -> None:
         fields = [_Field(name="headline", max_words=5)]
-        provider = scripted_provider_for(
-            _case(case_id="c-normal", difficulty="hard"), fields, {}
-        )
+        provider = scripted_provider_for(_case(case_id="c-normal", difficulty="hard"), fields, {})
         await provider.complete_structured("prompt", {})
         second = await provider.complete_structured("prompt", {})
         assert len(second["headline"].split()) <= 5
