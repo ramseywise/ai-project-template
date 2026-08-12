@@ -1,15 +1,19 @@
-"""Transform layer — column-type inference and the `ColumnTransformer` builder.
+"""Transform stage — column-type inference and the `ColumnTransformer` builder.
 
-`TabularPreprocessor` is re-exported from `ml.model_comparison.compare` rather
-than moved: it is the sentinel-fill + one-hot transformer harvested from a
-deployed credit-scoring pipeline, still the right tool when a tree model wants
-missingness encoded as a splittable value, and existing code imports it from its
-original home. This layer extends it rather than replacing it.
+Everything here is fitted **inside a fold** by `training/`; nothing in this
+package may be fitted on the full frame (naming.md §3 rule 3).
+
+`TabularPreprocessor` is re-exported from `ml.evaluation.compare`, where it sits
+next to the comparison harness that is its main caller. As of 2026-08-12 it is
+imputer + scaler + one-hot (it was a `-9999` sentinel fill before), so it now
+learns statistics at fit time and must go inside a `Pipeline` rather than being
+applied to a frame before splitting. `numeric_strategy="sentinel"` restores the
+old behaviour for a tree-only comparison.
 """
 
 from __future__ import annotations
 
-from ml.model_comparison.compare import TabularPreprocessor
+from ml.evaluation.compare import TabularPreprocessor
 from ml.transform.columns import (
     DEFAULT_HIGH_CARD_THRESHOLD,
     ColumnPlan,

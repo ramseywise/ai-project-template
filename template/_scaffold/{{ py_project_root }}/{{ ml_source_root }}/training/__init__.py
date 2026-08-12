@@ -6,7 +6,7 @@ where they are wired together into the one call a run script makes.
 
 from __future__ import annotations
 
-from ml.workflows.classification import (
+from ml.training.classification import (
     ModelRun,
     RunResult,
     TransformLeakageError,

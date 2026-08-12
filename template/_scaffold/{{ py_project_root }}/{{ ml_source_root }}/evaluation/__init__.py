@@ -1,19 +1,25 @@
-"""Evaluation — splitting, metrics, calibration, and the decision rule.
+"""Evaluation stage — split plans, metrics, and comparison against a baseline.
 
 The split comes first deliberately. Metrics computed over a leaky split are
 precise measurements of nothing, so `splitting.py` is the module the rest of
 this package depends on being correct.
+
+Calibration and threshold choice used to live here and now live in
+`ml.calibration`. They were split out because they consume *costs* — a business
+input, not a model output — and mixing the two is what makes a pipeline
+un-reviewable (naming.md §3 rule 2). Import them from `ml.calibration`; they are
+deliberately not re-exported here, so the stage boundary stays visible at the
+call site.
 """
 
 from __future__ import annotations
 
-from ml.evaluation.calibration import (
-    CalibrationReport,
-    assess_calibration,
-    calibrate_classifier,
-    expected_calibration_error,
-    recommend_method,
-    reliability_curve,
+from ml.evaluation.compare import (
+    ModelComparisonResult,
+    ModelCVResult,
+    TabularPreprocessor,
+    compare_classifiers,
+    default_baseline_models,
 )
 from ml.evaluation.metrics import (
     ClassificationMetrics,
@@ -38,41 +44,30 @@ from ml.evaluation.splitting import (
     assert_temporal_order,
     make_splitter,
 )
-from ml.evaluation.threshold import (
-    ThresholdResult,
-    choose_threshold,
-    expected_cost,
-    threshold_for_capacity,
-)
 
 __all__ = [
     "DEFAULT_N_SPLITS",
     "RANDOM_STATE",
-    "CalibrationReport",
     "ClassificationMetrics",
     "ClusteringMetrics",
     "CurvePoints",
     "GroupLeakageError",
+    "ModelCVResult",
+    "ModelComparisonResult",
     "RegressionMetrics",
     "SortedTimeSeriesSplit",
     "SplitPlan",
+    "TabularPreprocessor",
     "TemporalLeakageError",
-    "ThresholdResult",
     "assert_no_group_leakage",
     "assert_temporal_order",
-    "assess_calibration",
-    "calibrate_classifier",
-    "choose_threshold",
     "classification_metrics",
     "clustering_metrics",
-    "expected_calibration_error",
-    "expected_cost",
+    "compare_classifiers",
+    "default_baseline_models",
     "make_splitter",
     "pr_curve",
     "precision_at_k",
-    "recommend_method",
     "regression_metrics",
-    "reliability_curve",
     "roc_curve_points",
-    "threshold_for_capacity",
 ]

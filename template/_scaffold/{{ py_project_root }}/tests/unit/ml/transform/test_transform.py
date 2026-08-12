@@ -244,6 +244,6 @@ def test_unknown_strategy_names_raise():
 def test_tabular_preprocessor_is_still_reachable_from_the_new_layer():
     """The existing transformer is extended, not replaced — code importing it
     from `ml.transform` and from its original module gets the same class."""
-    from ml.model_comparison.compare import TabularPreprocessor as Original
+    from ml.evaluation.compare import TabularPreprocessor as Original
 
     assert TabularPreprocessor is Original

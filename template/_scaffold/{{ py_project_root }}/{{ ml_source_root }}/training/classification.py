@@ -32,7 +32,7 @@ import pandas as pd
 from sklearn.base import clone
 from sklearn.pipeline import Pipeline
 
-from ml.evaluation.calibration import (
+from ml.calibration.calibration import (
     CalibrationReport,
     assess_calibration,
     calibrate_classifier,
@@ -40,8 +40,8 @@ from ml.evaluation.calibration import (
 )
 from ml.evaluation.metrics import ClassificationMetrics, classification_metrics
 from ml.evaluation.splitting import SplitPlan, make_splitter
-from ml.evaluation.threshold import ThresholdResult, choose_threshold
-from ml.model_comparison.compare import TabularPreprocessor
+from ml.calibration.threshold import ThresholdResult, choose_threshold
+from ml.evaluation.compare import TabularPreprocessor
 from ml.sampling.resample import build_sampler
 from ml.selection.registry import get_models
 from ml.transform.columns import infer_column_types

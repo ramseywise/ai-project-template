@@ -22,7 +22,7 @@ import pandas as pd
 import pytest
 
 from ml.reporting import write_report
-from ml.workflows.classification import run_classification
+from ml.training.classification import run_classification
 
 RANDOM_STATE = 42
 

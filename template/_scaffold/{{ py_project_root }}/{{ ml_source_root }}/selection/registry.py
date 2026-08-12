@@ -115,6 +115,13 @@ def _catboost_clf(**kw: Any) -> Any:
         "allow_writing_files": False,
     }
     params.update(kw)
+    # CatBoost treats random_state as an alias of random_seed and rejects having
+    # both set — but only at fit() time, not construction. Every workflow passes
+    # random_state, so leaving both live makes catboost fail on every real call
+    # while still *building* fine; it was logged as "skipped" and vanished from
+    # the comparison table. Collapse the alias here so the caller can pass either.
+    if "random_state" in params:
+        params["random_seed"] = params.pop("random_state")
     return CatBoostClassifier(**params)
 
 

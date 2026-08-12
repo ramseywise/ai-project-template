@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from sklearn.datasets import load_breast_cancer
 
-from ml.model_comparison.compare import (
+from ml.evaluation.compare import (
     TabularPreprocessor,
     compare_classifiers,
     default_baseline_models,

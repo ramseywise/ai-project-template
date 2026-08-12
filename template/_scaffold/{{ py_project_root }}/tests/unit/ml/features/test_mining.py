@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from ml.feature_engineering.mining import (
+from ml.features.mining import (
     add_binned_features,
     add_group_aggregates,
     add_interaction_features,

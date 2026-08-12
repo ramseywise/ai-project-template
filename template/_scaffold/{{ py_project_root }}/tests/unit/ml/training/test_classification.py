@@ -18,7 +18,7 @@ import pandas as pd
 import pytest
 
 from ml.evaluation.splitting import make_splitter
-from ml.workflows.classification import BASELINE_TOLERANCE, run_classification
+from ml.training.classification import BASELINE_TOLERANCE, run_classification
 
 RANDOM_STATE = 42
 
