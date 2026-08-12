@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+
 from experiments.fingerprint import fingerprint_frame, validate_class_balance
 from experiments.record import DataIdentity
 
