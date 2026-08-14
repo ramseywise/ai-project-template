@@ -1513,9 +1513,19 @@ _tasks:
   # the lg_agent task only removes that dir when lg_agent was the chosen
   # framework, so on a `none` render it survives, importing a package that is
   # about to be deleted.
+  # `or include_rag_agent` on the package removal: the ML shape can opt into
+  # rag_agent (`copier update -d include_rag_agent=true`), and the rag_agent
+  # task above keeps agents/rag_agent staged when it does — deleting the parent
+  # package here would take it right back out. rag_agent is self-contained
+  # (its own graph/nodes/model/settings), so agents/ keeping __init__.py +
+  # README.md + rag_agent/ is a coherent tree. The test dirs are NOT gated the
+  # same way: they cover the lg_agent chat surface, which an ml_model render
+  # never has.
+  - >-
+    {{ 'true' if not is_ml_shaped or include_rag_agent else 'rm -rf '
+    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/agents' }}
   - >-
     {{ 'true' if not is_ml_shaped else 'rm -rf '
-    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/agents '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/unit/agents '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/smoke' }}
   # evals/ — the eval root and its data/tests. The interaction-eval and corpus
