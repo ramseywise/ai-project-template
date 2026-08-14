@@ -76,7 +76,8 @@ rag:
   corpus_pipeline: {{ corpus_pipeline_kind }}
 
 # ─── Platform ──────────────────────────────────────────────────────────────
-# cloud selects the managed-RAG and terraform provider trees: none | aws | gcp
+# cloud selects the managed-RAG provider tree (bedrock_kb for aws, vertex_rag for gcp): none | aws | gcp
+# Note: the terraform/ skeleton is AWS-only — it ships only when cloud == aws.
 cloud: {{ cloud }}
 # local | docker | cloud
 deployment_target: {{ deployment_target }}

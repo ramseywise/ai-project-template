@@ -67,7 +67,7 @@ Try the TS agent (Vercel AI SDK) with `make ts-install && make ts-dev`, then
 ├── nbks/                                Marimo notebooks — inspection, not production code
 {%- endif %}
 ├── tests/                               unit / smoke / integration
-├── infrastructure/                      docker-compose + Dockerfiles{% if cloud != 'none' %}, Terraform skeleton{% endif %}
+├── infrastructure/                      docker-compose + Dockerfiles{% if cloud == 'aws' %}, Terraform skeleton{% endif %}
 ├── configs/                             Per-environment config (non-secret)
 ├── .claude/                             Claude Code skills + hooks
 {%- if include_dev_companion %}
