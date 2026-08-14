@@ -1041,17 +1041,6 @@ include_ml:
   # which is the pre-existing /add-capability path.
   when: false
 
-# The run registry (experiments/) is a top-level shared root, not an
-# ml_source_root subtree — AI evals consume the same record shape (see
-# experiments/record.py), so this does NOT gate on include_ml. Default is
-# "on whenever a full scaffold happens", same posture as eval_root, which
-# has no off-switch of its own either. It is one of the few roots an ml_model
-# render KEEPS: a model comparison is exactly the thing a run registry records.
-include_run_registry:
-  type: bool
-  default: "{{ scaffold_full_project }}"
-  when: false
-
 # llm_kit/ is a standalone LLM-calling starter kit at the repo root. It had no
 # gate at all before ml_model existed — it rendered into every project,
 # including layering-only ones, and nothing in copier.yaml or _tasks referenced
@@ -1547,16 +1536,14 @@ _tasks:
   # path, not a staging path — the one cleanup in this block that does.
   - "{{ 'true' if include_llm_kit else 'rm -rf ' ~ _copier_conf.dst_path ~ '/llm_kit' }}"
   # Agentic lifecycle docs. Also rendered at the destination root rather than
-  # under _scaffold/ (same class as llm_kit above), except SANYI.md which IS
-  # staged — hence the two path shapes in one task. DESIGN.md/CLAUDE.md/README.md
+  # under _scaffold/ (same class as llm_kit above). DESIGN.md/CLAUDE.md/README.md
   # are deliberately absent: those are shape-neutral and every render keeps them.
   - >-
     {{ 'true' if include_lifecycle_docs or (not scaffold_full_project) else 'rm -f '
     ~ _copier_conf.dst_path ~ '/LIFECYCLE.md '
     ~ _copier_conf.dst_path ~ '/DELIVERY.md '
     ~ _copier_conf.dst_path ~ '/DEPLOYMENT.md '
-    ~ _copier_conf.dst_path ~ '/RELEASE.md '
-    ~ _copier_conf.dst_path ~ '/_scaffold/SANYI.md' }}
+    ~ _copier_conf.dst_path ~ '/RELEASE.md' }}
   # The ML EDA notebook is the ML shape's counterpart to corpus_analysis.py —
   # removed as a FILE for any non-ML shape, same as the corpus task removes the
   # corpus notebook for a non-retrieval shape. Between the two, nbks/ holds
@@ -1676,12 +1663,6 @@ _tasks:
     ~ _copier_conf.dst_path ~ '/_scaffold/.env.example '
     ~ _copier_conf.dst_path ~ '/_scaffold/project_init.sh '
     ~ _copier_conf.dst_path ~ '/') if scaffold_full_project else 'true' }}
-  # SANYI.md is promoted separately, not in the unconditional mv above: the
-  # lifecycle-docs cleanup removes it from staging for the ml_model shape, and
-  # `mv` fails the WHOLE task (taking pyproject.toml/Makefile with it) the moment
-  # one listed source is missing. Same reasoning as the railway.toml/promptfoo
-  # bare-file moves further down.
-  - "{{ ('mv ' ~ _copier_conf.dst_path ~ '/_scaffold/SANYI.md ' ~ _copier_conf.dst_path ~ '/') if (scaffold_full_project and include_lifecycle_docs) else 'true' }}"
   # README.md is the project's own doc — never clobber an existing one on
   # re-render (copier --skip semantics don't reach post-task mv).
   - >-
