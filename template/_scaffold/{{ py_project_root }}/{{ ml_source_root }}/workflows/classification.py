@@ -51,8 +51,8 @@ leads the report and class weighting is worth applying."""
 
 def run_classification(
     df: pd.DataFrame,
-    target: str,
     *,
+    target: str,
     output: str = "binary",
     models: list[str] | None = None,
     sampling: str = "class_weight",

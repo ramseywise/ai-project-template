@@ -19,6 +19,8 @@ Two properties are worth asserting rather than trusting:
 from __future__ import annotations
 
 from evals.generation.metrics import compute_metrics
+from typing import Any
+
 from evals.generation.report import format_report, summarize_table
 from evals.generation.results import CaseResult
 

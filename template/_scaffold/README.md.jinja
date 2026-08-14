@@ -16,8 +16,6 @@ standalone service — the shared retrieval backend the MCP tool calls)
 via its framework's native client — see `.claude/skills/mcp-builder/SKILL.md`'s
 "Consuming your server" section.
 {% endif -%}
-{%- if include_akira %} Plus `/akira`, a proactive quality-scan skill
-(vendored `akira-scan` agent — see `.claude/skills/akira/SKILL.md`).{%- endif %}
 Plus the project shell (evals, infra, tests, CI) to build real agents on top
 of. See `CLAUDE.md` for AI-assistant conventions and `.agents/skills/README.md`
 for the ADK/LangGraph framework reference library.

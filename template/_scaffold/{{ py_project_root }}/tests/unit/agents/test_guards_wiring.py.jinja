@@ -1,6 +1,6 @@
 """Wiring integration tests for the three guard layers (AIT-50).
 
-These tests exist because `security/guards.py` previously passed a full
+These tests exist because `guardrails/guards.py` previously passed a full
 behavioural suite while being called by nothing on any graph path. Testing the
 guard functions in isolation proves they WORK; only these tests prove they RUN.
 Each docstring names the exact edit that makes the test fail — an assertion
@@ -28,7 +28,7 @@ from agents.{{ lg_agent_dir }}.nodes.guardrail import guardrail_node
 from agents.{{ lg_agent_dir }}.nodes.retrieve import retrieve_node
 {%- endif %}
 from agents.{{ lg_agent_dir }}.state import State
-from security.settings import settings as guard_settings
+from guardrails.settings import settings as guard_settings
 
 # A credential shape assembled at runtime — a literal key in a committed file
 # trips secret scanners, and the scrubber only sees the concatenated value.
@@ -55,7 +55,7 @@ async def _no_tools() -> list[object]:
 
 
 def test_guardrail_node_delegates_to_check_input() -> None:
-    """guardrail_node must call security.guards.check_input, not its own patterns.
+    """guardrail_node must call guardrails.guards.check_input, not its own patterns.
 
     FAILS IF: guardrail.py goes back to carrying a local ``_BLOCKED_PATTERNS``
     substring list — the spy below is never called and the count stays 0.
@@ -74,7 +74,7 @@ def test_guardrail_node_delegates_to_check_input() -> None:
         guardrail_module.check_input = real_check_input
 
     assert len(calls) == 1, (
-        "check_input was never called — guardrail_node is not delegating to security.guards"
+        "check_input was never called — guardrail_node is not delegating to guardrails.guards"
     )
     assert result["blocked"] is True
 
@@ -250,7 +250,7 @@ async def test_generate_node_scrubs_rather_than_blocks(
 ) -> None:
     """FAILS IF: the layer-3 wiring branches on ``blocked`` and returns the
     refusal on a scrub hit. A leaked token must cost the token, not the answer —
-    check_output scrubs and still delivers (see security/README.md).
+    check_output scrubs and still delivers (see guardrails/README.md).
     """
 
     async def _fake_agenerate(system_prompt: str, messages: list[dict], tools=None):

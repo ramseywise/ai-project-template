@@ -23,7 +23,11 @@ set -euo pipefail
 DRY_RUN=0
 [ "${1:-}" = "--dry-run" ] && DRY_RUN=1
 
-RESERVOIR="$HOME/.claude/skills/new-agent/references"
+# Source moved 2026-08-11: global is no longer the skill reservoir. `new-agent`
+# is now owned by guacamayo (production workflow repo); its references/ tree is
+# the canonical source for this template's .agents/ library. See the retired
+# scripts/sync-global-skills.sh for the full ownership-model rationale.
+RESERVOIR="$HOME/workspace/guacamayo/.claude/skills/new-agent/references"
 TEMPLATE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/template/.agents"
 
 # ---------------------------------------------------------------------------

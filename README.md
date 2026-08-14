@@ -27,14 +27,14 @@ it runs in **phases** (see "The interview" below), and the tiers describe what l
    `evals/`, `infrastructure/`, `tests/`, CI, `.pre-commit-config.yaml` (ruff-pre-commit, reads the same
    `[tool.ruff]` config as everything else — real git-level enforcement alongside the Claude-session
    hooks) and `renovate.json` (automated dependency-update PRs, with the fast-moving AI framework deps
-   held back from automerge) — plus the sub-gated `include_akira`/`include_dev_companion` toggles within
+   held back from automerge) — plus the sub-gated `include_dev_companion` toggle within
    this tier. Working example agents are minimal by default and **derived from `project_type`**, not asked:
    `primary_chat_agent` picks the user-facing chat agent — `lg_agent` (LangGraph, BM25 — the default for
    chat/agent/workflow/prototype shapes), `adk_agent` (Google ADK), `both`, or `none` — and `rag_agent`
    (embedding-based retrieval behind `/api/v1/retrieval`) ships default-on only for the `rag` shape. Both
    are now `-d`-only capabilities: a second framework or `include_rag_agent=true` is a `copier update -d`
    away (the `/add-capability` path), never a genesis question. `langgraph`/`langchain-core` stay installed
-   regardless — the chat agents and `akira` depend on them; only the chosen chat agent's
+   regardless — the chat agents depend on them; only the chosen chat agent's
    own framework-specific deps (`langchain-mcp-adapters` for `lg_agent`, `google-adk`+`mcp` for
    `adk_agent`) actually toggle. The retrieval golden-QA eval grades every backend independently (see
    `evals/README.md` in the generated project) and ships alongside the corpus pipeline; a non-retrieval
@@ -172,7 +172,7 @@ one shape example; each is a mid-project capability, added later with `copier up
 | `frontend_backend_topology` | `single` | `split_service` = Next.js (Vercel) + FastAPI (Railway) sharing Supabase-JWT identity |
 | `include_mcp_server` | `true` only when project is an MCP server, or MCP was explicitly selected in `agent_tools` | Scaffolds `mcp_servers/<slug>/` — a thin adapter over the REST boundary |
 | `mcp_server_language` | follows `primary_backend_language` | `python` (FastMCP) or `typescript` (official MCP TS SDK) |
-| `optional_features` | `[akira, dev_companion]` + seeded | The optional-add-ons list — see "Optional features" below; add more with `-d optional_features=[…]` |
+| `optional_features` | `[dev_companion]` + seeded | The optional-add-ons list — see "Optional features" below; add more with `-d optional_features=[…]` |
 | `eval_metrics` | `[escalation, friction]` for agent-shaped, else `[]` | Interaction-eval metrics; add with `-d eval_metrics=[…]` (`/add-eval-metric`) |
 
 **Optional features** (values of the `optional_features` variable; each maps to a derived
@@ -180,7 +180,6 @@ one shape example; each is a mid-project capability, added later with `copier up
 
 | Value | Derived variable | What it scaffolds |
 |---|---|---|
-| `akira` (default on) | `include_akira` | A second prebuilt LangGraph agent for proactive codebase quality scanning (kiyoko/kaneda/dao modes) |
 | `dev_companion` (default on) | `include_dev_companion` | A living "how we work on this project" doc (transforms, not appends) plus a `/dream` maintenance-audit skill |
 | `promptfoo` (seeded by `eval_suite`) | `include_promptfoo` | `promptfoo.config.yaml` — config-driven eval harness (`npx promptfoo eval`) hitting `rag_agent`'s `/chat` endpoint, alongside the Python eval suite |
 | `ragas` | `include_ragas_grader` | ragas-based LLM-judge grader. **Known issue** (verified 2026-07-14): `ragas` 0.4.3 has a broken import upstream — degrades gracefully, no real scores until fixed |
@@ -209,7 +208,7 @@ isn't in the multiselect — it derives directly from Calendar in `external_syst
 | `mcp_server_name` / `mcp_server_slug` | `<project_slug>` | MCP server naming. `mcp_server_slug` is the seed for `py_mcp_server_slug` / `ts_mcp_server_slug` — the chosen language renders at the real slug, the other gets an `__unchosen_*` suffix that `_tasks` prunes |
 | `expensive_command_patterns` | *(blank)* | Regex for commands that should nudge `--dry-run`; blank disables the hook |
 | `include_agent_reference_library` | `false` | `.agents/skills/` (ADK + LangGraph reference library) + `/new-agent` — opt in for offline/team-portability; canonical home stays this template |
-| `global_skills_source` | `vendored` | Maintainer knob — see `scripts/sync-global-skills.sh` |
+| `global_skills_source` | `vendored` | Maintainer knob — `vendored` ships the payload in `template/.claude/skills/`, `none` strips it at render. The payload is now maintained by hand: `scripts/sync-global-skills.sh` was retired 2026-08-11 when global stopped being the skill reservoir. |
 
 ## Repository layout
 
@@ -239,4 +238,4 @@ template-maintainer material.
   optional — this template currently targets Python (+ optional TypeScript) projects.
 - Rendered projects plug into a machine-level review ladder if present (workspace Makefile +
   global `/review-sweep`, refs, and agent defs in `~/.claude/`) — the template ships only the
-  per-repo halves: Makefile lint/test targets, `Refs:` lines in CLAUDE.md, optional SANYI contract.
+  per-repo halves: Makefile lint/test targets and `Refs:` lines in CLAUDE.md.

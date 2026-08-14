@@ -21,7 +21,7 @@ For prompt-caching, annotate stable system-prompt sections before the call:
 Architecture note
 -----------------
 - This module never instantiates an Anthropic client — import one from
-  ``agents.<name>.clients.llm`` (sdk-factory rule; see .claude/hooks/sdk_lint.sh).
+  ``agents.<name>.model.gateway`` (sdk-factory rule; see .claude/hooks/sdk_lint.sh).
 - ``track_usage()`` and ``should_compact()`` are pure functions: they read
   ``settings`` for thresholds and log to the standard logger, but they never
   mutate shared state. Callers own the history list.
@@ -179,7 +179,7 @@ def compact_history(
         passed to ``messages.create``).
     client:
         An ``anthropic.Anthropic`` or ``anthropic.AsyncAnthropic`` instance
-        sourced from ``agents.<name>.clients.llm.get_client()``.
+        sourced from ``agents.<name>.model.gateway.get_client()``.
     model:
         Model to use for summarisation (typically the same as the agent model).
     keep_last_n:

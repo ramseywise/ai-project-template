@@ -108,8 +108,8 @@ Deferred items don't.
        - Every row's `Source risk` quotes an MVP Scope `In:` or `Open:` bullet verbatim.
          A row that traces to nothing is a row nobody asked for.
        - Unambiguous: two readers must agree on pass/fail without arguing.
-     SANYI layer note: the case ROWS are 简易 Jianyi (add cases freely as you learn);
-     "the golden set is authored before implementation" is 不易 Buyi. -->
+     Add cases freely as you learn — but authoring the golden set BEFORE
+     implementation is the part that must not move. -->
 
 ---
 
@@ -122,9 +122,9 @@ Deferred items don't.
 <!-- These targets become evals/targets.yaml — `make eval-gate` fails when a metric
      drops below target. Derive at least one row from each top risk in MVP Scope,
      and one from the naive baseline (what margin over it justifies the AI).
-     SANYI layer note: the threshold VALUES are 变易 Bianyi (tune freely in
-     targets.yaml, no deploy); "the eval gate must run before release" is 不易
-     Buyi — record it in SANYI.md once wired into CI. -->
+     Threshold VALUES are tunable freely in targets.yaml (no deploy needed);
+     "the eval gate must run before release" is the part that must not move —
+     enforce it in CI. -->
 
 ---
 

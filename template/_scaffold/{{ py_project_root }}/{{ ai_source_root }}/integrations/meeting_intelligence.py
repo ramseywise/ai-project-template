@@ -8,7 +8,7 @@ import json
 
 from pydantic import BaseModel
 
-from integrations.clients.llm import get_client
+from integrations.model.gateway import get_client
 from integrations.settings import settings
 
 _SYSTEM_PROMPT = """\

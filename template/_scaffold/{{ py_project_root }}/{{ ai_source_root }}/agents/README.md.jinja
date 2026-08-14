@@ -9,12 +9,12 @@ reading `.env`, and Makefile lifecycle targets (`make <name>-up` /
 - `{{ lg_agent_dir }}/` — the user-facing chat agent (LangGraph): graph +
   nodes (`retrieve` → `generate` → `guardrail`), checkpointer-backed
   conversation state, BM25 retrieval over the `core/pipelines/corpus/` index, MCP tool wiring
-  via `clients/mcp.py`.
+  via `model/mcp.py`.
 {% endif -%}
 {% if primary_chat_agent in ["adk_agent", "both"] -%}
 - `{{ adk_agent_dir }}/` — {% if primary_chat_agent == "both" %}the same assistant role built on Google ADK (comparison implementation){% else %}the user-facing chat agent (Google ADK){% endif %}:
   router + sub-agents (`direct_agent`, `rag_agent`), prompt files under
-  `prompts/`, FastAPI gateway under `gateway/`.
+  `prompts/`, FastAPI HTTP edge under `api/`.
 {% endif -%}
 {% if include_rag_agent -%}
 - `rag_agent/` — the retrieval backend (LangGraph + embedding vector store).

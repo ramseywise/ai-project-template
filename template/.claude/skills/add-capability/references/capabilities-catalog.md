@@ -282,6 +282,47 @@ API routes) rather than calling out to a separate Python agent service.
 
 ---
 
+## frontend-bundler-vite
+
+**Label:** Vite + React SPA frontend (instead of Next.js)
+
+| Field | Value |
+|-------|-------|
+| sets | `frontend_bundler=vite` |
+| requires | `include_frontend=true`; `scaffold_full_project=true` |
+| conflicts_with | `frontend_backend_topology=split_service` when the split relies on Next.js middleware for the auth boundary — a Vite SPA has no server to run Edge middleware, so the JWT check moves to the API |
+| adds | `_scaffold/frontend-vite/{ts_project_root}/` — Vite + React 19 + Tailwind SPA (`vite.config.ts`, `vitest.config.ts`, `src/components/`, react-router entry), promoted to `frontend/` in place of the Next.js tree |
+
+The default is `next`. Choose vite for a client-rendered console or dashboard
+talking to a separate API (the `dssg/project-mgmt-ai` shape); stay on next when
+pages must render server-side or the frontend IS the backend.
+
+Switching an existing frontend flips the whole build toolchain — treat it as a
+rewrite of `frontend/`, not an in-place upgrade.
+
+---
+
+## supabase-db
+
+**Label:** Supabase as the application database (migrations + RLS)
+
+| Field | Value |
+|-------|-------|
+| sets | `include_supabase_db=true` |
+| requires | `scaffold_full_project=true` |
+| companion_questions | none |
+| adds | `_scaffold/supabase/migrations/` (tenancy + RLS starter), `_scaffold/supabase/tests/rls.test.sql`, `_scaffold/supabase/config.toml` — all promoted to `supabase/` at the repo root |
+
+Distinct from the two Supabase touchpoints that already exist: **auth**
+(`@supabase/ssr` in the frontend, JWT middleware in the split_service backend)
+and **`vector_backend=postgres`** (pgvector as a RAG store). Neither of those
+gives a project row-level tenant isolation or a migration history — this does.
+
+Add when Postgres IS the application database and tenant isolation is enforced
+in the database rather than the application layer.
+
+---
+
 ## Notes for `/add-capability` detection
 
 When evaluating whether a capability is addable, read `.copier-answers.yml`

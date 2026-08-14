@@ -10,7 +10,13 @@ from __future__ import annotations
 
 import pytest
 
-from experiments.record import CodeState, DataIdentity, ExecutionConfig, NotApplicable, RunRecord
+from experiments.record import (
+    CodeState,
+    DataIdentity,
+    ExecutionConfig,
+    NotApplicable,
+    RunRecord,
+)
 
 
 def _code_state() -> CodeState:
