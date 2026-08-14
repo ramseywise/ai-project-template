@@ -413,6 +413,39 @@ def test_ties_break_toward_the_lower_threshold():
     assert result.n_flagged == 3
 
 
+def test_threshold_marks_itself_in_sample_by_default(imbalanced_predictions):
+    """The threshold is fitted to the rows it is then scored on, so precision and
+    recall are optimistic. The result has to say so — a caller should not have to
+    know to add the caveat, which is exactly what went unsaid before."""
+    y_true, y_prob = imbalanced_predictions
+    result = choose_threshold(y_true, y_prob, cost_fp=1.0, cost_fn=6.0)
+
+    assert result.in_sample is True
+    assert result.selection_caveat is not None
+    assert "optimistic" in result.selection_caveat
+
+
+def test_an_out_of_sample_threshold_carries_no_caveat(imbalanced_predictions):
+    """When the caller has genuinely held rows out, the numbers are honest and
+    the caveat would be wrong."""
+    y_true, y_prob = imbalanced_predictions
+    result = choose_threshold(y_true, y_prob, cost_fp=1.0, cost_fn=6.0, in_sample=False)
+
+    assert result.in_sample is False
+    assert result.selection_caveat is None
+
+
+def test_the_in_sample_flag_does_not_change_the_chosen_threshold(imbalanced_predictions):
+    """The flag is a statement about provenance, not an input to the arithmetic —
+    it must not move the optimum."""
+    y_true, y_prob = imbalanced_predictions
+    marked = choose_threshold(y_true, y_prob, cost_fp=1.0, cost_fn=6.0, in_sample=True)
+    unmarked = choose_threshold(y_true, y_prob, cost_fp=1.0, cost_fn=6.0, in_sample=False)
+
+    assert marked.threshold == unmarked.threshold
+    assert marked.expected_cost == unmarked.expected_cost
+
+
 def test_zero_cost_raises():
     """A free error class degenerates the optimum to flag-everything or
     flag-nothing — a result that looks like a decision but is an input artefact.

@@ -1076,9 +1076,9 @@ include_core_etl:
   default: "{{ scaffold_full_project and (not is_ml_shaped or has_corpus_pipeline) }}"
   when: false
 
-# The agentic lifecycle docs (LIFECYCLE/DELIVERY/DEPLOYMENT/RELEASE) are
-# written around gates that read eval evidence over agent behaviour — none of
-# which an ml_model render produces. DESIGN.md and CLAUDE.md
+# The agentic lifecycle docs (LIFECYCLE/DELIVERY/DEPLOYMENT/RELEASE + SANYI) are
+# written around gates that read eval evidence and a change contract over agent
+# behaviour — none of which an ml_model render produces. DESIGN.md and CLAUDE.md
 # are NOT in this set: both are shape-neutral project docs every render keeps.
 include_lifecycle_docs:
   type: bool
@@ -1496,6 +1496,68 @@ _tasks:
   # other optional full-project-tier content — removed from staging (not the
   # final path) if not requested, same reasoning as the lg_agent cleanup above.
   - "{{ 'true' if (not scaffold_full_project) or include_ml else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ml_source_root ~ ' ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/unit/ml' }}"
+  # ─── ml_model shape (is_ml_shaped) — remove the agentic scaffold ────────
+  # These five tasks are what make ml_model a PROJECT TYPE rather than a
+  # feature flag. Everything above adds capability to an agentic scaffold; an
+  # ML project's payload is ml/ + nbks/ + tests/unit/ml, and the agentic tree
+  # is not a smaller version of that — it is a different project. Each removal
+  # is guarded by its own include_* flag (not a bare is_ml_shaped), so any one
+  # of them can be restored on an ml_model render with -d.
+  #
+  # agents/ — the whole package, not just the chat-agent subtree. The
+  # primary_chat_agent/rag_agent tasks above already remove the individual agent
+  # dirs (ml_model derives primary_chat_agent=none), but they leave agents/
+  # itself holding __init__.py + README.md. tests/unit/agents goes with it —
+  # the lg_agent task only removes that dir when lg_agent was the chosen
+  # framework, so on a `none` render it survives, importing a package that is
+  # about to be deleted.
+  - >-
+    {{ 'true' if not is_ml_shaped else 'rm -rf '
+    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/agents '
+    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/unit/agents '
+    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/smoke' }}
+  # evals/ — the eval root and its data/tests. The interaction-eval and corpus
+  # tasks above already strip most of the tree for a non-agentic shape (ml_model
+  # has has_gradeable_interactions=false and has_corpus_pipeline=false), but the
+  # root itself, targets.yaml, generation/, and the reports/ scaffolding survive
+  # those. An ML project measures models through ml/evaluation/ + the run
+  # registry instead.
+  - >-
+    {{ 'true' if include_eval_suite or (not scaffold_full_project) else 'rm -rf '
+    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ eval_root ~ ' '
+    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/unit/' ~ eval_root ~ ' '
+    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/data/' ~ eval_root }}
+  # core/ — the ETL home. The corpus task above removes core/pipelines/corpus
+  # for any non-retrieval shape; this removes the remaining shell (core/__init__.py
+  # + core/pipelines/) for the ML shape, which does its data work in
+  # ml/transform + ml/feature_engineering against a tabular frame.
+  - >-
+    {{ 'true' if include_core_etl or (not scaffold_full_project) else 'rm -rf '
+    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/core '
+    ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/unit/core' }}
+  # llm_kit/ — the standalone LLM starter kit. NOT staged under _scaffold/: it
+  # sits at template root and renders straight to the destination (it predates
+  # the staging convention and had no gate at all), so this rm targets the final
+  # path, not a staging path — the one cleanup in this block that does.
+  - "{{ 'true' if include_llm_kit else 'rm -rf ' ~ _copier_conf.dst_path ~ '/llm_kit' }}"
+  # Agentic lifecycle docs. Also rendered at the destination root rather than
+  # under _scaffold/ (same class as llm_kit above). DESIGN.md/CLAUDE.md/README.md
+  # are deliberately absent: those are shape-neutral and every render keeps them.
+  - >-
+    {{ 'true' if include_lifecycle_docs or (not scaffold_full_project) else 'rm -f '
+    ~ _copier_conf.dst_path ~ '/LIFECYCLE.md '
+    ~ _copier_conf.dst_path ~ '/DELIVERY.md '
+    ~ _copier_conf.dst_path ~ '/DEPLOYMENT.md '
+    ~ _copier_conf.dst_path ~ '/RELEASE.md' }}
+  # The ML EDA notebook is the ML shape's counterpart to corpus_analysis.py —
+  # removed as a FILE for any non-ML shape, same as the corpus task removes the
+  # corpus notebook for a non-retrieval shape. Between the two, nbks/ holds
+  # exactly the notebooks the render's shape justifies.
+  - "{{ 'true' if is_ml_shaped or (not scaffold_full_project) else 'rm -f ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/nbks/01_eda.py' }}"
+  # nbks/ — removed only when NEITHER reason to have notebooks applies. The two
+  # tasks above remove the notebook FILES; this removes the now-empty directory
+  # for a shape with no notebooks at all.
+  - "{{ 'true' if include_notebooks or (not scaffold_full_project) else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/nbks' }}"
   # experiments/ (run registry) is staged the same way — removed from staging
   # when not requested, same reasoning as ml/ above. NOT gated on include_ml:
   # this root is shared with AI evals, not ML-only.
