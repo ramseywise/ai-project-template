@@ -32,7 +32,9 @@ pd.set_option("display.max_columns", 200)
 
 # %%
 frame, is_real = load_frame()
-print(f"{'real' if is_real else 'synthetic'} frame: {frame.shape[0]:,} rows x {frame.shape[1]} cols")
+print(
+    f"{'real' if is_real else 'synthetic'} frame: {frame.shape[0]:,} rows x {frame.shape[1]} cols"
+)
 frame.head()
 
 # %% [markdown]

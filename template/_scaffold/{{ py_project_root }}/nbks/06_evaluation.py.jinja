@@ -86,9 +86,7 @@ for train_idx, test_idx in split_plan.split(x, y, groups=x[GROUP_COL]):
         pipeline = make_pipeline(clone(preprocessor), clone(estimator))
         pipeline.fit(x_train, y_train)
         probabilities = pipeline.predict_proba(x_test)[:, 1]
-        metrics = classification_metrics(
-            y_test.to_numpy(), pipeline.predict(x_test), probabilities
-        )
+        metrics = classification_metrics(y_test.to_numpy(), pipeline.predict(x_test), probabilities)
         per_fold[name].append(metrics.average_precision or float("nan"))
 
 spread = pd.DataFrame(per_fold).T
@@ -128,8 +126,10 @@ if len(ranked) >= 2:
     print(differences.round(4).to_string())
     print(f"\nmean difference: {differences.mean():.4f}")
     print(f"all folds favour {best_name}: {bool((differences > 0).all())}")
-    print(f"exceeds tolerance band ({settings.baseline_tolerance}): "
-          f"{bool(abs(differences.mean()) > settings.baseline_tolerance)}")
+    print(
+        f"exceeds tolerance band ({settings.baseline_tolerance}): "
+        f"{bool(abs(differences.mean()) > settings.baseline_tolerance)}"
+    )
 
 # %% [markdown]
 # ## PR and ROC curves

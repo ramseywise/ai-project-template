@@ -113,7 +113,9 @@ if numeric_features:
     )
     for axis, column in zip(axes[0], numeric_features, strict=False):
         for label, group in frame.groupby(TARGET):
-            axis.hist(group[column].dropna(), bins=30, alpha=0.55, density=True, label=f"{TARGET}={label}")
+            axis.hist(
+                group[column].dropna(), bins=30, alpha=0.55, density=True, label=f"{TARGET}={label}"
+            )
         axis.set_title(column)
         axis.legend(fontsize=7)
     fig.tight_layout()

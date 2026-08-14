@@ -60,7 +60,8 @@ def sample_frame(n: int = 1200, seed: int = SEED) -> pd.DataFrame:
             "utilisation": utilisation,
             "region": region,
             "tier": pd.Categorical(tier, categories=["bronze", "silver", "gold"], ordered=True),
-            "opened_at": pd.to_datetime("2024-01-01") + pd.to_timedelta(rng.integers(0, 730, n), "D"),
+            "opened_at": pd.to_datetime("2024-01-01")
+            + pd.to_timedelta(rng.integers(0, 730, n), "D"),
             TARGET: target,
         }
     )
