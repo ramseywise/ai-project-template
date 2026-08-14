@@ -276,3 +276,51 @@ class TestNoGalactusImport:
             assert mod.__file__ is not None
             with open(mod.__file__) as f:
                 assert "galactus" not in f.read()
+
+
+@pytest.mark.asyncio
+async def test_shared_provider_attributes_only_its_own_calls_to_each_case() -> None:
+    """`run_all(provider=...)` is documented, but every test above hands each
+    case its own provider — so a cumulative `provider.calls` read looked correct.
+
+    On the shared path the counter never resets, so case N would report every
+    call made since the run began: per-case counts climb 1, 2, 3 and the total
+    grows quadratically while the run is behaving perfectly.
+    """
+
+    class CountingProvider:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def complete_structured(self, _prompt: str, _schema: Any) -> dict[str, str]:
+            self.calls += 1
+            return {"level": "INFO", "message": "ok"}
+
+    shared = CountingProvider()
+
+    async def produce_one_call(
+        case: LogCase, contract: LogLineContract, provider: Any
+    ) -> ProducerOutcome:
+        output = await provider.complete_structured(case.prompt, None)
+        return ProducerOutcome(
+            output=output,
+            first_pass_valid=True,
+            repair_attempts=0,
+            used_fallback=False,
+            grounding_texts=[],
+        )
+
+    results = await run_all(
+        CASES,
+        contract_for=_contract_for,
+        produce=produce_one_call,
+        validate=_validate,
+        is_grounded=is_grounded,
+        provider=shared,
+    )
+
+    assert shared.calls == len(CASES), "fixture must make exactly one call per case"
+    assert [r.llm_calls for r in results] == [1] * len(CASES), (
+        "each case must report only the calls it made, not the run's running total"
+    )
+    assert sum(r.llm_calls for r in results) == shared.calls

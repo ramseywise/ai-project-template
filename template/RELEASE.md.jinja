@@ -82,13 +82,11 @@ to deployment.
 | `/code-review` · `/review-pr` | reviewed changes per PR |
 | `/add-capability` | a deferred capability, when its trigger fires (via copier, never hand-copied) |
 | `/security-review` | the security artifact G2 reads |
-| `/sanyi audit` | the change-contract check G2 reads |
 
 **Gate G2 (delivery exit)** — audited by `/gate-check`; pre-flighted by `/deploy-check`:
 
 - `eval_gate_green` — `make eval-gate` passes against targets (incl. the margin-over-naive-baseline row)
 - `security_review_clean` — `/security-review` clean at the shipping commit
-- `sanyi_audit_clean` — `/sanyi audit` passes the change contract
 - `deployment_target_resolved` — DESIGN.md deployment decision no longer Open/Deferred
 - `runbook_monitoring_documented` — `DEPLOYMENT.md` runbook + operator model filled
 
@@ -146,6 +144,6 @@ the gates can be trusted.
   or run Design and Delivery as one push and defer Deployment. The framework is
   the sequence of gates, not a mandate to do all three at once.
 - **Layered onto an existing repo?** Some checks audit template-owned artifacts
-  (evals, sanyi, CI). Where the project never adopted that machinery,
+  (evals, CI). Where the project never adopted that machinery,
   `/gate-check` marks the check inapplicable rather than blocking the gate — the
   gate must not fail on machinery that was never there.

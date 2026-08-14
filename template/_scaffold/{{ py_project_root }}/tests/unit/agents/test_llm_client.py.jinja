@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from agents.{{ lg_agent_dir }}.clients import llm as llm_module
+from agents.{{ lg_agent_dir }}.model import gateway as llm_module
 from agents.{{ lg_agent_dir }}.settings import settings
 
 
@@ -133,7 +133,7 @@ def test_rag_agent_generate_sends_no_sampling_params(
     lg_agent alone. CI's rag_agent leg is where this one actually executes.
     """
     rag_llm = pytest.importorskip(
-        "agents.rag_agent.clients.llm", reason="rag_agent not rendered in this config"
+        "agents.rag_agent.model.gateway", reason="rag_agent not rendered in this config"
     )
 
     sink: dict = {}

@@ -96,10 +96,10 @@ rag-chat:
 {% if primary_chat_agent in ["adk_agent", "both"] -%}
 # --- Chat agent ({{ py_project_root }}/{{ ai_source_root }}/agents/{{ adk_agent_dir }}, Google ADK) — MCP via McpToolset ---
 {{ adk }}-up:
-	$(UVICORN) agents.{{ adk_agent_dir }}.gateway.main:app --port $${ADK_PORT:-8000} --reload &
+	$(UVICORN) agents.{{ adk_agent_dir }}.api.main:app --port $${ADK_PORT:-8000} --reload &
 
 {{ adk }}-down:
-	pkill -f "uvicorn agents.{{ adk_agent_dir }}.gateway.main:app" 2>/dev/null || true
+	pkill -f "uvicorn agents.{{ adk_agent_dir }}.api.main:app" 2>/dev/null || true
 
 {{ adk }}-wait:
 	@for i in $$(seq 1 30); do \

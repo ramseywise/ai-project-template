@@ -36,16 +36,6 @@ export default tseslint.config(
     },
   },
   {
-    // .cjs config files (jest.config.cjs) are CommonJS regardless of the
-    // package.json "type": "module" setting — tell eslint so `module`/`require`
-    // are recognized as valid globals instead of flagged as undefined.
-    files: ["**/*.cjs"],
-    languageOptions: {
-      sourceType: "commonjs",
-      globals: { module: "writable", require: "readonly" },
-    },
-  },
-  {
     // Build/CI scripts are plain Node ESM, not TypeScript — the TS configs
     // above bring no environment with them, so Node's own globals have to be
     // declared or every `console`/`process` use is a no-undef error.

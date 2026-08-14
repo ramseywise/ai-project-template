@@ -4,7 +4,7 @@
 which is what the caller receives. Non-streaming, so layer 3 is the simple
 case here: the whole answer exists before anything is returned. (The
 TypeScript twin streams, and pays for that with a carry-window transform —
-see security/guards.ts's AIT-50 decision block.)
+see guardrails/guards.py's AIT-50 decision block.)
 
 Tool results are filtered by layer 2 at `retrieve_node` for retrieval and here
 for MCP tool output, before either re-enters the prompt.
@@ -18,11 +18,11 @@ from typing import Any
 from langchain_core.tools import BaseTool
 
 from context_budget.context_budget import compact_history, should_compact, track_usage
+from guardrails.guards import check_output, filter_content
 from observability.spans import chat_span, execute_tool_span, record_finish_reason
-from security.guards import check_output, filter_content
 
-from ..clients.llm import agenerate, get_client
-from ..clients.mcp import get_mcp_tools
+from ..model.gateway import agenerate, get_client
+from ..model.mcp import get_mcp_tools
 from ..settings import settings
 from ..stall_detector import StallDetectedError, StallDetector
 from ..state import State

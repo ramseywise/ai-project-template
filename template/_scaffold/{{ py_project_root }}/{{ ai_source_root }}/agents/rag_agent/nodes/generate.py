@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from agents.rag_agent.clients.llm import generate
+from agents.rag_agent.model.gateway import generate
 from agents.rag_agent.state import State
 
 _SYSTEM_PROMPT = """You are a support assistant answering questions using ONLY the \

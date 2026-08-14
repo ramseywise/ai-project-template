@@ -29,12 +29,21 @@ const SRC = join(ROOT, "src");
 
 // Process entry points: reached by the runtime or a package.json script, not
 // by an import. Anything listed here is exempt from needing an importer.
-const ENTRY_POINTS = ["src/index.ts", "src/agent/eval/run.ts"];
+const ENTRY_POINTS = ["src/index.ts", "src/evals/run.ts"];
 
 // Files whose imports count as "someone uses this". Tests count deliberately:
 // a module exercised only by a test is wired enough to have been type-checked
 // and run at least once, which is the bar this guard enforces.
-const SCAN_DIRS = ["src", "tests"];
+//
+// Since AIT-70 tests are colocated (src/<layer>/__tests__/) rather than in a
+// sibling tests/ tree, so scanning src/ alone already picks them up as
+// importers. They must NOT also be judged as subjects: a test file is imported
+// by nothing by definition — the runner discovers it by glob — so treating one
+// as a subject reports every test as an orphan.
+const SCAN_DIRS = ["src"];
+
+/** True for a test file: an importer of record, never a subject. */
+const isTest = (file) => file.includes("/__tests__/") || file.endsWith(".test.ts");
 
 function walk(dir) {
   if (!existsSync(dir)) {
@@ -83,7 +92,8 @@ for (const file of allFiles) {
 }
 
 const exempt = new Set(ENTRY_POINTS.map((p) => join(ROOT, p)));
-const orphans = walk(SRC)
+const subjects = walk(SRC).filter((f) => !isTest(f));
+const orphans = subjects
   .filter((f) => !imported.has(f) && !exempt.has(f))
   .map((f) => relative(ROOT, f))
   .sort();
@@ -107,4 +117,4 @@ if (orphans.length > 0) {
   process.exit(1);
 }
 
-console.error(`OK: all ${walk(SRC).length} modules under src/ have an importer.`);
+console.error(`OK: all ${subjects.length} modules under src/ have an importer.`);
