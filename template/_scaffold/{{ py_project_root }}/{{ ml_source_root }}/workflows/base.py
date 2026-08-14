@@ -44,6 +44,16 @@ whose metric is tighter or noisier than that should override it at the call site
 and be able to point at what it changed."""
 
 
+class TransformLeakageError(RuntimeError):
+    """Raised when a model fitted a transformer outside its cross-validation
+    pipeline, which inflates every score it reported.
+
+    A distinct type rather than `TypeError`: leakage is a result-validity
+    failure, and a caller that wants to catch it must not have to catch every
+    other type error alongside it.
+    """
+
+
 @dataclass
 class ModelResult:
     """One fitted model and everything measured about it."""
@@ -143,14 +153,14 @@ class RunResult:
         """
         for model in self.models:
             if not isinstance(model.estimator, Pipeline):
-                raise TypeError(
+                raise TransformLeakageError(
                     f"model {model.name!r} is a {type(model.estimator).__name__}, not a "
                     "Pipeline. Preprocessing outside the pipeline is fitted on the whole "
                     "frame, so every cross-validated score it produces is inflated."
                 )
             steps = dict(model.estimator.named_steps)
             if "preprocess" not in steps:
-                raise TypeError(
+                raise TransformLeakageError(
                     f"model {model.name!r} has no 'preprocess' step; its transformer was "
                     "fitted somewhere the CV split cannot reach."
                 )
