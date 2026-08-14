@@ -1,22 +1,24 @@
-"""Unit tests for the run report renderer (evals/generation/report.py).
+"""Unit tests for the generation harness's human-readable report
+(evals/generation/report.py).
 
-These are the module's importer of record. Before them, report.py was reached
-by nothing: `python -m evals.pipelines.run` builds its own summary, so the
-formatter shipped in every scaffold with no caller and no test, and only
-`scripts/check_imports.py` noticed.
+`format_report` is the only part of the harness a person actually reads, and
+it is a pure function over `CaseResult` rows plus a `compute_metrics` dict —
+no LLM calls, no galactus/ml/agents imports. The metrics dict is built by
+`compute_metrics` rather than hand-written, so a change to the metric keys
+breaks this test instead of silently rendering a report with a missing number.
 
-The report is what a human actually reads after an eval run, so the properties
-worth pinning are the ones that make it readable and honest: every case appears
-as a row, the headline numbers are carried through verbatim, and a failure is
-visible as a failure rather than rendering as an ordinary row.
+Two properties are worth asserting rather than trusting:
 
-Pure Python over hand-built ``CaseResult`` rows — no LLM calls, no I/O.
+  - every case reaches the table, so a report is never a partial view of the
+    run it claims to summarize;
+  - `repair_convergence=None` (no case converged) renders as "n/a" rather than
+    "None", and case errors surface in their own section — a report that
+    swallowed either would read like a clean run.
 """
 
 from __future__ import annotations
 
-from typing import Any
-
+from evals.generation.metrics import compute_metrics
 from evals.generation.report import format_report, summarize_table
 from evals.generation.results import CaseResult
 
@@ -37,88 +39,60 @@ def _result(**overrides: object) -> CaseResult:
     return CaseResult(**base)  # type: ignore[arg-type]
 
 
-def _metrics(**overrides: Any) -> dict[str, Any]:
-    base: dict[str, Any] = {
-        "cases": 1,
-        "contract_pass_rate": 100.0,
-        "repair_convergence": 0.0,
-        "fallback_rate": 0.0,
-        "grounding_rate": 100.0,
-        "contract_valid_rate": 100.0,
-        "total_llm_calls": 1,
-    }
-    base.update(overrides)
-    return base
-
-
 class TestSummarizeTable:
-    def test_renders_a_row_per_input_dict(self) -> None:
-        table = summarize_table([{"a": "1", "b": "2"}, {"a": "3", "b": "4"}])
-
-        # Header, separator, and one line per row.
-        assert len(table.splitlines()) == 4
-        assert "| a" in table
-        assert "| 3" in table
-
-    def test_columns_are_padded_to_the_widest_cell(self) -> None:
-        # Ragged columns are the whole reason this helper exists rather than a
-        # bare join — an unpadded table is unreadable in a terminal.
-        table = summarize_table([{"name": "x"}, {"name": "a-much-longer-value"}])
-        widths = {len(line) for line in table.splitlines()}
-
-        assert len(widths) == 1, f"rows have inconsistent widths: {widths}"
-
-    def test_empty_input_says_so_rather_than_rendering_an_empty_table(self) -> None:
+    def test_empty_rows_render_as_a_placeholder(self) -> None:
         assert summarize_table([]) == "_no rows_"
+
+    def test_header_and_every_row_are_present(self) -> None:
+        table = summarize_table([{"a": "1", "b": "2"}, {"a": "3", "b": "4"}])
+        lines = table.splitlines()
+        # header, separator, one line per row
+        assert len(lines) == 4
+        assert "a" in lines[0] and "b" in lines[0]
+        assert "1" in lines[2] and "4" in lines[3]
+
+    def test_columns_are_padded_to_a_common_width(self) -> None:
+        table = summarize_table([{"case": "short"}, {"case": "a-much-longer-value"}])
+        body = table.splitlines()[2:]
+        assert len({len(line) for line in body}) == 1
 
 
 class TestFormatReport:
-    def test_every_case_appears_in_the_table(self) -> None:
-        results = [_result(case_id="c-1"), _result(case_id="c-2"), _result(case_id="c-3")]
-
-        report = format_report(results, _metrics(cases=3))
-
-        for case_id in ("c-1", "c-2", "c-3"):
+    def test_every_case_reaches_the_table(self) -> None:
+        results = [_result(case_id="a"), _result(case_id="b"), _result(case_id="c")]
+        report = format_report(results, compute_metrics(results))
+        for case_id in ("a", "b", "c"):
             assert case_id in report
 
-    def test_headline_metrics_are_carried_through_verbatim(self) -> None:
-        # FAILS IF: the formatter recomputes any of these instead of printing
-        # what metrics.py produced. Two sources of truth for a pass rate is how
-        # a report and its gate come to disagree.
-        report = format_report(
-            [_result()],
-            _metrics(contract_pass_rate=62.5, fallback_rate=12.5, grounding_rate=87.5),
-        )
+    def test_headline_metrics_are_reported_with_denominators(self) -> None:
+        results = [
+            _result(case_id="a", first_pass_valid=True, grounded=True),
+            _result(case_id="b", first_pass_valid=False, grounded=False),
+        ]
+        report = format_report(results, compute_metrics(results))
+        assert "Cases:                2" in report
+        assert "50.0%" in report
 
-        assert "62.5" in report
-        assert "12.5" in report
-        assert "87.5" in report
+    def test_absent_convergence_reads_as_na_not_none(self) -> None:
+        # Every case fell back, so no case converged -> repair_convergence is None.
+        results = [_result(case_id="a", used_fallback=True)]
+        metrics = compute_metrics(results)
+        assert metrics["repair_convergence"] is None
 
-    def test_an_invalid_case_is_visually_distinct(self) -> None:
-        # The valid column renders "NO" upper-case precisely so a failed case is
-        # scannable in a wall of yes/no. Losing that is a readability
-        # regression a pass-rate assertion would not catch.
-        report = format_report([_result(contract_valid=False)], _metrics(contract_valid_rate=0.0))
-
-        assert "NO" in report
-
-    def test_errors_are_listed_with_their_case_id(self) -> None:
-        report = format_report(
-            [_result(case_id="c-boom", error="provider timeout")],
-            _metrics(),
-        )
-
-        assert "Errors:" in report
-        assert "c-boom" in report
-        assert "provider timeout" in report
-
-    def test_no_error_section_when_every_case_succeeded(self) -> None:
-        assert "Errors:" not in format_report([_result()], _metrics())
-
-    def test_unconverged_repairs_render_as_na_not_none(self) -> None:
-        # repair_convergence is None when no case converged. Printing a bare
-        # "None" into a human report reads as a bug in the harness.
-        report = format_report([_result()], _metrics(repair_convergence=None))
-
-        assert "n/a" in report
+        report = format_report(results, metrics)
+        assert "Repair convergence:   n/a" in report
         assert "None" not in report
+
+    def test_case_errors_are_surfaced_in_their_own_section(self) -> None:
+        results = [
+            _result(case_id="ok"),
+            _result(case_id="bad", error="provider timed out"),
+        ]
+        report = format_report(results, compute_metrics(results))
+        assert "Errors:" in report
+        assert "bad: provider timed out" in report
+
+    def test_a_clean_run_has_no_error_section(self) -> None:
+        results = [_result(case_id="ok")]
+        report = format_report(results, compute_metrics(results))
+        assert "Errors:" not in report

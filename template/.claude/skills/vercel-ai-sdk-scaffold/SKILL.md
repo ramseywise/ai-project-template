@@ -82,7 +82,7 @@ At least 3 scenarios (missing tool arg, provider timeout, malformed messages arr
 ## Step 3: Scaffold the File Set
 
 Substitute `{AGENT_NAME}` → camelCase/slug, `{OUTPUT_DIR}` →
-`{ts_project_root}/{ts_source_root}/agents/{ts_agent_dir}/` (confirm the exact path from the project
+`{ts_project_root}/{ts_source_root}/agent/` (confirm the exact path from the project
 layout — check `package.json` / `tsconfig.json` for the source root if unclear).
 
 ```
