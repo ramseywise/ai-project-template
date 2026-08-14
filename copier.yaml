@@ -1041,17 +1041,6 @@ include_ml:
   # which is the pre-existing /add-capability path.
   when: false
 
-# The run registry (experiments/) is a top-level shared root, not an
-# ml_source_root subtree — AI evals consume the same record shape (see
-# experiments/record.py), so this does NOT gate on include_ml. Default is
-# "on whenever a full scaffold happens", same posture as eval_root, which
-# has no off-switch of its own either. It is one of the few roots an ml_model
-# render KEEPS: a model comparison is exactly the thing a run registry records.
-include_run_registry:
-  type: bool
-  default: "{{ scaffold_full_project }}"
-  when: false
-
 # llm_kit/ is a standalone LLM-calling starter kit at the repo root. It had no
 # gate at all before ml_model existed — it rendered into every project,
 # including layering-only ones, and nothing in copier.yaml or _tasks referenced
@@ -1082,9 +1071,9 @@ include_core_etl:
   default: "{{ scaffold_full_project and not is_ml_shaped }}"
   when: false
 
-# The agentic lifecycle docs (LIFECYCLE/DELIVERY/DEPLOYMENT/RELEASE + SANYI) are
-# written around gates that read eval evidence and a change contract over agent
-# behaviour — none of which an ml_model render produces. DESIGN.md and CLAUDE.md
+# The agentic lifecycle docs (LIFECYCLE/DELIVERY/DEPLOYMENT/RELEASE) are
+# written around gates that read eval evidence over agent behaviour — none of
+# which an ml_model render produces. DESIGN.md and CLAUDE.md
 # are NOT in this set: both are shape-neutral project docs every render keeps.
 include_lifecycle_docs:
   type: bool
@@ -1107,7 +1096,8 @@ include_notebooks:
 # ml_source_root subtree — AI evals consume the same record shape (see
 # experiments/record.py), so this does NOT gate on include_ml. Default is
 # "on whenever a full scaffold happens", same posture as eval_root, which
-# has no off-switch of its own either.
+# has no off-switch of its own either. It is one of the few roots an ml_model
+# render KEEPS: a model comparison is exactly the thing a run registry records.
 # It IS gated on the backend language: experiments/ is a Python tree, and the
 # _tasks copy step already refuses to stage it for a TS-only backend. Without
 # the same guard here the flag stays true for that scaffold and pulls in a
@@ -1611,12 +1601,6 @@ _tasks:
     ~ _copier_conf.dst_path ~ '/_scaffold/.env.example '
     ~ _copier_conf.dst_path ~ '/_scaffold/project_init.sh '
     ~ _copier_conf.dst_path ~ '/') if scaffold_full_project else 'true' }}
-  # SANYI.md is promoted separately, not in the unconditional mv above: the
-  # lifecycle-docs cleanup removes it from staging for the ml_model shape, and
-  # `mv` fails the WHOLE task (taking pyproject.toml/Makefile with it) the moment
-  # one listed source is missing. Same reasoning as the railway.toml/promptfoo
-  # bare-file moves further down.
-  - "{{ ('mv ' ~ _copier_conf.dst_path ~ '/_scaffold/SANYI.md ' ~ _copier_conf.dst_path ~ '/') if (scaffold_full_project and include_lifecycle_docs) else 'true' }}"
   # README.md is the project's own doc — never clobber an existing one on
   # re-render (copier --skip semantics don't reach post-task mv).
   - >-
