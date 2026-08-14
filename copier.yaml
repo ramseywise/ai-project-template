@@ -1057,18 +1057,23 @@ include_llm_kit:
 # goes. Its own toggle rather than a bare is_ml_shaped reference in _tasks: the
 # eval tree is also what a future non-agentic-but-graded shape would want to keep,
 # and `-d include_eval_suite=true` restores it on an ml_model render.
+# `or has_corpus_pipeline`: an ml_model render that opts into rag_agent keeps the
+# retrieval golden-QA eval staged (evals/pipelines/run.py, graders/citation.py,
+# metrics/retrieval.py) — without this clause it is staged and then silently
+# discarded with _scaffold/.
 include_eval_suite:
   type: bool
-  default: "{{ scaffold_full_project and not is_ml_shaped }}"
+  default: "{{ scaffold_full_project and (not is_ml_shaped or has_corpus_pipeline) }}"
   when: false
 
 # core/ is the general ETL home for the corpus/document pipeline that feeds
 # retrieval. An ML project's data work lives in ml/transform + ml/feature_engineering
 # against a tabular frame, so core/ ships nothing it uses. Same override posture
-# as include_eval_suite above.
+# as include_eval_suite above — including the has_corpus_pipeline clause: with
+# rag_agent opted in, core/pipelines/corpus/ is exactly what core/ is for.
 include_core_etl:
   type: bool
-  default: "{{ scaffold_full_project and not is_ml_shaped }}"
+  default: "{{ scaffold_full_project and (not is_ml_shaped or has_corpus_pipeline) }}"
   when: false
 
 # The agentic lifecycle docs (LIFECYCLE/DELIVERY/DEPLOYMENT/RELEASE + SANYI) are
@@ -1711,12 +1716,18 @@ _tasks:
   # tree beside its TS root; re-parenting both to backend/ turned that latent
   # bug into a visible collision. Gated here to mirror the TS merge's own
   # primary_backend_language condition.
-  # `not is_ml_shaped` guard: the ml_model cleanup removes the whole staged AI
-  # source tree, and this task's `mkdir -p` runs before the `cp -R`, so without
-  # the guard an ML render ends up with an empty backend/src/ — a directory the
-  # project has no use for, created by the very task that had nothing to copy
-  # into it.
-  - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/' ~ py_project_root ~ '/' ~ ai_source_root ~ ' && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/. ' ~ _copier_conf.dst_path ~ '/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/') if (scaffold_full_project and not is_ml_shaped and py_project_root != '' and primary_backend_language in ['python', 'both']) else 'true' }}"
+  # `not is_ml_shaped` guard: the ml_model cleanups strip the staged AI source
+  # tree down to nothing, and this task's `mkdir -p` runs before the `cp -R`, so
+  # without the guard an ML render ends up with an empty backend/src/ — a
+  # directory the project has no use for, created by the very task that had
+  # nothing to copy into it.
+  # `or include_rag_agent`: the ML shape can opt into rag_agent (tier-3
+  # capability, `copier update -d include_rag_agent=true`), and the rag_agent
+  # cleanup above keeps the tree staged when it does. Without this clause the
+  # tree is staged and then silently discarded with _scaffold/ — the guard's
+  # empty-directory rationale doesn't apply, because include_rag_agent=true
+  # makes the tree non-empty by construction.
+  - "{{ ('mkdir -p ' ~ _copier_conf.dst_path ~ '/' ~ py_project_root ~ '/' ~ ai_source_root ~ ' && cp -R ' ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/. ' ~ _copier_conf.dst_path ~ '/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/') if (scaffold_full_project and (not is_ml_shaped or include_rag_agent) and py_project_root != '' and primary_backend_language in ['python', 'both']) else 'true' }}"
   # Separate merge (not part of the block above) — the ml/ cleanup task above
   # rm -rf's the whole staged ml directory when include_ml is false, so it may
   # not exist at all; folding it in would make the copy fail on a missing
