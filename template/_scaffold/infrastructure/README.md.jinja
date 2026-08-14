@@ -5,7 +5,7 @@ deploy story is versioned from day one instead of bolted on later.
 
 - `containers/` — Dockerfiles + compose for the long-running services
   (see `containers/README.md`).
-{%- if cloud != 'none' %}
+{%- if cloud == 'aws' %}
 - `terraform/` — IaC skeleton, including the data-classification resource
   tag derived from `data_sensitivity` (see `terraform/README.md`).
 {%- endif %}

@@ -233,7 +233,8 @@ deployment_target:
   help: >-
     Expected deployment. Recorded in DESIGN.md's key decisions; Dockerfiles
     (infrastructure/containers/) ship with every full scaffold, and the
-    terraform/ skeleton ships when a cloud is selected (cloud != none).
+    terraform/ skeleton ships only when cloud == aws (the skeleton is AWS-only:
+    ECS Fargate + ALB; selecting gcp would render the wrong provider's IaC).
     docker/cloud additionally scaffold .github/workflows/cd.yml
     (build-and-push to GHCR) when the lg_agent image exists to build —
     local/serverless get no CD workflow (serverless deploys via the
@@ -1414,10 +1415,11 @@ _tasks:
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ eval_root ~ '/metrics/retrieval.py '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/' ~ ai_source_root ~ '/agents/' ~ lg_agent_dir ~ '/nodes/retrieve.py '
     ~ _copier_conf.dst_path ~ '/_scaffold/' ~ py_project_root ~ '/tests/unit/agents/test_retrieve.py' }}
-  # terraform/ is an AWS IaC skeleton (and carries the VECTORDB_PATH plumbing) —
-  # dead weight for a project with no cloud target. containers/ still ships
-  # (Dockerfiles/compose are useful at cloud=none).
-  - "{{ 'true' if (not scaffold_full_project) or cloud != 'none' else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/infrastructure/terraform' }}"
+  # terraform/ is an AWS-only IaC skeleton (ECS Fargate + ALB, provider "aws") —
+  # sending it to a GCP project would ship the wrong cloud's IaC, which is worse
+  # than shipping none. containers/ still ships regardless (Dockerfiles/compose
+  # are useful at every cloud target, including none).
+  - "{{ 'true' if (not scaffold_full_project) or cloud == 'aws' else 'rm -rf ' ~ _copier_conf.dst_path ~ '/_scaffold/infrastructure/terraform' }}"
   # Interaction-eval metrics: per-metric modules (heuristic + judge + metrics
   # aggregator) are independently removable, same pattern as integrations/
   # sub-modules above — staged under _scaffold/<eval_root>, removed from
