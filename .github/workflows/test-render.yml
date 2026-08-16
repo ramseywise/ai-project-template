@@ -178,6 +178,9 @@ jobs:
       # The f-string pattern is scripted.py's literal {{field}} placeholder
       # emitted by an f-string ('{{{{' collapses to '{{' at runtime) — real code,
       # not unrendered copier.
+      # experiments/io.py's {{"..."}} pairs are f-string brace escaping in an error
+      # message (each '{{' collapses to a literal '{' at runtime) — real code, not
+      # unrendered copier, same as the scripted.py pattern above.
       # {{prompt}}/{{question}} are promptfoo's own runtime template syntax, not
       # unrendered copier Jinja — filtered by pattern (not by excluding the whole
       # file, which also carries real copier substitutions worth checking).
@@ -194,7 +197,7 @@ jobs:
         env:
           ACTIONS_EXPR: '[$]{{'
         run: |
-          if grep -rn '{{' out/ --exclude-dir='.agents' --exclude-dir='skills' --exclude-dir='references' --include='*.py' --include='*.md' --include='*.toml' --include='*.yaml' --include='*.yml' | grep -v "font-family\|border-collapse\|padding: 0.4rem\|background: #f2f2f2\|margin-bottom\|font-weight: bold\|{{prompt}}\|{{question}}\|{{ }}\|return f\"{{{{{field_spec.name}}}}}\"$\|$ACTIONS_EXPR"; then
+          if grep -rn '{{' out/ --exclude-dir='.agents' --exclude-dir='skills' --exclude-dir='references' --include='*.py' --include='*.md' --include='*.toml' --include='*.yaml' --include='*.yml' | grep -v "font-family\|border-collapse\|padding: 0.4rem\|background: #f2f2f2\|margin-bottom\|font-weight: bold\|{{prompt}}\|{{question}}\|{{ }}\|return f\"{{{{{field_spec.name}}}}}\"$\|{{\"{_NOT_APPLICABLE_KEY}\": {{\"reason\"\|$ACTIONS_EXPR"; then
             echo "Leftover unrendered Jinja found"
             exit 1
           fi
