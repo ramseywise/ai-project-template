@@ -26,3 +26,23 @@ force-exclude = true
 select = ["E", "W", "F", "I", "N", "UP", "B", "C4", "SIM", "RUF"]
 # RUF001-003: typographic unicode in prose; N803/N806: ML naming (X, y, X_train)
 ignore = ["E501", "RUF001", "RUF002", "RUF003", "N803", "N806"]
+
+[lint.isort]
+# Mirror of pyproject.toml.jinja's known-first-party, with the templated roots
+# resolved to their copier defaults (ml_source_root=ml, run_registry_root=
+# experiments, eval_root=evals). Without this pin, ruff at the repo root
+# classifies scaffold packages as third-party (their directories carry Jinja
+# names it cannot resolve) and I001 demands an import order that the rendered
+# project's own lint would then reject.
+known-first-party = [
+    "agents",
+    "context_budget",
+    "core",
+    "evals",
+    "experiments",
+    "guardrails",
+    "integrations",
+    "middleware",
+    "ml",
+    "observability",
+]
