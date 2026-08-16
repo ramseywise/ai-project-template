@@ -35,7 +35,7 @@ from sklearn.model_selection import cross_val_predict
 from ml.evaluation.calibration import assess_calibration, calibrate_classifier, recommend_method
 from ml.evaluation.metrics import classification_metrics, pr_curve, roc_curve_points
 from ml.evaluation.splitting import RANDOM_STATE, SplitPlan, make_splitter, split_columns
-from ml.evaluation.threshold import choose_threshold
+from ml.evaluation.threshold import choose_threshold_out_of_fold
 from ml.sampling.resample import build_sampler
 from ml.selection.registry import get_models, get_spec
 from ml.transform.columns import infer_column_types
@@ -243,17 +243,19 @@ def _fit_one(
             )
 
         if cost_fp is not None and cost_fn is not None:
-            # `y_prob` is out-of-fold, so the probabilities are honest — but the
-            # threshold is still chosen by minimising cost over these same rows
-            # and then scored at that point. The selection is in-sample even
-            # though the predictions are not, so the result says so.
-            threshold = choose_threshold(
+            # `y_prob` is out-of-fold, and the threshold selection is too: each
+            # fold's operating point is chosen on the other folds' rows and
+            # scored on its own, so precision/recall/expected_cost describe
+            # rows the sweep never saw. The returned threshold itself is the
+            # deployable full-data choice; `fold_thresholds` shows its
+            # stability across folds.
+            threshold = choose_threshold_out_of_fold(
                 y,
                 y_prob,
+                cv,
                 cost_fp=cost_fp,
                 cost_fn=cost_fn,
                 positive_label=positive_label,
-                in_sample=True,
             )
 
     # Fit on the full frame last: the metrics above are out-of-fold, and the
