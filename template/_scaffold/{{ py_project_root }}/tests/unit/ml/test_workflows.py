@@ -187,6 +187,12 @@ def test_costs_produce_a_threshold_and_their_absence_does_not(cancer_frame):
     assert chosen is not None
     assert 0.0 <= chosen.threshold <= 1.0
     assert chosen.expected_cost <= chosen.cost_at_default
+    # The operating point is selected out-of-fold: each fold's threshold is
+    # chosen on the other folds' rows, so the metrics carry no in-sample
+    # optimism and need no caveat.
+    assert chosen.in_sample is False
+    assert chosen.selection_caveat is None
+    assert len(chosen.fold_thresholds) == with_costs.split_plan.n_splits
 
 
 def test_calibration_report_is_attached_when_requested(cancer_frame):
