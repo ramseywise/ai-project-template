@@ -6,9 +6,8 @@ tooling, or by any other agent harness this project ends up using. `.claude/skil
 holds workflow commands scoped to Claude Code; this directory holds durable framework
 knowledge that outlives any one tool.
 
-`.claude/skills/new-agent/SKILL.md` is the entry point most sessions will use — it
-reads `framework-selection` to pick ADK or LangGraph, then hands off to the matching
-scaffold skill below.
+`framework-selection` decides between ADK, LangGraph, and Vercel AI SDK, then hands
+off to the matching scaffold skill below.
 
 ## Quick map
 
@@ -38,7 +37,7 @@ duplicating the knowledge inline in a workflow skill.
 
 ## Claude Code relevance
 
-These are useful reading for Claude even outside of `/new-agent`:
+These are useful reading for Claude in any agent development session:
 
 - `framework-selection` — before choosing which framework to build a new agent on
 - `adk-scaffold` / `adk-dev-guide` — before writing or modifying any ADK agent code

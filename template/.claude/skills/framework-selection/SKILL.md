@@ -1,7 +1,7 @@
 ---
 name: framework-selection
 description: >
-  INVOKE THIS SKILL before scaffolding a new agent (e.g. via /new-agent) or writing
+  INVOKE THIS SKILL before scaffolding a new agent or writing
   agent code from scratch, whenever the framework hasn't already been decided.
   Decides between Google ADK, LangGraph, and a TS-native Vercel AI SDK agent based
   on deployment target, control-flow needs, and runtime (Python vs. TypeScript).

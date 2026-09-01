@@ -7,8 +7,7 @@ allowed-tools: Read Bash Grep Glob Edit Write
 
 ## Target repo
 
-Same convention as the workflow pipeline (workflow-research/plan/execute/review): a
-`repo:<name-or-path>` token in `$ARGUMENTS` targets another workspace repo (bare name
+A `repo:<name-or-path>` token in `$ARGUMENTS` targets another workspace repo (bare name
 resolves to `~/workspace/<name>`); all repo-relative paths and git/test commands resolve
 against it, and artifacts land in the TARGET repo. No token → the cwd's repo; in a
 meta/workspace-root session, ask rather than defaulting.
@@ -39,7 +38,7 @@ Present all changes in a risk-tiered table. Do not edit until user approves.
 
 After each change: "did the user request this improvement?" If no, stop. Do not cascade ("this fix revealed the caller should also change") or gold-plate ("let me also add docstrings").
 
-If the refactor would touch >10 files → suggest the full `/workflow-research` → `/workflow-plan` → `/workflow-execute` pipeline.
+If the refactor would touch >10 files → suggest breaking it into a planned work item with its own issue and branch.
 
 ## Output
 
