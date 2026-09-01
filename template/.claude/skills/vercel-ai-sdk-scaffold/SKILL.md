@@ -5,7 +5,7 @@ description: >
   factory, tool registry, streamText loop, framework-agnostic HTTP handler, and
   eval smoke-test. Use when the user wants to build or extend a TS-native agent
   (e.g. "add a Vercel agent", "build me a TS agent for X", "extend the agent/ tree")
-  or when /new-agent selects the vercel_ai_sdk framework. Requires
+  or when the framework selection skill picks vercel_ai_sdk. Requires
   `has_typescript: true` and `ts_agent_framework: vercel_ai_sdk` in copier.yaml.
 ---
 
@@ -233,7 +233,7 @@ route → handler → agent loop → provider chain is wired.
   prompt can loop until token budget is exhausted.
 - **No RAG wiring here.** If the agent needs retrieval, add it as a `tool()` entry
   that calls the Python RAG backend over HTTP — do not re-implement retrieval in TS.
-  See `cap-rag.md` in `/new-agent`'s references for the Python-side RAG scaffold.
+  See the `langgraph-scaffold` skill for the Python-side RAG scaffold pattern.
 
 ---
 

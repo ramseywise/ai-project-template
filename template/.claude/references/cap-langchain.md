@@ -371,13 +371,8 @@ Add `langchain` to the capability table in SKILL.md:
 | `langchain` | LCEL chains, output parsers, retrieval chain, memory, streaming callbacks |
 ```
 
-And the corresponding spec load in the dispatch logic:
-
-```
-~/.claude/skills/new-agent/specs/cap-langchain.md   # if langchain in capabilities
-```
-
-Spawns **langchain-builder** subagent with this spec.
+The langchain capability reference is this file — read it when the `langchain`
+capability is selected.
 
 **Note on framework interaction:**
 - `--framework langgraph` + `--capabilities langchain` → LCEL chains used *inside* LangGraph nodes (e.g., a node calls `make_answer_chain(llm).invoke(...)`)
