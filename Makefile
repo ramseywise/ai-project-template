@@ -8,11 +8,11 @@ help:  ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-12s %s\n", $$1, $$2}'
 
 lint:  ## Validate template paths, copier config, and Python lint
-	@python3 scripts/validate_paths.py
-	@ruff check scripts/
+	@python3 tools/template/validate_paths.py
+	@ruff check tools/template/
 
 ## Lint the SCAFFOLD by rendering it and running the rendered project's own
-## `make lint-check`. `make lint` above only covers scripts/ — it cannot touch
+## `make lint-check`. `make lint` above only covers tools/template/ — it cannot touch
 ## template/_scaffold/, whose files carry Jinja in both paths and bodies and so
 ## are unparseable by ruff until rendered. Without this target the scaffold's
 ## Python is linted exclusively by test-render.yml's "Lint rendered project"
@@ -75,8 +75,8 @@ lint-render: check_tools
 	echo; echo "lint-render passed"
 
 test:  ## Validate paths + catalog check
-	@python3 scripts/validate_paths.py
-	@python3 scripts/validate_paths.py --catalog-check
+	@python3 tools/template/validate_paths.py
+	@python3 tools/template/validate_paths.py --catalog-check
 
 ## Render the ML matrix entry to a real directory and run its pytest suite.
 ## validate_paths.py's run_render_tests() renders this same combination but only
@@ -139,4 +139,4 @@ project: check_tools
 ## Usage: make preview_defaults project_type=rag external_systems="[slack,github]"
 ##        make preview_defaults ARGS="--all"
 preview_defaults:
-	@python3 scripts/preview_defaults.py $(filter-out $@,$(MAKECMDGOALS)) $(ARGS)
+	@python3 tools/template/preview_defaults.py $(filter-out $@,$(MAKECMDGOALS)) $(ARGS)

@@ -37,7 +37,7 @@ Aliases (thin front doors to the same flow, pre-filling the capability):
 | `/add-rag` | `include_rag_agent=true` | + prompts for `vector_backend` if not already set |
 | `/add-eval-metric <name>` | adds `<name>` to `eval_metrics` | `escalation`/`friction`/`intent`/`language` |
 | `/add-integration <name>` | adds `<name>` to `optional_features` | `composio`/`n8n_webhook`/`web_research`/`marketing`/`meeting_intelligence` |
-| `/new-agent`, `/mcp-builder` | (already exist) | prefer these for their domains; they call copier the same way for scaffolding |
+| `/adk-scaffold`, `/langgraph-scaffold` | (framework skills) | prefer these for agent scaffolding; they handle framework-specific setup |
 
 ## Capability → copier answer
 
@@ -94,7 +94,7 @@ From Step 1's baseline + the request, build the `-d` list:
   `postgres` vs `duckdb`). "I don't know" → take copier's derived default; note
   it in the report.
 - Confirm the derived `-d` list back to the user before running anything — same
-  "don't silently default" discipline as `new-agent` / `project-genesis`.
+  "don't silently default" discipline as `project-genesis`.
 
 ### Step 4 — Run copier update
 
@@ -153,7 +153,7 @@ Report what failed with output; don't call it done on a green render alone.
   request wants logic *in* the MCP server, that's a design smell — surface it.
 - **Don't invent capabilities.** If the request maps to no copier variable, say
   the template can't scaffold it and stop — same reporting discipline as
-  `new-agent` Step 4. The fix is a new template toggle, not a hand-copied file.
+  the framework scaffold skills. The fix is a new template toggle, not a hand-copied file.
 - **Where genesis vs add-capability applies:** genesis = first render (no
   `.copier-answers.yml`); add-capability = every render after. Same engine, two
   front doors.

@@ -11,8 +11,8 @@ tools:
   - Bash
 ---
 
-You are the agent factory for this project. You scaffold production-ready AI agents from
-spec templates stored in `.claude/skills/new-agent/specs/`.
+You are the agent factory for this project. You scaffold production-ready AI agents
+using the framework reference skills in `.agents/skills/` and `.claude/skills/`.
 
 ---
 
@@ -51,25 +51,24 @@ Wait for explicit confirmation or adjustment before writing any files.
 
 ### 2. Load specs
 
-Read **only** the spec files you need — do not load everything:
+Read the framework reference skills relevant to the chosen framework:
 
 ```
-Always load:
-  .claude/skills/new-agent/specs/core.md
-  .claude/skills/new-agent/specs/infra.md
-  .claude/skills/new-agent/specs/test.md
-  .claude/skills/new-agent/specs/eval.md
-  .claude/skills/new-agent/specs/docs.md
-
 Framework (pick one):
-  .claude/skills/new-agent/specs/framework-langgraph.md   # if langgraph
-  .claude/skills/new-agent/specs/framework-adk.md         # if adk
+  .claude/skills/langgraph-scaffold/SKILL.md       # if langgraph
+  .claude/skills/langgraph-fundamentals/SKILL.md   # if langgraph
+  .claude/skills/adk-scaffold/SKILL.md             # if adk
+  .claude/skills/adk-dev-guide/SKILL.md            # if adk
+  .claude/skills/vercel-ai-sdk-scaffold/SKILL.md   # if vercel_ai_sdk
 
-Per capability (only those selected):
-  .claude/skills/new-agent/specs/cap-{capability}.md
+Framework decision (if not yet made):
+  .claude/skills/framework-selection/SKILL.md
+
+Capability references (if .agents/skills/ is present):
+  .agents/skills/                                  # tool-agnostic reference library
 ```
 
-If a spec file doesn't exist, log a warning and skip.
+If a reference file doesn't exist, log a warning and skip.
 
 ### 3. Generate
 
