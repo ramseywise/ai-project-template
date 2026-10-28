@@ -22,7 +22,7 @@ from pathlib import Path
 
 def load_copier_yaml() -> str:
     """Load copier.yaml as raw text (avoid pyyaml dependency)."""
-    path = Path(__file__).parent.parent / "copier.yaml"
+    path = Path(__file__).resolve().parents[2] / "copier.yaml"
     return path.read_text()
 
 

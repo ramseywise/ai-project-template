@@ -208,7 +208,7 @@ isn't in the multiselect — it derives directly from Calendar in `external_syst
 | `mcp_server_name` / `mcp_server_slug` | `<project_slug>` | MCP server naming. `mcp_server_slug` is the seed for `py_mcp_server_slug` / `ts_mcp_server_slug` — the chosen language renders at the real slug, the other gets an `__unchosen_*` suffix that `_tasks` prunes |
 | `expensive_command_patterns` | *(blank)* | Regex for commands that should nudge `--dry-run`; blank disables the hook |
 | `include_agent_reference_library` | `false` | `.agents/skills/` (ADK + LangGraph reference library) + `/new-agent` — opt in for offline/team-portability; canonical home stays this template |
-| `global_skills_source` | `vendored` | Maintainer knob — `vendored` ships the payload in `template/.claude/skills/`, `none` strips it at render. The payload is now maintained by hand: `scripts/sync-global-skills.sh` was retired 2026-08-11 when global stopped being the skill reservoir. |
+| `global_skills_source` | `vendored` | Maintainer knob — `vendored` ships the payload in `template/.claude/skills/`, `none` strips it at render. The payload is now maintained by hand: `tools/template/sync-global-skills.sh` was retired 2026-08-11 when global stopped being the skill reservoir. |
 
 ## Repository layout
 
@@ -224,7 +224,7 @@ template-maintainer material.
 | `template/mcp_servers/` | Python FastMCP server scaffold (`include_mcp_server`); swapped for the TS tree when `mcp_server_language=typescript`. |
 | `template/_scaffold/` | **Staging dir** for the full-project tier. Copier renders it verbatim, then `_tasks` prunes unselected features and `mv`s the survivors to the project root. Never collides with a pre-existing repo — layering-only mode discards it wholesale. |
 | `template/_scaffold/configs/` | Environment config files (dev.yaml, prod.yaml) — rendered into project root by `_tasks`. |
-| `scripts/` | Maintainer utilities (see `scripts/README.md`). |
+| `tools/template/` | Maintainer utilities (see `tools/template/README.md`). |
 | `.claude/docs/` | This repo's own plan/research docs (local-only, git-ignored by policy). |
 | `.github/workflows/test-render.yml` | CI render matrix — leftover-Jinja + ruff checks per config. |
 

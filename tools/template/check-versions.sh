@@ -14,7 +14,7 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 WORKSPACE_ROOT="$(cd "$REPO_ROOT/.." && pwd)"
 MANIFEST="$REPO_ROOT/versions.toml"
 

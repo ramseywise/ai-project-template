@@ -1378,7 +1378,7 @@ _tasks:
   # pipelines/compare.py ships on the unmerged AIT-29-otel-spans branch; when it
   # rebases, AIT-29 must append compare.py to this rm list and gate its
   # eval-compare Makefile target on has_corpus_pipeline (see issue #29). It is
-  # NOT listed here preemptively — scripts/validate_paths.py rejects _tasks
+  # NOT listed here preemptively — tools/template/validate_paths.py rejects _tasks
   # paths with no matching template entry.
   # graders/custom/ goes with run.py: `from evals.graders.custom import all_graders`
   # in run.py is its ONLY importer, so without run.py the custom-grader registry

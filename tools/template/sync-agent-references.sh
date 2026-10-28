@@ -28,7 +28,7 @@ DRY_RUN=0
 # the canonical source for this template's .agents/ library. See the retired
 # scripts/sync-global-skills.sh for the full ownership-model rationale.
 RESERVOIR="$HOME/workspace/guacamayo/.claude/skills/new-agent/references"
-TEMPLATE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/template/.agents"
+TEMPLATE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/template/.agents"
 
 # ---------------------------------------------------------------------------
 # What goes where

@@ -52,7 +52,7 @@ from typing import Any
 # Constants
 # ---------------------------------------------------------------------------
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 TEMPLATE_DIR = REPO_ROOT / "template"
 COPIER_YAML = REPO_ROOT / "copier.yaml"
 

@@ -7,7 +7,7 @@
 # and nothing surfaced the gap until someone tried to move a file between repos.
 #
 # Direction of authority: this file is canon and consumers pull from it.
-# `scripts/check-versions.sh` reads the consumer manifests and reports drift; it
+# `tools/template/check-versions.sh` reads the consumer manifests and reports drift; it
 # never writes to them. Bumping a version here is a deliberate act — run the
 # check, then update each consumer on its own branch with its own test run.
 #
@@ -66,7 +66,7 @@ pydantic = ">=2.9"
 "pydantic-settings" = ">=2.6.0"
 
 # ---------------------------------------------------------------------------
-# Consumers checked by scripts/check-versions.sh
+# Consumers checked by tools/template/check-versions.sh
 # ---------------------------------------------------------------------------
 #
 # Paths are relative to the workspace root (the parent of this repo). A missing
