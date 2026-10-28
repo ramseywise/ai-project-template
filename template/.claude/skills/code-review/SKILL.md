@@ -1,9 +1,8 @@
 ---
 name: code-review
-description: "Standing repo/workspace review — no plan doc required. Leveled: level:1 diff+lint+doc-flags, level:2 (default) +tests+SANYI diff+akira-scan, level:3 +full sanyi audit (single repo only). Pass repo:<name> for one repo, 'sweep' for all dirty workspace repos, 'headless' for non-interactive runs (questions go to a Needs-input section). For plan-fidelity review of a specific work item, use /code-review instead."
+description: "Standing repo/workspace review — no plan doc required. Level 1: diff + lint + doc flags. Levels 2-3 are currently non-functional (the review agents they dispatched were absorbed into guacamayo's review-* dimension family 2026-08-11). Pass repo:<name> for one repo, 'sweep' for all dirty workspace repos, 'headless' for non-interactive runs."
 disable-model-invocation: true
 allowed-tools: Read Grep Glob Bash Write Agent
-skills: [review-shared]
 ---
 
 You are a staff engineer running a standing review. Report-only for code (never fix
@@ -50,32 +49,20 @@ Probe: `make -C <repo> -n lint 2>/dev/null` / `make -C <repo> -n test 2>/dev/nul
 Never install anything. Record pass/fail; test failures don't abort the sweep — they
 lead the report.
 
-### 3. Contract (SANYI) — level ≥2
-If `SANYI.md` exists at the repo root: run the `/sanyi review` protocol on the changed
-set — glob-match changed files against the contract registry, report NEW violations
-only (entries in `## Debt` stay silent). SANYI outputs canonical schema fields alongside
-its native report (see `~/.claude/refs/finding-schema.md`). Merge-impact mapping:
-BY-* → `blocker`, JY-* → `important`, BN-1 → `suggestion`, MG-*/UN-* → `nit`.
-Report-only — never auto-fix a contract violation. Skip silently when no `SANYI.md` exists.
-At **level 3** additionally run the full `/sanyi audit` protocol on the whole repo
-(not just the diff) — this is the expensive step and why level 3 is single-repo.
+### 3. Contract review — level ≥2 (non-functional)
+**Levels 2-3 are currently non-functional.** The contract review (SANYI) and quality scan
+(akira-scan) agents they dispatched were absorbed into guacamayo's `review-*` dimension
+family (2026-08-11). To run a full review, use the review driver in guacamayo or the
+`review-*` dimension skills in the repo that owns the work.
 
-### 4. Quality scan (akira-scan) — level ≥2
-Split the changed set into batches of ~5 files. Spawn the global `akira-scan` agent on
-each batch **in parallel** (pass file paths + one-line repo context; `model: haiku` —
-pinned in the agent def, restate on the Agent call). Agent outputs canonical schema
-with evidence tags (see `~/.claude/refs/finding-schema.md`).
-
-**Merge step:** Apply merge/dedup logic from review-shared — see its "Merge and deduplication" section.
-Drop findings the linter already caught in step 2.
+Skip steps 3-4 and proceed to step 5.
 
 ### 5. Docs
 - Machine-consumed docs (`.claude/`, CLAUDE.md, SANYI.md): if changed code contradicts
   them (renamed commands, moved paths, dead references), FLAG at level 1; PROPOSE a
   diff in the report at level ≥2.
-- Human-consumed docs (README, DESIGN.md, wiki): at level ≥2, run the `/docs-check`
-  protocol (diff mode — scoped to changed dirs). Flag staleness only — never edit
-  (doc-writer boundary). At level 1, skip structural check
+- Human-consumed docs (README, DESIGN.md, wiki): at level ≥2, flag staleness in
+  changed dirs. Never edit (doc-writer boundary). At level 1, skip structural check
   but still flag obviously broken references caught by the `docs_hygiene` hook.
 
 ### 6. Report
@@ -85,19 +72,11 @@ this diff, append there; otherwise write `<repo>/.claude/docs/plans/YYYY-MM-DD-r
 
 ### 6b. Persist findings
 
-After writing the report, append each merged finding as one JSON line to
-`~/workspace/guacamayo/.claude/docs/review-findings.jsonl` (create if missing).
-Use the persistence format from `~/.claude/refs/finding-schema.md`:
+After writing the report, if there are structured findings, append each as one JSON
+line to a `review-findings.jsonl` in the repo's `.claude/docs/` directory (create if
+missing). Fields: `date`, `repo`, `review_type`, `file`, `lines`, `title`, `category`.
 
-- `date`: today's date (YYYY-MM-DD)
-- `repo`: the repo being reviewed
-- `review_type`: "code-review"
-- `session_id`: from environment if available, else omit
-- All other fields from the canonical finding (id, source, file, lines, title,
-  merge_impact, evidence_state, category)
-
-Skip if there are zero findings. Do not persist linter-only pass/fail — only
-structured findings from akira-scan and SANYI.
+Skip if there are zero findings. Do not persist linter-only pass/fail.
 
 ```markdown
 ## Review — sweep [date]
@@ -132,5 +111,4 @@ blocking count · verdict) in the session output — not written to any file.
 - Never commit, push, or fix findings — Ramsey commits; fixes go through normal work.
 - Never edit human-consumed docs.
 - Per-repo failures (missing tooling, broken make) are reported, not worked around.
-- See `/akira` for the question (`wander`) and fix (`dao`) modes — the interactive,
-  actuating sibling that shares this scan.
+- For deeper review, use the `review-*` dimension skills in the repo that owns the work.

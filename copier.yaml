@@ -1311,10 +1311,11 @@ include_agent_reference_library:
   default: false
   when: false
 
-# Maintainer knob: "vendored" copies this template's own snapshot of the
-# shared workflow skills, last synced from the ~/.claude/skills/ reservoir via
-# scripts/sync-global-skills.sh — portable, works for anyone who clones this
-# template. Run that script first, then render, for the latest reservoir state.
+# Maintainer knob: "vendored" ships the code-* skills (code-debug,
+# code-refactor, code-review) into the rendered project. "none" removes them.
+# The design-* pipeline (initiative/product/system/roadmap) always ships —
+# it is template-native, not synced from global.
+# sync-global-skills.sh is retired and must not be run.
 global_skills_source:
   type: str
   choices:
@@ -1329,38 +1330,19 @@ _tasks:
   # guarded/independent: keep everything; permissions differ in settings.json only.
   - "{{ 'true' if agent_config_profile != 'vanilla' else 'rm -rf ' ~ _copier_conf.dst_path ~ '/.claude ' ~ _copier_conf.dst_path ~ '/.agents' }}"
   - "{{ 'true' if include_mcp_server else 'rm -rf ' ~ _copier_conf.dst_path ~ '/mcp_servers' }}"
-  # agent_creator.md is the subagent new-agent dispatches to — it is useless
-  # without the skill and the .agents/ reference library, so it goes with them.
-  - "{{ 'true' if include_agent_reference_library else 'rm -rf ' ~ _copier_conf.dst_path ~ '/.agents ' ~ _copier_conf.dst_path ~ '/.claude/skills/new-agent ' ~ _copier_conf.dst_path ~ '/.claude/agents/agent_creator.md' }}"
-  # The names below MUST match SKILLS[] in scripts/sync-global-skills.sh — that
-  # array decides what gets vendored in, this list decides what gets removed when
-  # global_skills_source=none. They drifted apart once (2026-07-19: all 13 names
-  # here were pre-rename, so 15 renamed skills escaped cleanup and shipped even
-  # with the knob off). new-agent is synced by that script but removed by the
-  # include_agent_reference_library task above, so it is deliberately absent here.
+  # agent_creator.md is the subagent that the .agents/ reference library
+  # dispatches to — useless without it, so it goes with it.
+  - "{{ 'true' if include_agent_reference_library else 'rm -rf ' ~ _copier_conf.dst_path ~ '/.agents ' ~ _copier_conf.dst_path ~ '/.claude/agents/agent_creator.md' }}"
+  # code-* are the only skills gated by global_skills_source. The design-*
+  # pipeline (initiative/product/system/roadmap) is template-native and always
+  # ships. Demoted skills (workflow-*, git-*, docs-check, new-agent, etc.) were
+  # removed from the template 2026-08-27 — they live in the repo that owns
+  # their stage (guacamayo for production, galactus for prototyping).
   - >-
     {{ 'true' if global_skills_source == 'vendored' else 'rm -rf ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/git-commit ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/git-pr ' ~
     _copier_conf.dst_path ~ '/.claude/skills/code-refactor ' ~
     _copier_conf.dst_path ~ '/.claude/skills/code-review ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/code-debug ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/workflow-research ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/workflow-plan ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/workflow-execute ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/workflow-review ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/workflow-insights ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/workflow-refine ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/workflow-retro ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/design-sprint ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/design-initiative ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/design-milestones ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/design-prototype ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/review-shared ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/docs-check ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/github-projects ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/mcp-builder ' ~
-    _copier_conf.dst_path ~ '/.claude/skills/skill-creator' }}
+    _copier_conf.dst_path ~ '/.claude/skills/code-debug' }}
   # dev_companion is .claude-only and guarded on include_* alone (not
   # `(not scaffold_full_project) or ...`): it lives under .claude/, which
   # layering-only mode DOES ship, so the removal must fire there too when the
